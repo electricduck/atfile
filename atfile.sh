@@ -677,27 +677,27 @@ Commands
     upload <file>
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
-        
-    list [<cursor>] [<actor>]
-        List all uploaded files stored on the PDS. Only $_max_list items can be
-        displayed; to paginate, use the last Key for <cursor>
-        
-    get <key> [<actor>]
-        Get full details for an uploaded file
-       
-    get-url <key> [<actor>]
-        Get blob URL for an uploaded file
 
     fetch <key> [<actor>]
         Download an uploaded file
         
-    open <key> [<actor>]
-        Open (don't download) an uploaded file
-        ℹ️  text/* files will print to the shell. Other files will open in a
-           browser (using 'xdg-open'; if installed)
+    cat <key> [<actor>]
+        Print (don't download) an uploaded file to the shell
+        ℹ️  Only text/* files will print to the shell. Other files will open in
+           a browser (using 'xdg-open'; if installed)
+           
+    url <key> [<actor>]
+        Get blob URL for an uploaded file
+        
+    info <key> [<actor>]
+        Get full details for an uploaded file
+        
+    list [<cursor>] [<actor>]
+        List all uploaded files. Only $_max_list items can be displayed; to
+        paginate, use the last Key for <cursor>
 
     delete <key>
-        Delete an uploaded file from the PDS
+        Delete an uploaded file
         ⚠️  This action is immediate and does not ask for confirmation!
 
     upload-crypt <file> <recipient>
@@ -793,6 +793,11 @@ if [[ $_skip_auth_check != 0 ]]; then
 fi
 
 case "$_command" in
+    "cat"|"open"|"print"|"c")
+        [[ -z "$2" ]] && die "<key> not set"
+        [[ -n "$3" ]] && override_actor "$3"
+        invoke_print "$2"
+        ;;
     "delete"|"rm")
         [[ -z "$2" ]] && die "<key> not set"
         invoke_delete "$2"
@@ -808,15 +813,10 @@ case "$_command" in
         [[ -n "$3" ]] && override_actor "$3"
         invoke_download "$2" 1
         ;;
-    "get"|"g")
+    "info"|"get"|"i")
         [[ -z "$2" ]] && die "<key> not set"
         [[ -n "$3" ]] && override_actor "$3"
         invoke_get "$2"
-        ;;
-    "get-url"|"gu"|"b")
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_get_url "$2"
         ;;
     "list"|"ls")
         [[ -n "$3" ]] && override_actor "$3"
@@ -827,11 +827,6 @@ case "$_command" in
         ;;
     "nick")
         invoke_profile "$2"
-        ;;
-    "open"|"cat"|"print"|"o"|"c"|"p")
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_print "$2"
         ;;
     "post"|"bsky")
         [[ -z "$2" ]] && die "<key> not set"
@@ -850,6 +845,11 @@ case "$_command" in
         [[ -z "$2" ]] && die "<file> not set"
         [[ -n "$3" ]] && die "<recipient> not set"
         invoke_upload "$2" "$3"
+        ;;
+    "url"|"get-url"|"b")
+        [[ -z "$2" ]] && die "<key> not set"
+        [[ -n "$3" ]] && override_actor "$3"
+        invoke_get_url "$2"
         ;;
     *)
         die "Unknown command '$_command'; see 'help'"
