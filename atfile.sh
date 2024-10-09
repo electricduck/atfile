@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-_version="0.1"
+_version="0.1.1"
 
 # Utilities
 

@@ -20,7 +20,7 @@
 
 ```sh
 cd ~/.local/bin
-wget https://github.com/electricduck/atfile/releases/download/v%2F0.x%2F0.1/atfile.sh -O atfile
+wget https://github.com/electricduck/atfile/releases/download/v%2F0.x%2F0.1.1/atfile.sh -O atfile
 chmod +x atfile
 export ATFILE_USERNAME="<your-atproto-username>" # e.g. jay.bsky.team, did:plc:oky5czdrnfjpqslsw2a5iclo
 export ATFILE_PASSWORD="<your-atproto-password>"
