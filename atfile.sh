@@ -519,10 +519,8 @@ function invoke_list_blobs() {
 }
 
 function invoke_post() {
-    service="$1" # NOTE: Futureproofing
+    service="$1"
     key="$2"
-    message="$3"
-    facets="$4"
     
     upload_record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
     [[ $(is_xrpc_success $? "$upload_record") != 1 ]] && die "Unable to get '$key'"
@@ -532,9 +530,11 @@ function invoke_post() {
     nsid=""
     
     case "$service" in
-        "bsky")
+        "app.bsky")
             nsid="app.bsky.feed.post"
             embed=""
+            facets="$4"
+            text="$3"
     
             case "$type" in
                 "image/jpeg"|"image/png")
@@ -542,7 +542,7 @@ function invoke_post() {
                 *) die "Cannot embed '$type' into '$nsid'"
             esac
             
-        record="{ \"\$type\": \"app.bsky.feed.post\", \"createdAt\": \"$_now\", \"embed\": $embed, $([[ -n "$facets" ]] && echo "\"facets\": $facets,") \"text\": \"$message\" }"
+        record="{ \"\$type\": \"app.bsky.feed.post\", \"createdAt\": \"$_now\", \"embed\": $embed, $([[ -n "$facets" ]] && echo "\"facets\": $facets,") \"text\": \"$text\" }"
         ;;
     esac
     
@@ -835,7 +835,11 @@ case "$_command" in
         ;;
     "post"|"bsky")
         [[ -z "$2" ]] && die "<key> not set"
-        invoke_post "bsky" "$2" "$3" "$4"
+        service="bsky" # NOTE: Futureproofing
+        case service in
+            "bsky"|"bluesky"|"app.bsky") invoke_post "app.bsky" "$2" "$3" "$4" ;;
+            *) die "Service '$service' not supported" ;;
+        esac
         ;;
     "upload"|"ul"|"u")
         [[ -z "$2" ]] && die "<key> not set"
