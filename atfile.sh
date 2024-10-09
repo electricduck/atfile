@@ -120,18 +120,34 @@ function get_term_rows() {
 function get_type_emoji() {
     mime_type="$1"
     short_type="$(echo $mime_type | cut -d "/" -f 1)"
+    desc_type="$(echo $mime_type | cut -d "/" -f 2)"
 
     case $short_type in
         "application")
-            case "$mime_type" in
-                "application/prs.${_nsid_prefix}.gpg") echo "🔑" ;;
-                "application/pdf"| \
-                    "application/vnd.oasis.opendocument.text") echo "📄" ;;
-                "application/vnd.android.package-archive") echo "📱" ;;
-                "application/vnd.debian.binary-package"| \
-                    "application/vnd.microsoft.portable-executable") echo "💻" ;;
-                "application/zip") echo "📦" ;;
-                *) echo "⚙️" ;;
+            case "$desc_type" in
+                 # Apps (Desktop)
+                "vnd.debian.binary-package"| \
+                "vnd.microsoft.portable-executable"| \
+                "x-executable"| \
+                "x-rpm")
+                    echo "💻" ;;
+                # Apps (Mobile)
+                "vnd.android.package-archive")
+                    echo "📱" ;;
+                # Archives
+                "gzip"|"x-7z-compressed"|"x-bzip2"|"x-stuffit"|"x-xz"|"zip")
+                    echo "📦" ;;
+                # Disk Images
+                "x-iso9660-image")
+                    echo "💿" ;;
+                # Encrypted
+                "prs.${_nsid_prefix}.gpg")
+                    echo "🔑" ;;
+                # Rich Text
+                "pdf"| \
+                "vnd.oasis.opendocument.text")
+                    echo "📄" ;;
+                *) echo "⚙️ " ;;
             esac
             ;;
         "audio") echo "🎵" ;;
@@ -383,9 +399,16 @@ function invoke_delete() {
 
 function invoke_download() {
     key="$1"
-    decrypt=$2
+    out_dir="$2"
+    decrypt=$3
     success=1
     downloaded_file=""
+    
+    if [[ -n "$out_dir" ]]; then
+        mkdir -p "$out_dir"
+        [[ $? != 0 ]] && die "Unable to create '$out_dir'"
+        out_dir="$(realpath "$out_dir")"
+    fi
     
     record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
@@ -394,7 +417,7 @@ function invoke_download() {
         blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
-        downloaded_file="${key}__${file_name}"
+        downloaded_file="$out_dir/${key}__${file_name}"
         
         curl --silent "$blob_uri" -o "$downloaded_file"
         [[ $? != 0 ]] && success=0
@@ -414,8 +437,9 @@ function invoke_download() {
     fi
     
     if [[ $success == 1 ]]; then
-        echo "Downloaded '$key' to '$downloaded_file'"
-        [[ $decrypt == 1 ]] && echo "Decrypted '$downloaded_file'"
+        echo -e "Downloaded: $key"
+        [[ $decrypt == 1 ]] && echo "Decrypted: $downloaded_file"
+        echo -e "↳ Path: $(realpath "$downloaded_file")"
     else
         [[ -f "$downloaded_file" ]] && rm -f "$downloaded_file"
         die "Unable to download '$key'"
@@ -446,7 +470,6 @@ function invoke_get() {
         
         header="$file_type_emoji $key"
         echo "$header"
-        echo "$(repeat "-" ${#header})"
         echo -e "↳ Blob: $blob_uri"
         [[ -n "$cdn_uri" ]] && echo -e " ↳ CDN: $cdn_uri"
         echo -e "↳ File"
@@ -682,7 +705,7 @@ Commands
         List all uploaded files. Only $_max_list items can be displayed; to
         paginate, use the last Key for <cursor>
 
-    fetch <key> [<actor>]
+    fetch <key> [<out-dir>] [<actor>]
         Download an uploaded file
         
     cat <key> [<actor>]
@@ -722,6 +745,7 @@ Arguments
     <cursor>    Key or CID used as a reference to paginate through lists
     <key>       Key of an uploaded file (unique to that user and collection)
     <nick>      Nickname
+    <out-dir>   Path to receive downloaded files
     <recipient> GPG recipient during file encryption
                 See 'gpg --help' for more information
 
@@ -779,16 +803,16 @@ check_prog "xargs"
 [[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
 
-if [[ $_skip_auth_check != 0 ]]; then
-    if [[ "$_username" != "did:"* ]]; then
-        die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
-    fi
-
+if [[ $_skip_auth_check == 0 ]]; then
     session="$(com.atproto.server.getSession)"
     if [[ $(is_xrpc_success $? "$session") == 0 ]]; then
         die "Unable to authenticate as \"$_username\" on \"$_server\""
     else
         _username="$(echo $session | jq -r ".did")"
+    fi
+else
+    if [[ "$_username" != "did:"* ]]; then
+        die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
     fi
 fi
 
@@ -804,14 +828,14 @@ case "$_command" in
         ;;
     "fetch"|"download"|"f"|"d")
         [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_download "$2"
+        [[ -n "$4" ]] && override_actor "$4"
+        invoke_download "$2" "$3"
         ;;
     "fetch-crypt"|"download-crypt"|"fc"|"dc")
         check_gpg_prog
         [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_download "$2" 1
+        [[ -n "$4" ]] && override_actor "$4"
+        invoke_download "$2" "$3" 1
         ;;
     "info"|"get"|"i")
         [[ -z "$2" ]] && die "<key> not set"
