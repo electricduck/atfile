@@ -3,7 +3,8 @@
 </h1>
 
 <p align="center">
-    Store and retrieve files on a <a href="https://atproto.com/guides/glossary#pds-personal-data-server">PDS</a> (like <a href="https://bsky.app">Bluesky</a>)
+    Store and retrieve files on a <a href="https://atproto.com/guides/glossary#pds-personal-data-server">PDS</a> (like <a href="https://bsky.app">Bluesky</a>)<br />
+    <em>Written entirely in Bash Shell. No Node here.</em>
 </p>
 
 <p align="center">
@@ -14,3 +15,13 @@
 </p>
 
 <hr />
+
+## ✨ Quick Start
+
+```sh
+cd ~/.local/bin
+wget https://github.com/electricduck/atfile/releases/download/v%2F0.x%2F0.1/atfile.sh
+export AT_USERNAME="<your-atproto-username>" # e.g. jay.bsky.team, did:plc:oky5czdrnfjpqslsw2a5iclo
+export AT_PASSWORD="<your-atproto-password>"
+./atfile.sh help
+```
