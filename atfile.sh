@@ -677,6 +677,10 @@ Commands
     upload <file>
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
+        
+    list [<cursor>] [<actor>]
+        List all uploaded files. Only $_max_list items can be displayed; to
+        paginate, use the last Key for <cursor>
 
     fetch <key> [<actor>]
         Download an uploaded file
@@ -691,10 +695,6 @@ Commands
         
     info <key> [<actor>]
         Get full details for an uploaded file
-        
-    list [<cursor>] [<actor>]
-        List all uploaded files. Only $_max_list items can be displayed; to
-        paginate, use the last Key for <cursor>
 
     delete <key>
         Delete an uploaded file
