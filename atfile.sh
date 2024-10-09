@@ -407,7 +407,7 @@ function invoke_download() {
     if [[ -n "$out_dir" ]]; then
         mkdir -p "$out_dir"
         [[ $? != 0 ]] && die "Unable to create '$out_dir'"
-        out_dir="$(realpath "$out_dir")"
+        out_dir="$(realpath "$out_dir")/"
     fi
     
     record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
@@ -417,7 +417,7 @@ function invoke_download() {
         blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
-        downloaded_file="$out_dir/${key}__${file_name}"
+        downloaded_file="${out_dir}${key}__${file_name}"
         
         curl --silent "$blob_uri" -o "$downloaded_file"
         [[ $? != 0 ]] && success=0
