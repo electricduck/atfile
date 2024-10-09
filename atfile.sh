@@ -305,7 +305,7 @@ function blue.zio.atfile.upload() {
 }"
 }
 
-function blue.zio.atfile.profile() {
+function blue.zio.meta.profile() {
     nickname="$1"
     
     echo "{
@@ -616,11 +616,14 @@ function invoke_print() {
 function invoke_profile() {
     nick="$1"
     
-    profile_record="$(blue.zio.atfile.profile "$1")"
-    record="$(com.atproto.repo.putRecord "$_username" "${_nsid_prefix}.profile" "self" "$profile_record")"
+    profile_record="$(blue.zio.meta.profile "$1")"
+    record="$(com.atproto.repo.putRecord "$_username" "blue.zio.meta.profile" "self" "$profile_record")"
+    
+    # HACK: Renamed record to "blue.zio.meta.profile". Remove this in the future.
+    dummy="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.profile" "self")"
     
     if [[ $(is_xrpc_success $? "$record") == 1 ]]; then
-        record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.profile" "self")"
+        record="$(com.atproto.repo.getRecord "$_username" "blue.zio.meta.profile" "self")"
     
         echo "Updated profile"
         echo "↳ Nickname: $(echo "$record" | jq -r ".value.nickname")"
