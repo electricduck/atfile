@@ -354,10 +354,10 @@ function com.atproto.repo.listRecords() {
 function com.atproto.repo.putRecord() {
     repo="$1"
     collection="$2"
-    rkey="$4"
+    rkey="$3"
     record="$4"
     
-    xrpc_post "com.atproto.repo.putRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"self\", \"record\": $record }"
+    xrpc_post "com.atproto.repo.putRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\", \"record\": $record }"
 }
 
 function com.atproto.identity.resolveHandle() {
@@ -635,6 +635,7 @@ function invoke_profile() {
 function invoke_upload() {
     file="$1"
     recipient="$2"
+    key="$3"
     success=1
     
     if [ ! -f "$file" ]; then
@@ -665,7 +666,7 @@ function invoke_upload() {
         file_name="$(basename "$file")"
         file_size="$(wc -c "$file" | cut -d " " -f 1)"
         file_type="$(file -b --mime-type "$file")"
-        [[ -n $recipient ]] && file_type="application/prs.blue.zio.gpg"
+        [[ -n $recipient ]] && file_type="application/prs.${_nsid_prefix}.gpg"
         file_type_emoji="$(get_type_emoji "$file_type")"
 
         blob="$(com.atproto.sync.uploadBlob "$file")"
@@ -673,8 +674,13 @@ function invoke_upload() {
         
         file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type")"
         
-        record="$(com.atproto.repo.createRecord "$_username" "${_nsid_prefix}.upload" "$file_record")"
-        success=$(is_xrpc_success $? "$record")
+        if [[ -n "$key" ]]; then
+            record="$(com.atproto.repo.putRecord "$_username" "${_nsid_prefix}.upload" "$key" "$file_record")"
+            success=$(is_xrpc_success $? "$record")
+        else
+            record="$(com.atproto.repo.createRecord "$_username" "${_nsid_prefix}.upload" "$file_record")"
+            success=$(is_xrpc_success $? "$record")
+        fi
     fi
     
     if [[ -n $recipient ]]; then
@@ -686,7 +692,7 @@ function invoke_upload() {
         echo -e "↳ Blob: $(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
         echo -e "↳ Key:  $(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
     else
-        die "Unable to upload '$file"
+        die "Unable to upload '$file'"
     fi
 }
 
@@ -700,7 +706,7 @@ function invoke_usage() {
     Licensed under MIT License ✨
     
 Commands
-    upload <file>
+    upload <file> [<key>]
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
         
@@ -726,7 +732,7 @@ Commands
         Delete an uploaded file
         ⚠️  This action is immediate and does not ask for confirmation!
 
-    upload-crypt <file> <recipient>
+    upload-crypt <file> <recipient> [<key>]
         Encrypt file (with GPG) for <recipient> and upload to the PDS
         ℹ️  Make sure the necessary GPG key has been imported first
         
@@ -864,14 +870,14 @@ case "$_command" in
         esac
         ;;
     "upload"|"ul"|"u")
-        [[ -z "$2" ]] && die "<key> not set"
-        invoke_upload "$2"
+        [[ -z "$2" ]] && die "<file> not set"
+        invoke_upload "$2" "" "$3"
         ;;
     "upload-crypt"|"uc")
         check_gpg_prog
         [[ -z "$2" ]] && die "<file> not set"
-        [[ -n "$3" ]] && die "<recipient> not set"
-        invoke_upload "$2" "$3"
+        [[ -z "$3" ]] && die "<recipient> not set"
+        invoke_upload "$2" "$3" "$4"
         ;;
     "url"|"get-url"|"b")
         [[ -z "$2" ]] && die "<key> not set"
