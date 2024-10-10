@@ -132,11 +132,12 @@ function get_type_emoji() {
                 "x-rpm")
                     echo "💻" ;;
                 # Apps (Mobile)
-                "vnd.android.package-archive")
+                "vnd.android.package-archive"| \
+                "x-ios-app")
                     echo "📱" ;;
                 # Archives
                 "prs.atfile.car"| \
-                "gzip"|"x-7z-compressed"|"x-bzip2"|"x-stuffit"|"x-xz"|"zip")
+                "gzip"|"x-7z-compressed"|"x-apple-diskimage"|"x-bzip2"|"x-stuffit"|"x-xz"|"zip")
                     echo "📦" ;;
                 # Disk Images
                 "x-iso9660-image")
@@ -670,11 +671,12 @@ function invoke_upload() {
         
         if [[ -n $recipient ]]; then
             file_type="application/prs.atfile.gpg-crypt"
-        elif [[ "$file_type" == "application/octet-stream" ]]; then
+        elif [[ "$file_type" == "application/"* ]]; then
             file_extension="$(echo "$file_name" | sed 's:.*\.::')"
             
             case "$file_extension" in
-                "car") file_type="application/prs.atfile.car"
+                "car") file_type="application/prs.atfile.car" ;;
+                "dmg"|"smi") file_type="application/x-apple-diskimage" ;;
             esac
         fi
         
