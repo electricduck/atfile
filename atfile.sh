@@ -95,7 +95,7 @@ function get_size_pretty() {
         size=$(( $size / 1024 ))
         suffix="KiB"
     else
-        suffix="Bytes"
+        suffix="B"
     fi
     
     echo "$size $suffix"
