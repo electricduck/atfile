@@ -135,6 +135,7 @@ function get_type_emoji() {
                 "vnd.android.package-archive")
                     echo "📱" ;;
                 # Archives
+                "prs.atfile.car"| \
                 "gzip"|"x-7z-compressed"|"x-bzip2"|"x-stuffit"|"x-xz"|"zip")
                     echo "📦" ;;
                 # Disk Images
@@ -666,9 +667,18 @@ function invoke_upload() {
         file_name="$(basename "$file")"
         file_size="$(wc -c "$file" | cut -d " " -f 1)"
         file_type="$(file -b --mime-type "$file")"
-        [[ -n $recipient ]] && file_type="application/prs.atfile.gpg-crypt"
+        
+        if [[ -n $recipient ]]; then
+            file_type="application/prs.atfile.gpg-crypt"
+        elif [[ "$file_type" == "application/octet-stream" ]]; then
+            file_extension="$(echo "$file_name" | sed 's:.*\.::')"
+            
+            case "$file_extension" in
+                "car") file_type="application/prs.atfile.car"
+            esac
+        fi
+        
         file_type_emoji="$(get_type_emoji "$file_type")"
-
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(is_xrpc_success $? "$blob")
         
