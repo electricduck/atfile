@@ -141,7 +141,7 @@ function get_type_emoji() {
                 "x-iso9660-image")
                     echo "💿" ;;
                 # Encrypted
-                "prs.${_nsid_prefix}.gpg")
+                "prs.atfile.gpg-crypt")
                     echo "🔑" ;;
                 # Rich Text
                 "pdf"| \
@@ -388,7 +388,7 @@ function invoke_delete() {
     key="$1"
     success=1
 
-    record="$(com.atproto.repo.deleteRecord "$_username" "${_nsid_prefix}.upload" "$key")"
+    record="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.upload" "$key")"
     
     if [[ $(is_xrpc_success $? "$record") == 1 ]]; then
         echo "Deleted: $key"
@@ -410,7 +410,7 @@ function invoke_download() {
         out_dir="$(realpath "$out_dir")/"
     fi
     
-    record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
@@ -450,7 +450,7 @@ function invoke_get() {
     key="$1"
     success=1
     
-    record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
@@ -488,7 +488,7 @@ function invoke_get_url() {
     key="$1"
     success=1
     
-    record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
     
     if [[ $success == 1 ]]; then
         echo "$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
@@ -501,7 +501,7 @@ function invoke_list() {
     cursor="$1"
     success=1
     
-    records="$(com.atproto.repo.listRecords "$_username" "${_nsid_prefix}.upload" "$cursor")"
+    records="$(com.atproto.repo.listRecords "$_username" "blue.zio.atfile.upload" "$cursor")"
     success="$(is_xrpc_success $? "$records")"
     
     echo -e "Key\t\tFile"
@@ -545,7 +545,7 @@ function invoke_post() {
     service="$1"
     key="$2"
     
-    upload_record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
+    upload_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
     [[ $(is_xrpc_success $? "$upload_record") != 1 ]] && die "Unable to get '$key'"
     
     blob="$(echo "$upload_record" | jq -r ".value.blob")"
@@ -589,7 +589,7 @@ function invoke_print() {
     key="$1"
     success=1
     
-    record="$(com.atproto.repo.getRecord "$_username" "${_nsid_prefix}.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
@@ -666,7 +666,7 @@ function invoke_upload() {
         file_name="$(basename "$file")"
         file_size="$(wc -c "$file" | cut -d " " -f 1)"
         file_type="$(file -b --mime-type "$file")"
-        [[ -n $recipient ]] && file_type="application/prs.${_nsid_prefix}.gpg"
+        [[ -n $recipient ]] && file_type="application/prs.atfile.gpg-crypt"
         file_type_emoji="$(get_type_emoji "$file_type")"
 
         blob="$(com.atproto.sync.uploadBlob "$file")"
@@ -675,10 +675,10 @@ function invoke_upload() {
         file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type")"
         
         if [[ -n "$key" ]]; then
-            record="$(com.atproto.repo.putRecord "$_username" "${_nsid_prefix}.upload" "$key" "$file_record")"
+            record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.upload" "$key" "$file_record")"
             success=$(is_xrpc_success $? "$record")
         else
-            record="$(com.atproto.repo.createRecord "$_username" "${_nsid_prefix}.upload" "$file_record")"
+            record="$(com.atproto.repo.createRecord "$_username" "blue.zio.atfile.upload" "$file_record")"
             success=$(is_xrpc_success $? "$record")
         fi
     fi
@@ -788,12 +788,10 @@ _command="$1"
 #_envvar_prefix="$(echo ${_prog^^} | cut -d "-" -f 1 | cut -d "." -f 1 | cut -d " " -f 1)"
 _envvar_prefix="ATFILE"
 _max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 accounting for the list header (2 lines) and the shell prompt (which is usually 1 line)
-_nsid_prefix_default="blue.zio.atfile"
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
 
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
-_nsid_prefix="$(get_envvar "${_envvar_prefix}_NSID_PREFIX" "$_nsid_prefix_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
 _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
