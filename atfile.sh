@@ -862,8 +862,17 @@ case "$_command" in
         invoke_get "$2"
         ;;
     "list"|"ls")
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_list "$2"
+    	if [[ "$2" == *.* ]]; then
+    	    # NOTE: User has entered <actor> in the wrong place, so we'll fix it
+    	    #       for them
+    	    # BUG:  Keys with periods in them can't be used as a cursor
+    	    
+    	    override_actor "$2"
+            invoke_list "$3"
+    	else
+    	    [[ -n "$3" ]] && override_actor "$3"
+            invoke_list "$2"   
+    	fi
         ;;
     "list-blobs"|"lsb")
         invoke_list_blobs "$2"
