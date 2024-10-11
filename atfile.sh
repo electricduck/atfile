@@ -723,6 +723,7 @@ Commands
         ⚠️  ATProto records are public: do not upload sensitive files
         
     list [<cursor>] [<actor>]
+    list <actor> [<cursor>]
         List all uploaded files. Only $_max_list items can be displayed; to
         paginate, use the last Key for <cursor>
 
