@@ -810,7 +810,7 @@ _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
-if [[ $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
+if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     invoke_usage
     exit 0
 fi
