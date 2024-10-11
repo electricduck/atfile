@@ -543,50 +543,6 @@ function invoke_list_blobs() {
     fi
 }
 
-function invoke_post() {
-    service="$1"
-    key="$2"
-    
-    upload_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
-    [[ $(is_xrpc_success $? "$upload_record") != 1 ]] && die "Unable to get '$key'"
-    
-    blob="$(echo "$upload_record" | jq -r ".value.blob")"
-    type="$(echo "$upload_record" | jq -r ".value.file.mimeType")"
-    nsid=""
-    
-    case "$service" in
-        "app.bsky")
-            nsid="app.bsky.feed.post"
-            embed=""
-            facets="$4"
-            text="$3"
-    
-            case "$type" in
-                "image/jpeg"|"image/png")
-                     embed="{ \"\$type\": \"app.bsky.embed.images\", \"images\": [ { \"alt\": \"\", \"image\": $blob }] }" ;;
-                *) die "Cannot embed '$type' into '$nsid'"
-            esac
-            
-        record="{ \"\$type\": \"app.bsky.feed.post\", \"createdAt\": \"$_now\", \"embed\": $embed, $([[ -n "$facets" ]] && echo "\"facets\": $facets,") \"text\": \"$text\" }"
-        ;;
-    esac
-    
-    if [[ -n "$nsid" && -n "$record" ]]; then
-        created_record="$(com.atproto.repo.createRecord "$_username" "$nsid" "$record")"
-
-        if [[ $(is_xrpc_success $? "$created_record") == 1 ]]; then
-                uri="$(echo $created_record | jq -r ".uri")"
-                app="$(resolve_at_to_app "$uri")"
-        
-        	echo -e "Posted: $(get_type_emoji "$type") $key"
-        	echo -e "↳ App: $app"
-        	echo -e "↳ URI: $uri"
-        else
-        	die "Unable to post '$type'"
-        fi
-    fi
-}
-
 function invoke_print() {
     key="$1"
     success=1
@@ -753,17 +709,12 @@ Commands
         Download an uploaded encrypted file and attempt to decrypt it (with GPG)
         ℹ️  Make sure the necessary GPG key has been imported first
         
-    post <key> [<bsky-text>] [<bsky-facets>]
-        Post uploaded file to Bluesky
-        
     nick <nick>
         Set nickname
         ℹ️  Intended for future use
        
 Arguments
     <actor>     Act upon another ATProto user (either by handle or DID)
-    <bsky-facets> ...
-    <bsky-text> ...
     <cursor>    Key or CID used as a reference to paginate through lists
     <key>       Key of an uploaded file (unique to that user and collection)
     <nick>      Nickname
@@ -880,14 +831,6 @@ case "$_command" in
         ;;
     "nick")
         invoke_profile "$2"
-        ;;
-    "post"|"bsky")
-        [[ -z "$2" ]] && die "<key> not set"
-        service="bsky" # NOTE: Futureproofing
-        case service in
-            "bsky"|"bluesky"|"app.bsky") invoke_post "app.bsky" "$2" "$3" "$4" ;;
-            *) die "Service '$service' not supported" ;;
-        esac
         ;;
     "upload"|"ul"|"u")
         [[ -z "$2" ]] && die "<file> not set"
