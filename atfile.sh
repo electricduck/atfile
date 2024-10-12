@@ -166,6 +166,39 @@ function get_file_type_emoji() {
     esac
 }
 
+function get_meta_from_mediainfo() {
+    file="$1"
+    category="$2"
+    field="$3"
+    default="$4"
+    output=""
+
+    mediainfo_output="$(mediainfo --Inform="$category;%$field%\n" "$file")"
+
+    if [[ -n "$mediainfo_output" ]]; then
+        if [[ "$mediainfo_output" == "None" ]]; then
+            output="$default"
+        else
+            output="$mediainfo_output"
+        fi
+    else
+        output="$default"
+    fi
+    
+    echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
+}
+
+function get_meta_record() {
+    file="$1"
+    type="$2"
+    
+    case "$type" in
+        "audio/mpeg") blue.zio.atfile.meta__music "$1" ;;
+        "video/mp4") blue.zio.atfile.meta__video "$1" ;;
+        *) blue.zio.atfile.meta__unknown ;;
+    esac
+}
+
 function get_md5() {
     file="$1"
     
@@ -327,8 +360,110 @@ function xrpc_post_blob() {
 
 # Lexicons
 
+## Records
+
+function get_line() {
+    input="$1"
+    index=$(( $2 + 1 ))
+    
+    echo "$(echo -e "$input" | sed -n "$(( $index ))"p)"
+}
+
+function blue.zio.atfile.meta__unknown() {
+    echo "{
+    \"\$type\": \"blue.zio.atfile.meta#unknown\"
+}"
+}
+
+function get_mediainfo_audio_json() {
+    file="$1"
+
+    bitrates=$(get_meta_from_mediainfo "$file" "Audio" "BitRate" 0)
+    bitrate_modes=$(get_meta_from_mediainfo "$file" "Audio" "BitRate_Mode" "")
+    channelss=$(get_meta_from_mediainfo "$file" "Audio" "Channels" 0)
+    compressions="$(get_meta_from_mediainfo "$file" "Audio" "Compression_Mode" "")"
+    durations=$(get_meta_from_mediainfo "$file" "Audio" "Duration" 0)
+    formats="$(get_meta_from_mediainfo "$file" "Audio" "Format" "")"
+    samplings=$(get_meta_from_mediainfo "$file" "Audio" "SamplingRate" 0)
+    titles="$(get_meta_from_mediainfo "$file" "Audio" "Title" "")"
+    
+    lines="$(echo "$bitrates" | wc -l)"
+    output=""
+
+    for ((i = 0 ; i < $lines ; i++ )); do
+        lossy=true
+        
+        [[ \"$(get_line "$compressionss" $i)\" == "Lossless" ]] && lossy=false
+    
+        output+="{
+    \"bitrate\": $(get_line "$bitrates" $i),
+    \"channels\": $(get_line "$channelss" $i),
+    \"duration\": $(get_line "$durations" $i),
+    \"format\": \"$(get_line "$formats" $i)\",
+    \"mode\": \"$(get_line "$bitrate_modes" $i)\",
+    \"lossy\": $lossy,
+    \"sampling\": $(get_line "$samplings" $i),
+    \"title\": \"$(get_line "$titles" $i)\"
+},"
+    done
+    
+    echo "${output::-1}"
+}
+
+function blue.zio.atfile.meta__video() {
+    file="$1"
+    
+    audio="$(get_mediainfo_audio_json "$file")"
+    
+    echo "{
+    \"\$type\": \"blue.zio.atfile.meta#video\",
+    \"value\": {
+        \"audio\": [ $audio ]
+    }
+}"
+}
+
+function blue.zio.atfile.meta__music() {
+    file="$1"
+    
+    audio="$(get_mediainfo_audio_json "$file")"
+    tag_album="$(get_meta_from_mediainfo "$file" "General" "Album" "(Unknown Album)")"
+    tag_albumArtist="$(get_meta_from_mediainfo "$file" "General" "Album/Performer" "(Unknown Album Artist)")"
+    tag_artist="$(get_meta_from_mediainfo "$file" "General" "Performer" "(Unknown Artist)")"
+    tag_date="$(get_meta_from_mediainfo "$file" "General" "Original/Released_Date" "?")"
+    tag_disc=$(get_meta_from_mediainfo "$file" "General" "Part/Position" 0)
+    tag_discTotal=$(get_meta_from_mediainfo "$file" "General" "Part/Position_Total" 0)
+    tag_duration=$(get_meta_from_mediainfo "$file" "General" "Duration" 0)
+    tag_title="$(get_meta_from_mediainfo "$file" "General" "Title" "(Unknown Track)")"
+    tag_track=$(get_meta_from_mediainfo "$file" "General" "Track/Position" 0)
+    tag_trackTotal=$(get_meta_from_mediainfo "$file" "General" "Track/Position_Total" 0)
+    
+    echo "{
+    \"\$type\": \"blue.zio.atfile.meta#music\",
+    \"value\": {
+        \"audio\": [ $audio ],
+        \"tags\": {
+            \"album\": \"$tag_album\",
+            \"album_artist\": \"$tag_albumArtist\",
+            \"artist\": \"$tag_artist\",
+            \"date\": \"$tag_date\",
+            \"disc\": {
+                \"position\": $tag_disc,
+                \"total\": $tag_discTotal
+            },
+            \"duration\": $tag_duration,
+            \"title\": \"$tag_title\",
+            \"track\": {
+                \"position\": $tag_track,
+                \"total\": $tag_trackTotal
+            }
+        }
+    }
+}"
+}
+
 function blue.zio.atfile.upload() {
-    blob="$1"
+    blob_record="$1"
     createdAt="$2"
     file_hash="$3"
     file_hash_type="$4"
@@ -336,6 +471,7 @@ function blue.zio.atfile.upload() {
     file_name="$6"
     file_size="$7"
     file_type="$8"
+    meta_record="$9"
 
     echo "{
     \"createdAt\": \"$createdAt\",
@@ -349,7 +485,8 @@ function blue.zio.atfile.upload() {
         \"hash\": \"$file_hash\",
         \"type\": \"$file_hash_type\"
     },
-    \"blob\": $blob
+    \"meta\": $meta_record,
+    \"blob\": $blob_record
 }"
 }
 
@@ -360,6 +497,8 @@ function blue.zio.meta.profile() {
     \"nickname\": \"$nickname\"  
 }"
 }
+
+## Queries
 
 function app.bsky.actor.getProfile() {
     actor="$1"
@@ -696,12 +835,13 @@ function invoke_upload() {
         fi
         
         file_type_emoji="$(get_file_type_emoji "$file_type")"
+        file_meta="$(get_meta_record "$file" "$file_type")"
         
         echo "Uploading '$file'..."
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(is_xrpc_success $? "$blob")
         
-        file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type")"
+        file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta")"
         
         if [[ -n "$key" ]]; then
             record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.upload" "$key" "$file_record")"
@@ -958,6 +1098,12 @@ case "$_command" in
         [[ -z "$2" ]] && die "<key> not set"
         [[ -n "$3" ]] && override_actor "$3"
         invoke_get_url "$2"
+        ;;
+    "temp-get-meta")
+        get_meta_record "$2" "$3"
+        ;;
+    "temp-get-meta-jq")
+        get_meta_record "$2" "$3" | jq
         ;;
     *)
         die "Unknown command '$_command'; see 'help'"
