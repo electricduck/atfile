@@ -681,7 +681,7 @@ function blue.zio.atfile.meta__photo() {
     \"orientation\": \"$orientation\",
     \"software\": \"$software\",
     \"title\": \"$title\"
-}" | sed -e "s|\"\",|null|g"
+}"
 }
 
 function blue.zio.atfile.meta__video() {
@@ -735,6 +735,14 @@ function blue.zio.atfile.meta__video() {
     },
     \"title\": \"$title\",
     \"video\": [ $video ]
+}"
+}
+
+function blue.zio.atfile.lock() {
+    lock="$1"
+    
+    echo "{
+    \"lock\": $lock
 }"
 }
 
@@ -847,9 +855,15 @@ function com.atproto.sync.uploadBlob() {
 
 # Commands
 
+# BUG: Locked files can still be deleted
 function invoke_delete() {
     key="$1"
     success=1
+
+    lock_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
+    if [[ $(is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".lock") == true ]]; then
+        die "Unable to delete '$key'; file is lockedz\nUse \`$prog unlock $key\` to unlock file."
+    fi
 
     record="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.upload" "$key")"
     
@@ -1006,6 +1020,40 @@ function invoke_list_blobs() {
             done
     else
         die "Unable to list blobs"
+    fi
+}
+
+function invoke_lock() {
+    key="$1"
+    locked=$2
+    
+    upload_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    success=$(is_xrpc_success $? "$upload_record")
+    
+    if [[ $success == 1 ]]; then        
+        if [[ $locked == 1 ]]; then
+            locked=true
+        else
+            locked=false
+        fi
+        
+        lock_record="$(blue.zio.atfile.lock $locked)"
+        record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.lock" "$key" "$lock_record")"
+        success=$(is_xrpc_success $? "$record")
+    fi
+    
+    if [[ $(is_xrpc_success $? "$record") == 1 ]]; then
+        if [[ $locked == true ]]; then
+            echo "Locked: $key"
+        else
+            echo "Unlocked: $key"
+        fi
+    else
+         if [[ $locked == true ]]; then
+            die "Unable to lock '$key'"
+        else
+            die "Unable to unlock '$key'"
+        fi
     fi
 }
 
@@ -1205,6 +1253,14 @@ Commands
         Delete an uploaded file
         ⚠️  This action is immediate and does not ask for confirmation!
 
+    lock <key>
+    unlock <key>
+        Lock (or unlock) an uploaded file to prevent it from unintended
+        deletions
+        ⚠️  This does not stop other clients being able to delete the file,
+           and is only intended as a safety-net in case you run \`delete\` on
+           the wrong file
+
     upload-crypt <file> <recipient> [<key>]
         Encrypt file (with GPG) for <recipient> and upload to the PDS
         ℹ️  Make sure the necessary GPG key has been imported first
@@ -1374,6 +1430,9 @@ case "$_command" in
     "list-blobs"|"lsb")
         invoke_list_blobs "$2"
         ;;
+    "lock")
+        invoke_lock "$2" 1
+        ;;
     "nick")
         invoke_profile "$2"
         ;;
@@ -1386,6 +1445,9 @@ case "$_command" in
         [[ -z "$2" ]] && die "<file> not set"
         [[ -z "$3" ]] && die "<recipient> not set"
         invoke_upload "$2" "$3" "$4"
+        ;;
+    "unlock")
+        invoke_lock "$2" 0
         ;;
     "url"|"get-url"|"b")
         [[ -z "$2" ]] && die "<key> not set"
