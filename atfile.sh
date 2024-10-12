@@ -168,7 +168,11 @@ function get_file_type_emoji() {
 
 function get_md5() {
     file="$1"
-    md5sum "$file" | cut -f 1 -d " "
+    
+    hash="$(md5sum "$file" | cut -f 1 -d " ")"
+    if [[ ${#hash} == 32 ]]; then
+        echo "$hash"
+    fi
 }
 
 function get_rkey_from_at_uri() {
@@ -501,11 +505,16 @@ function invoke_get() {
     	file_date="$(echo "$record" | jq -r '.value.file.modifiedAt')"
     	file_hash="$(echo "$record" | jq -r '.value.checksum.hash')"
     	file_hash_type="$(echo "$record" | jq -r '.value.checksum.type')"
+    	file_hash_pretty="$file_hash ($file_hash_type)"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
         file_size="$(echo "$record" | jq -r '.value.file.size')"
         file_size_pretty="$(get_file_size_pretty $file_size)"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         file_type_emoji="$(get_file_type_emoji "$file_type")"
+        
+        if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
+            file_hash_pretty="(none)"
+        fi
         
         did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
@@ -521,7 +530,7 @@ function invoke_get() {
         echo -e " ↳ Type: $file_type"
         echo -e " ↳ Size: $file_size_pretty"
         echo -e " ↳ Date: $(date --date "$file_date" "+%Y-%m-%d %H:%M:%S %Z")"
-        echo -e "↳ Hash: $file_hash ($file_hash_type)"
+        echo -e "↳ Hash: $file_hash_pretty"
         echo -e "↳ URI:  $(echo $record | jq -r ".uri")"
     else
         die "Unable to get '$key'"
@@ -670,6 +679,10 @@ function invoke_upload() {
         file_name="$(basename "$file")"
         file_size="$(wc -c "$file" | cut -d " " -f 1)"
         file_type="$(file -b --mime-type "$file")"
+        
+        if [[ -z "$file_hash" ]]; then
+            file_hash_type="none"
+        fi
         
         if [[ -n $recipient ]]; then
             file_type="application/prs.atfile.gpg-crypt"
