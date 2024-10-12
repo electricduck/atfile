@@ -616,7 +616,7 @@ function invoke_upload() {
         file="$(realpath "$file")"
     fi
     
-    if [[ "$_server" == "https://zio.blue" ]]; then
+    if [[ "$_server" == "https://bsky.social" ]]; then
         print_copyright_warning
     fi
     
