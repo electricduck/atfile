@@ -71,14 +71,17 @@ function get_date_json() {
     parsed="$2"
 
     if [[ -z "$parsed" ]]; then
-        parsed_date="$(get_date "$date")"
-        [[ $? == 0 ]] && parsed="$parsed_date"
+        if [[ -n "$date" ]]; then
+            parsed_date="$(get_date "$date")"
+            [[ $? == 0 ]] && parsed="$parsed_date"
+        fi
     fi
 
-    echo "{
-    \"original\": \"$date\",
-    \"parsed\": \"$parsed\"
-}"
+    if [[ -n "$parsed" ]]; then
+        echo "\"$parsed\""
+    else
+        echo "null"
+    fi
 }
 
 function get_envvar() {
@@ -117,21 +120,64 @@ function get_envvar_from_envfile() {
 
 function get_file_name_pretty() {
     file_record="$1"
-    output="$(echo "$file_record" | jq -r ".file.name")"
+    emoji="$(get_file_type_emoji "$(echo "$file_record" | jq -r '.file.mimeType')")"
+    output="$(echo "$file_record" | jq -r ".file.name" | cut -d "." -f 1)"
     
     meta_type="$(echo "$file_record" | jq -r ".meta.\"\$type\"")"
     
     if [[ -n "$meta_type" ]]; then
         case $meta_type in
             "blue.zio.atfile.meta#audio")
-                artist="$(echo "$file_record" | jq -r ".meta.tags.artist")"
+                album="$(echo "$file_record" | jq -r ".meta.tags.album")"
+                album_artist="$(echo "$file_record" | jq -r ".meta.tags.album_artist")"
+                date="$(echo "$file_record" | jq -r ".meta.tags.date.parsed")"
+                disc="$(echo "$file_record" | jq -r ".meta.tags.disc.position")"
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
-                output="$artist — $title"
+                track="$(echo "$file_record" | jq -r ".meta.tags.track.position")"
+                
+                [[ -z "$album" ]] && title="(Unknown Album)"
+                [[ -z "$album_artist" ]] && title="(Unknown Artist)"
+                [[ -z "$title" ]] && title="(No Title)"
+                
+                output="$title\n   $album_artist — $album"
+                [[ -n $date ]] && output+=" ($(date --date="$date" +%Y))"
+                output+=" [$disc.$track]"
+                ;;
+            "blue.zio.atfile.meta#photo")
+                date="$(echo "$file_record" | jq -r ".meta.date.create.parsed")"
+                lat="$(echo "$file_record" | jq -r ".meta.gps.lat")"
+                long="$(echo "$file_record" | jq -r ".meta.gps.long")"
+                title="$(echo "$file_record" | jq -r ".meta.title")"
+                
+                [[ -z "$title" ]] && title="(No Title)"
+                
+                output="$title"
+                
+                if [[ -n "$lat" && -n "$long" ]]; then
+                   output+="\n   $long $lat"
+                   
+                   if [[ -n "$date" ]]; then
+                       output+=" — $(date --date="$date")"
+                   fi
+                fi
+                ;;
+            "blue.zio.atfile.meta#video")
+                title="$(echo "$file_record" | jq -r ".meta.tags.title")"
+                
+                [[ -z "$title" ]] && title="(No Title)"
+                
+                output="$title"
                 ;;
         esac
     fi
     
-    echo "$output"
+    output="$emoji $output"
+    
+    output_last_line="$(echo -e "$output" | tail -n1)"
+    output_last_line_length="${#output_last_line}"
+    
+    echo -e "$output"
+    echo -e "$(repeat "-" $output_last_line_length)"
 }
 
 function get_file_size_pretty() {
@@ -206,7 +252,7 @@ function get_exiftool_field() {
     default="$3"
     output=""
     
-    exiftool_output="$(eval "exiftool -s -T -$tag \"$file\"")"
+    exiftool_output="$(eval "exiftool -c \"%+.6f\" -s -T -$tag \"$file\"")"
     
     if [[ -n "$exiftool_output" ]]; then
         if [[ "$exiftool_output" == "-" ]]; then
@@ -430,17 +476,14 @@ function repeat() {
     printf "%0.s$char" $(seq 1 $amount)
 }
 
-function resolve_at_to_app() {
-    at_uri="$1"
-    
-    did="$(echo $at_uri | cut -d "/" -f 3)"
-    nsid="$(echo $at_uri | cut -d "/" -f 4)"
-    rkey="$(echo $at_uri | cut -d "/" -f 5)"
-    
-    case $nsid in
-        "app.bsky.feed.post") echo "https://bsky.app/profile/${did}/post/${rkey}" ;;
-        *) echo "$at_uri" ;;
-    esac
+function parse_exiftool_date() {
+    in_date="$1"
+    tz="$2"
+        
+    date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
+    time="$(echo "$in_date" | cut -d " " -f 2)"
+      
+    echo "$date $time $tz"
 }
 
 # XRPC
@@ -528,17 +571,17 @@ function blue.zio.atfile.meta__audio() {
     fi
     
     audio="$(get_mediainfo_audio_json "$file")"
-    duration=$(get_mediainfo_field "$file" "General" "Duration" 0)
-    format="$(get_mediainfo_field "$file" "General" "Format" "(Unknown Album)")"
-    tag_album="$(get_mediainfo_field "$file" "General" "Album" "(Unknown Album)")"
-    tag_albumArtist="$(get_mediainfo_field "$file" "General" "Album/Performer" "(Unknown Album Artist)")"
-    tag_artist="$(get_mediainfo_field "$file" "General" "Performer" "(Unknown Artist)")"
+    duration=$(get_mediainfo_field "$file" "General" "Duration" null)
+    format="$(get_mediainfo_field "$file" "General" "Format")"
+    tag_album="$(get_mediainfo_field "$file" "General" "Album")"
+    tag_albumArtist="$(get_mediainfo_field "$file" "General" "Album/Performer")"
+    tag_artist="$(get_mediainfo_field "$file" "General" "Performer")"
     tag_date="$(get_mediainfo_field "$file" "General" "Original/Released_Date")"
-    tag_disc=$(get_mediainfo_field "$file" "General" "Part/Position" 0)
-    tag_discTotal=$(get_mediainfo_field "$file" "General" "Part/Position_Total" 0)
-    tag_title="$(get_mediainfo_field "$file" "General" "Title" "(Unknown Track)")"
-    tag_track=$(get_mediainfo_field "$file" "General" "Track/Position" 0)
-    tag_trackTotal=$(get_mediainfo_field "$file" "General" "Track/Position_Total" 0)
+    tag_disc=$(get_mediainfo_field "$file" "General" "Part/Position" null)
+    tag_discTotal=$(get_mediainfo_field "$file" "General" "Part/Position_Total" null)
+    tag_title="$(get_mediainfo_field "$file" "General" "Title")"
+    tag_track=$(get_mediainfo_field "$file" "General" "Track/Position" null)
+    tag_trackTotal=$(get_mediainfo_field "$file" "General" "Track/Position_Total" null)
     
     parsed_tag_date=""
     
@@ -579,39 +622,33 @@ function blue.zio.atfile.meta__photo() {
         return
     fi
 
-    function parse_exiftool_date() {
-        in_date="$1"
-        tz="$2"
-        
-        date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
-        time="$(echo "$in_date" | cut -d " " -f 2)"
-        
-        echo "$date $time $tz"
-    }
-
-    artist="$(get_exiftool_field "$file" "Artist" "")"
-    camera_aperture="$(get_exiftool_field "$file" "Aperture" "")"
-    camera_exposure="$(get_exiftool_field "$file" "ExposureTime" "")"
-    camera_flash="$(get_exiftool_field "$file" "Flash" "")"
-    camera_focalLength="$(get_exiftool_field "$file" "FocalLength" "")"
-    camera_iso="$(get_exiftool_field "$file" "ISO" 0)"
-    camera_make="$(get_exiftool_field "$file" "Make" "")"
-    camera_mpx="$(get_exiftool_field "$file" "Megapixels" "")"
-    camera_model="$(get_exiftool_field "$file" "Model" "")"
-    date_create="$(get_exiftool_field "$file" "CreateDate" "")"
-    date_modify="$(get_exiftool_field "$file" "ModifyDate" "")"
-    date_tz="$(get_exiftool_field "$file" "OffsetTime" "")"
-    dim_height="$(get_exiftool_field "$file" "ImageHeight" "")"
-    dim_width="$(get_exiftool_field "$file" "ImageWidth" "")"
-    gps_alt="$(get_exiftool_field "$file" "GPSAltitude" "")"
-    gps_lat="$(get_exiftool_field "$file" "GPSLatitude" "")"
-    gps_long="$(get_exiftool_field "$file" "GPSLongitude" "")"
-    orientation="$(get_exiftool_field "$file" "Orientation" "")"
-    software="$(get_exiftool_field "$file" "Software" "")"
-    title="$(get_exiftool_field "$file" "Title" "")"
+    artist="$(get_exiftool_field "$file" "Artist")"
+    camera_aperture="$(get_exiftool_field "$file" "Aperture")"
+    camera_exposure="$(get_exiftool_field "$file" "ExposureTime")"
+    camera_flash="$(get_exiftool_field "$file" "Flash")"
+    camera_focalLength="$(get_exiftool_field "$file" "FocalLength")"
+    camera_iso="$(get_exiftool_field "$file" "ISO" null)"
+    camera_make="$(get_exiftool_field "$file" "Make")"
+    camera_mpx="$(get_exiftool_field "$file" "Megapixels" null)"
+    camera_model="$(get_exiftool_field "$file" "Model")"
+    date_create="$(get_exiftool_field "$file" "CreateDate")"
+    date_modify="$(get_exiftool_field "$file" "ModifyDate")"
+    date_tz="$(get_exiftool_field "$file" "OffsetTime" "+00:00")"
+    dim_height="$(get_exiftool_field "$file" "ImageHeight" null)"
+    dim_width="$(get_exiftool_field "$file" "ImageWidth" null)"
+    gps_alt="$(get_exiftool_field "$file" "GPSAltitude" null)"
+    gps_lat="$(get_exiftool_field "$file" "GPSLatitude" null)"
+    gps_long="$(get_exiftool_field "$file" "GPSLongitude" null)"
+    orientation="$(get_exiftool_field "$file" "Orientation")"
+    software="$(get_exiftool_field "$file" "Software")"
+    title="$(get_exiftool_field "$file" "Title")"
     
     date_create="$(parse_exiftool_date "$date_create" "$date_tz")"
     date_modify="$(parse_exiftool_date "$date_modify" "$date_tz")"
+    
+    [[ $gps_alt == +* ]] && gps_alt="${gps_alt:1}"
+    [[ $gps_lat == +* ]] && gps_lat="${gps_lat:1}"
+    [[ $gps_long == +* ]] && gps_long="${gps_long:1}"
 
     echo "{
     \"\$type\": \"blue.zio.atfile.meta#photo\",
@@ -637,30 +674,66 @@ function blue.zio.atfile.meta__photo() {
         \"width\": $dim_width
     },
     \"gps\": {
-        \"alt\": \"$gps_alt\",
-        \"lat\": \"$gps_lat\",
-        \"long\": \"$gps_long\"
+        \"alt\": $gps_alt,
+        \"lat\": $gps_lat,
+        \"long\": "$gps_long"
     },
     \"orientation\": \"$orientation\",
     \"software\": \"$software\",
     \"title\": \"$title\"
-}"
+}" | sed -e "s|\"\",|null|g"
 }
 
 function blue.zio.atfile.meta__video() {
     file="$1"
     
-    if [ ! -x "$(command -v video)" ]; then
+    if [ ! -x "$(command -v mediainfo)" ]; then
         echo "$(blue.zio.atfile.meta__unknown "Unable to create record during upload (MediaInfo not installed)")"
         return
     fi
     
+    artist="$(get_mediainfo_field "$file" "General" "Artist")"
     audio="$(get_mediainfo_audio_json "$file")"
+    bitRate=$(get_mediainfo_field "$file" "General" "BitRate" null)
+    date_create="",
+    date_modify="",
+    duration=$(get_mediainfo_field "$file" "General" "Duration" null)
+    format="$(get_mediainfo_field "$file" "General" "Format")"
+    gps_alt=0
+    gps_lat=0
+    gps_long=0
+    title="$(get_mediainfo_field "$file" "General" "Title")"
     video="$(get_mediainfo_video_json "$file")"
+    
+    if [ -x "$(command -v exiftool)" ]; then
+        date_create="$(get_exiftool_field "$file" "CreateDate")"
+        date_modify="$(get_exiftool_field "$file" "ModifyDate")"
+        date_tz="$(get_exiftool_field "$file" "OffsetTime" "+00:00")"
+        gps_alt="$(get_exiftool_field "$file" "GPSAltitude" null)"
+        gps_lat="$(get_exiftool_field "$file" "GPSLatitude" null)"
+        gps_long="$(get_exiftool_field "$file" "GPSLongitude" null)"
+        
+        date_create="$(parse_exiftool_date "$date_create" "$date_tz")"
+        date_modify="$(parse_exiftool_date "$date_modify" "$date_tz")"
+    fi
     
     echo "{
     \"\$type\": \"blue.zio.atfile.meta#video\",
+    \"artist\": \"$artist\",
     \"audio\": [ $audio ],
+    \"biteRate\": $bitRate,
+    \"date\": {
+        \"create\": $(get_date_json "$date_create"),
+        \"modify\": $(get_date_json "$date_modify")
+    },
+    \"duration\": $duration,
+    \"format\": \"$format\",
+    \"gps\": {
+        \"alt\": $gps_alt,
+        \"lat\": $gps_lat,
+        \"long\": "$gps_long"
+    },
+    \"title\": \"$title\",
     \"video\": [ $video ]
 }"
 }
@@ -853,13 +926,12 @@ function invoke_get() {
         file_size="$(echo "$record" | jq -r '.value.file.size')"
         file_size_pretty="$(get_file_size_pretty $file_size)"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
-        file_type_emoji="$(get_file_type_emoji "$file_type")"
         
         did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         blob_uri="$(get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         cdn_uri="$(get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
-        header="$file_type_emoji $file_name_pretty"
+        header="$file_name_pretty"
         
         if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
             file_hash_pretty="(none)"
