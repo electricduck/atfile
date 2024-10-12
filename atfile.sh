@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 
+# ATFile
+# ------
+# (c) 2024 Ducky <https://github.com/electricduck/atfile>
+# Licensed under MIT License ✨
+
 _version="0.1.1"
+_c_year="2024"
 
 # Utilities
 
@@ -202,6 +208,17 @@ function override_actor() {
         fi
     else
         die "Unable to resolve '$actor'"
+    fi
+}
+
+function print_copyright_warning() {
+    if [[ $_skip_copyright_warn == 0 ]]; then
+        echo "
+ ##########################################
+ # You are uploading files to bsky.social #
+ #    Do not upload copyrighted files!    #
+ ##########################################
+"
     fi
 }
 
@@ -599,14 +616,18 @@ function invoke_upload() {
         file="$(realpath "$file")"
     fi
     
+    if [[ "$_server" == "https://zio.blue" ]]; then
+        print_copyright_warning
+    fi
+    
     if [[ -n $recipient ]]; then
         file_crypt="$(dirname "$file")/$(basename "$file").gpg"
+        
+        echo -e "Encrypting '$file_crypt'..."
         gpg --yes --quiet --recipient $recipient --output "$file_crypt" --encrypt "$file"
         [[ $? != 0 ]] && success=0
         
         if [[ $success == 1 ]]; then
-            echo "Encrypted: $(basename "$file")"
-            echo "↳ Recipient: $recipient ($(gpg --list-keys $recipient | sed -n 2p | xargs))"
             file="$file_crypt"
         else
             rm -f "$file_crypt"
@@ -634,6 +655,8 @@ function invoke_upload() {
         fi
         
         file_type_emoji="$(get_file_type_emoji "$file_type")"
+        
+        echo "Uploading '$file'..."
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(is_xrpc_success $? "$blob")
         
@@ -653,9 +676,13 @@ function invoke_upload() {
     fi
 
     if [[ $success == 1 ]]; then
+        echo "---"
         echo "Uploaded: $file_type_emoji $file_name"
         echo -e "↳ Blob: $(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
         echo -e "↳ Key:  $(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+        if [[ -n "$recipient" ]]; then
+            echo -e "↳ Recipient: $recipient ($(gpg --list-keys $recipient | sed -n 2p | xargs))"
+        fi
     else
         die "Unable to upload '$file'"
     fi
@@ -667,7 +694,7 @@ function invoke_usage() {
     Store and retrieve files on a PDS
     
     Version $_version
-    (c) 2024 Ducky <https://github.com/electricduck/atfile>
+    (c) $copy_year Ducky <https://github.com/electricduck/atfile>
     Licensed under MIT License ✨
     
 Commands
@@ -738,6 +765,8 @@ Enviroment Variables
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
         is a DID (*not* a handle), setting this to '1' will drastically improve
         performance!
+    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <int> (default: $_skip_copyright_warn_default)
+        Skip copyright warning when uploading files to https://bsky.social
 "
 # ------------------------------------------------------------------------------
 }
@@ -755,11 +784,13 @@ _fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?repo=[did]&cid=[cid]"
 _max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 accounting for the list header (2 lines) and the shell prompt (which is usually 1 line)
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
+_skip_copyright_warn_default=0
 
 _fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
 _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
+_skip_copyright_warn="$(get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
