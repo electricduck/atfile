@@ -66,6 +66,21 @@ function get_date() {
     fi
 }
 
+function get_date_json() {
+    date="$1"
+    parsed="$2"
+
+    if [[ -z "$parsed" ]]; then
+        parsed_date="$(get_date "$date")"
+        [[ $? == 0 ]] && parsed="$parsed_date"
+    fi
+
+    echo "{
+    \"original\": \"$date\",
+    \"parsed\": \"$parsed\"
+}"
+}
+
 function get_envvar() {
     envvar="$1"
     default="$2"
@@ -98,6 +113,25 @@ function get_envvar_from_envfile() {
             echo "$output"
         fi
     fi
+}
+
+function get_file_name_pretty() {
+    file_record="$1"
+    output="$(echo "$file_record" | jq -r ".file.name")"
+    
+    meta_type="$(echo "$file_record" | jq -r ".meta.\"\$type\"")"
+    
+    if [[ -n "$meta_type" ]]; then
+        case $meta_type in
+            "blue.zio.atfile.meta#audio")
+                artist="$(echo "$file_record" | jq -r ".meta.tags.artist")"
+                title="$(echo "$file_record" | jq -r ".meta.tags.title")"
+                output="$artist — $title"
+                ;;
+        esac
+    fi
+    
+    echo "$output"
 }
 
 function get_file_size_pretty() {
@@ -166,7 +200,28 @@ function get_file_type_emoji() {
     esac
 }
 
-function get_meta_from_mediainfo() {
+function get_exiftool_field() {
+    file="$1"
+    tag="$2"
+    default="$3"
+    output=""
+    
+    exiftool_output="$(eval "exiftool -s -T -$tag \"$file\"")"
+    
+    if [[ -n "$exiftool_output" ]]; then
+        if [[ "$exiftool_output" == "-" ]]; then
+            output="$default"
+        else
+            output="$exiftool_output"
+        fi
+    else
+        output="$default"
+    fi
+    
+    echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
+}
+
+function get_mediainfo_field() {
     file="$1"
     category="$2"
     field="$3"
@@ -188,14 +243,95 @@ function get_meta_from_mediainfo() {
     echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
 }
 
+function get_mediainfo_audio_json() {
+    file="$1"
+
+    bitRates=$(get_mediainfo_field "$file" "Audio" "BitRate" 0)
+    bitRate_modes=$(get_mediainfo_field "$file" "Audio" "BitRate_Mode" "")
+    channelss=$(get_mediainfo_field "$file" "Audio" "Channels" 0)
+    compressions="$(get_mediainfo_field "$file" "Audio" "Compression_Mode" "")"
+    durations=$(get_mediainfo_field "$file" "Audio" "Duration" 0)
+    formats="$(get_mediainfo_field "$file" "Audio" "Format" "")"
+    format_ids="$(get_mediainfo_field "$file" "Audio" "CodecID" "")"
+    format_profiles="$(get_mediainfo_field "$file" "Audio" "Format_Profile" "")"
+    samplings=$(get_mediainfo_field "$file" "Audio" "SamplingRate" 0)
+    titles="$(get_mediainfo_field "$file" "Audio" "Title" "")"
+    
+    lines="$(echo "$bitrates" | wc -l)"
+    output=""
+
+    for ((i = 0 ; i < $lines ; i++ )); do
+        lossy=true
+        
+        [[ \"$(get_line "$compressionss" $i)\" == "Lossless" ]] && lossy=false
+    
+        output+="{
+    \"bitRate\": $(get_line "$bitRates" $i),
+    \"channels\": $(get_line "$channelss" $i),
+    \"duration\": $(get_line "$durations" $i),
+    \"format\": {
+        \"id\": \"$(get_line "$format_ids" $i)\",
+        \"name\": \"$(get_line "$formats" $i)\",
+        \"profile\": \"$(get_line "$format_profiles" $i)\"
+    },
+    \"mode\": \"$(get_line "$bitrate_modes" $i)\",
+    \"lossy\": $lossy,
+    \"sampling\": $(get_line "$samplings" $i),
+    \"title\": \"$(get_line "$titles" $i)\"
+},"
+    done
+    
+    echo "${output::-1}"
+}
+
+function get_mediainfo_video_json() {
+    file="$1"
+
+    bitRates=$(get_mediainfo_field "$file" "Video" "BitRate" 0)
+    dim_height=$(get_mediainfo_field "$file" "Video" "Height" 0)
+    dim_width=$(get_mediainfo_field "$file" "Video" "Width" 0)
+    durations=$(get_mediainfo_field "$file" "Video" "Duration" 0)
+    formats="$(get_mediainfo_field "$file" "Video" "Format" "")"
+    format_ids="$(get_mediainfo_field "$file" "Video" "CodecID" "")"
+    format_profiles="$(get_mediainfo_field "$file" "Video" "Format_Profile" "")"
+    frameRates="$(get_mediainfo_field "$file" "Video" "FrameRate" "")"
+    frameRate_modes="$(get_mediainfo_field "$file" "Video" "FrameRate_Mode" "")"
+    titles="$(get_mediainfo_field "$file" "Video" "Title" "")"
+    
+    lines="$(echo "$bitrates" | wc -l)"
+    output=""
+
+    for ((i = 0 ; i < $lines ; i++ )); do    
+        output+="{
+    \"bitRate\": $(get_line "$bitRates" $i),
+    \"dimensions\": {
+        \"height\": $dim_height,
+        \"width\": $dim_width
+    },
+    \"duration\": $(get_line "$durations" $i),
+    \"format\": {
+        \"id\": \"$(get_line "$format_ids" $i)\",
+        \"name\": \"$(get_line "$formats" $i)\",
+        \"profile\": \"$(get_line "$format_profiles" $i)\"
+    },
+    \"frameRate\": $(get_line "$frameRates" $i),
+    \"mode\": \"$(get_line "$frameRate_modes" $i)\",
+    \"title\": \"$(get_line "$titles" $i)\"
+},"
+    done
+    
+    echo "${output::-1}"
+}
+
 function get_meta_record() {
     file="$1"
     type="$2"
     
     case "$type" in
-        "audio/mpeg") blue.zio.atfile.meta__music "$1" ;;
-        "video/mp4") blue.zio.atfile.meta__video "$1" ;;
-        *) blue.zio.atfile.meta__unknown ;;
+        "audio/"*) blue.zio.atfile.meta__audio "$1" ;;
+        "image/"*) blue.zio.atfile.meta__photo "$1" ;;
+        "video/"*) blue.zio.atfile.meta__video "$1" ;;
+        *) blue.zio.atfile.meta__unknown "" "$type" ;;
     esac
 }
 
@@ -370,95 +506,162 @@ function get_line() {
 }
 
 function blue.zio.atfile.meta__unknown() {
+    reason="$1"
+    type="$2"
+    
+    if [[ -z "$reason" ]]; then
+        reason="No metadata available for $type"
+    fi
+
     echo "{
-    \"\$type\": \"blue.zio.atfile.meta#unknown\"
+    \"\$type\": \"blue.zio.atfile.meta#unknown\",
+    \"reason\": \"$reason\"
 }"
 }
 
-function get_mediainfo_audio_json() {
+function blue.zio.atfile.meta__audio() {
     file="$1"
-
-    bitrates=$(get_meta_from_mediainfo "$file" "Audio" "BitRate" 0)
-    bitrate_modes=$(get_meta_from_mediainfo "$file" "Audio" "BitRate_Mode" "")
-    channelss=$(get_meta_from_mediainfo "$file" "Audio" "Channels" 0)
-    compressions="$(get_meta_from_mediainfo "$file" "Audio" "Compression_Mode" "")"
-    durations=$(get_meta_from_mediainfo "$file" "Audio" "Duration" 0)
-    formats="$(get_meta_from_mediainfo "$file" "Audio" "Format" "")"
-    samplings=$(get_meta_from_mediainfo "$file" "Audio" "SamplingRate" 0)
-    titles="$(get_meta_from_mediainfo "$file" "Audio" "Title" "")"
     
-    lines="$(echo "$bitrates" | wc -l)"
-    output=""
+    if [ ! -x "$(command -v mediainfo)" ]; then
+        echo "$(blue.zio.atfile.meta__unknown "Unable to create record at time of upload (MediaInfo not installed)")"
+        return
+    fi
+    
+    audio="$(get_mediainfo_audio_json "$file")"
+    duration=$(get_mediainfo_field "$file" "General" "Duration" 0)
+    format="$(get_mediainfo_field "$file" "General" "Format" "(Unknown Album)")"
+    tag_album="$(get_mediainfo_field "$file" "General" "Album" "(Unknown Album)")"
+    tag_albumArtist="$(get_mediainfo_field "$file" "General" "Album/Performer" "(Unknown Album Artist)")"
+    tag_artist="$(get_mediainfo_field "$file" "General" "Performer" "(Unknown Artist)")"
+    tag_date="$(get_mediainfo_field "$file" "General" "Original/Released_Date")"
+    tag_disc=$(get_mediainfo_field "$file" "General" "Part/Position" 0)
+    tag_discTotal=$(get_mediainfo_field "$file" "General" "Part/Position_Total" 0)
+    tag_title="$(get_mediainfo_field "$file" "General" "Title" "(Unknown Track)")"
+    tag_track=$(get_mediainfo_field "$file" "General" "Track/Position" 0)
+    tag_trackTotal=$(get_mediainfo_field "$file" "General" "Track/Position_Total" 0)
+    
+    parsed_tag_date=""
+    
+    if [[ "${#tag_date}" > 4 ]]; then
+        parsed_tag_date="$(get_date "$tag_date")"
+    elif [[ "${#tag_date}" == 4 ]]; then
+        parsed_tag_date="$(get_date "${tag_date}-01-01")"
+    fi
+    
+    echo "{
+    \"\$type\": \"blue.zio.atfile.meta#audio\",
+    \"audio\": [ $audio ],
+    \"duration\": $duration,
+    \"format\": \"$format\",
+    \"tags\": {
+        \"album\": \"$tag_album\",
+        \"album_artist\": \"$tag_albumArtist\",
+        \"artist\": \"$tag_artist\",
+        \"date\": $(get_date_json "$tag_date" "$parsed_tag_date"),
+        \"disc\": {
+            \"position\": $tag_disc,
+            \"total\": $tag_discTotal
+        },
+        \"title\": \"$tag_title\",
+        \"track\": {
+            \"position\": $tag_track,
+            \"total\": $tag_trackTotal
+        }
+    }
+}"
+}
 
-    for ((i = 0 ; i < $lines ; i++ )); do
-        lossy=true
+function blue.zio.atfile.meta__photo() {
+    file="$1"
+    
+    if [ ! -x "$(command -v exiftool)" ]; then
+        echo "$(blue.zio.atfile.meta__unknown "Unable to create record during upload (ExifTool not installed)")"
+        return
+    fi
+
+    function parse_exiftool_date() {
+        in_date="$1"
+        tz="$2"
         
-        [[ \"$(get_line "$compressionss" $i)\" == "Lossless" ]] && lossy=false
+        date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
+        time="$(echo "$in_date" | cut -d " " -f 2)"
+        
+        echo "$date $time $tz"
+    }
+
+    artist="$(get_exiftool_field "$file" "Artist" "")"
+    camera_aperture="$(get_exiftool_field "$file" "Aperture" "")"
+    camera_exposure="$(get_exiftool_field "$file" "ExposureTime" "")"
+    camera_flash="$(get_exiftool_field "$file" "Flash" "")"
+    camera_focalLength="$(get_exiftool_field "$file" "FocalLength" "")"
+    camera_iso="$(get_exiftool_field "$file" "ISO" 0)"
+    camera_make="$(get_exiftool_field "$file" "Make" "")"
+    camera_mpx="$(get_exiftool_field "$file" "Megapixels" "")"
+    camera_model="$(get_exiftool_field "$file" "Model" "")"
+    date_create="$(get_exiftool_field "$file" "CreateDate" "")"
+    date_modify="$(get_exiftool_field "$file" "ModifyDate" "")"
+    date_tz="$(get_exiftool_field "$file" "OffsetTime" "")"
+    dim_height="$(get_exiftool_field "$file" "ImageHeight" "")"
+    dim_width="$(get_exiftool_field "$file" "ImageWidth" "")"
+    gps_alt="$(get_exiftool_field "$file" "GPSAltitude" "")"
+    gps_lat="$(get_exiftool_field "$file" "GPSLatitude" "")"
+    gps_long="$(get_exiftool_field "$file" "GPSLongitude" "")"
+    orientation="$(get_exiftool_field "$file" "Orientation" "")"
+    software="$(get_exiftool_field "$file" "Software" "")"
+    title="$(get_exiftool_field "$file" "Title" "")"
     
-        output+="{
-    \"bitrate\": $(get_line "$bitrates" $i),
-    \"channels\": $(get_line "$channelss" $i),
-    \"duration\": $(get_line "$durations" $i),
-    \"format\": \"$(get_line "$formats" $i)\",
-    \"mode\": \"$(get_line "$bitrate_modes" $i)\",
-    \"lossy\": $lossy,
-    \"sampling\": $(get_line "$samplings" $i),
-    \"title\": \"$(get_line "$titles" $i)\"
-},"
-    done
-    
-    echo "${output::-1}"
+    date_create="$(parse_exiftool_date "$date_create" "$date_tz")"
+    date_modify="$(parse_exiftool_date "$date_modify" "$date_tz")"
+
+    echo "{
+    \"\$type\": \"blue.zio.atfile.meta#photo\",
+    \"artist\": \"$artist\",
+    \"camera\": {
+        \"aperture\": \"$camera_aperture\",
+        \"device\": {
+            \"make\": \"$camera_make\",
+            \"model\": \"$camera_model\"
+        },
+        \"exposure\": \"$camera_exposure\",
+        \"flash\": \"$camera_flash\",
+        \"focalLength\": \"$camera_focalLength\",
+        \"iso\": $camera_iso,
+        \"megapixels\": $camera_mpx
+    },
+    \"date\": {
+        \"create\": $(get_date_json "$date_create"),
+        \"modify\": $(get_date_json "$date_modify")
+    },
+    \"dimensions\": {
+        \"height\": $dim_height,
+        \"width\": $dim_width
+    },
+    \"gps\": {
+        \"alt\": \"$gps_alt\",
+        \"lat\": \"$gps_lat\",
+        \"long\": \"$gps_long\"
+    },
+    \"orientation\": \"$orientation\",
+    \"software\": \"$software\",
+    \"title\": \"$title\"
+}"
 }
 
 function blue.zio.atfile.meta__video() {
     file="$1"
     
+    if [ ! -x "$(command -v video)" ]; then
+        echo "$(blue.zio.atfile.meta__unknown "Unable to create record during upload (MediaInfo not installed)")"
+        return
+    fi
+    
     audio="$(get_mediainfo_audio_json "$file")"
+    video="$(get_mediainfo_video_json "$file")"
     
     echo "{
     \"\$type\": \"blue.zio.atfile.meta#video\",
-    \"value\": {
-        \"audio\": [ $audio ]
-    }
-}"
-}
-
-function blue.zio.atfile.meta__music() {
-    file="$1"
-    
-    audio="$(get_mediainfo_audio_json "$file")"
-    tag_album="$(get_meta_from_mediainfo "$file" "General" "Album" "(Unknown Album)")"
-    tag_albumArtist="$(get_meta_from_mediainfo "$file" "General" "Album/Performer" "(Unknown Album Artist)")"
-    tag_artist="$(get_meta_from_mediainfo "$file" "General" "Performer" "(Unknown Artist)")"
-    tag_date="$(get_meta_from_mediainfo "$file" "General" "Original/Released_Date" "?")"
-    tag_disc=$(get_meta_from_mediainfo "$file" "General" "Part/Position" 0)
-    tag_discTotal=$(get_meta_from_mediainfo "$file" "General" "Part/Position_Total" 0)
-    tag_duration=$(get_meta_from_mediainfo "$file" "General" "Duration" 0)
-    tag_title="$(get_meta_from_mediainfo "$file" "General" "Title" "(Unknown Track)")"
-    tag_track=$(get_meta_from_mediainfo "$file" "General" "Track/Position" 0)
-    tag_trackTotal=$(get_meta_from_mediainfo "$file" "General" "Track/Position_Total" 0)
-    
-    echo "{
-    \"\$type\": \"blue.zio.atfile.meta#music\",
-    \"value\": {
-        \"audio\": [ $audio ],
-        \"tags\": {
-            \"album\": \"$tag_album\",
-            \"album_artist\": \"$tag_albumArtist\",
-            \"artist\": \"$tag_artist\",
-            \"date\": \"$tag_date\",
-            \"disc\": {
-                \"position\": $tag_disc,
-                \"total\": $tag_discTotal
-            },
-            \"duration\": $tag_duration,
-            \"title\": \"$tag_title\",
-            \"track\": {
-                \"position\": $tag_track,
-                \"total\": $tag_trackTotal
-            }
-        }
-    }
+    \"audio\": [ $audio ],
+    \"video\": [ $video ]
 }"
 }
 
@@ -646,21 +849,22 @@ function invoke_get() {
     	file_hash_type="$(echo "$record" | jq -r '.value.checksum.type')"
     	file_hash_pretty="$file_hash ($file_hash_type)"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
+        file_name_pretty="$(get_file_name_pretty "$(echo "$record" | jq -r '.value')")"
         file_size="$(echo "$record" | jq -r '.value.file.size')"
         file_size_pretty="$(get_file_size_pretty $file_size)"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         file_type_emoji="$(get_file_type_emoji "$file_type")"
         
-        if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
-            file_hash_pretty="(none)"
-        fi
-        
         did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         blob_uri="$(get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         cdn_uri="$(get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
+        header="$file_type_emoji $file_name_pretty"
         
-        header="$file_type_emoji $key"
+        if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
+            file_hash_pretty="(none)"
+        fi
+        
         echo "$header"
         echo -e "↳ Blob: $blob_uri"
         [[ -n "$cdn_uri" ]] && echo -e " ↳ CDN: $cdn_uri"
@@ -894,7 +1098,7 @@ function invoke_test_vars() {
 
 function invoke_usage() {
 # ------------------------------------------------------------------------------
-    echo -e "ATFile ($_prog) 📦➔🦋
+    echo -e "ATFile 📦➔🦋
     Store and retrieve files on a PDS
     
     Version $_version
@@ -967,16 +1171,27 @@ Environment Variables
     ${_envvar_prefix}_SKIP_AUTH_CHECK <int> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
-        is a DID (*not* a handle), setting this to '1' will drastically improve
-        performance!
+        is a DID (*not* a handle), this will drastically improve performance!
     ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <int> (default: $_skip_copyright_warn_default)
-        Skip copyright warning when uploading files to https://bsky.social
+        Do not print copyright warning when uploading files to
+        https://bsky.social
+    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <int> (default: $_skip_ni_exiftool_default)
+        Do not check if ExifTool is installed
+        ⚠️  If Exiftool is not installed, the relevant metadata records will
+           not be created:
+           * image/*: blue.zio.atfile.meta#photo
+    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <int> (default: $_skip_ni_mediainfo_default)
+        Do not check if MediaInfo is installed
+        ⚠️  If MediaInfo is not installed, the relevant metadata records will
+           not be created:
+           * audio/*: blue.zio.atfile.meta#audio
+           * video/*: blue.zio.atfile.meta#video
 
 Files
     $_envfile
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
-"
+" | less
 # ------------------------------------------------------------------------------
 }
 
@@ -991,16 +1206,20 @@ _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
 _fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
-_max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 accounting for the list header (2 lines) and the shell prompt (which is usually 1 line)
+_max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 to accounti for the list header (2 lines) and the shell prompt (which is usually 1 line)
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
 _skip_copyright_warn_default=0
+_skip_ni_exiftool=0
+_skip_ni_mediainfo=0
 
 _fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
 _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _skip_copyright_warn="$(get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
+_skip_ni_exiftool="$(get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool")"
+_skip_ni_mediainfo="$(get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo")"
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
@@ -1014,8 +1233,10 @@ if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command ==
 fi
 
 check_prog "curl"
+[[ $_skip_exiftool_warn == 0 ]] && check_prog "exiftool" "https://exiftool.org/"
 check_prog "jq" "https://jqlang.github.io/jq"
 check_prog "md5sum"
+[[ $_skip_mediainfo_warn == 0 ]] && check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 check_prog "xargs"
 
 [[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
