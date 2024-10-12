@@ -30,13 +30,10 @@ function check_gpg_prog() {
 
 function get_blob_uri() {
     did="$1"
-    blob_cid="$2"
-    
-    if [[ $_server == "https://zio.blue" ]]; then
-        echo "$_server/blob/$did/$blob_cid"
-    else
-        echo "$_server/xrpc/com.atproto.sync.getBlob?cid=$blob_cid&did=$did"
-    fi
+    cid="$2"
+    pds="$_server"
+
+    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
 }
 
 function get_cdn_uri() {
@@ -730,6 +727,9 @@ Enviroment Variables
     ${_envvar_prefix}_PASSWORD <string>
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
+    ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
+        Format for blob URLs. See default (above) for example; includes
+        all possible fragments
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
         Maximum amount of items in any lists
         Default value is calculated from your terminal's height
@@ -751,10 +751,12 @@ _command="$1"
 
 #_envvar_prefix="$(echo ${_prog^^} | cut -d "-" -f 1 | cut -d "." -f 1 | cut -d " " -f 1)"
 _envvar_prefix="ATFILE"
+_fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?repo=[did]&cid=[cid]"
 _max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 accounting for the list header (2 lines) and the shell prompt (which is usually 1 line)
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
 
+_fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
 _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
