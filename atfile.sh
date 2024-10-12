@@ -71,17 +71,7 @@ function get_envvar() {
     fi
 }
 
-function get_md5() {
-    file="$1"
-    md5sum "$file" | cut -f 1 -d " "
-}
-
-function get_rkey_from_at_uri() {
-    at_uri="$1"
-    echo $at_uri | cut -d "/" -f 5
-}
-
-function get_size_pretty() {
+function get_file_size_pretty() {
     size="$1"
     suffix=""
     
@@ -98,23 +88,7 @@ function get_size_pretty() {
     echo "$size $suffix"
 }
 
-function get_term_cols() {
-    if [[ -n $COLUMNS ]]; then
-        echo $COLUMNS
-    else
-        echo 80
-    fi
-}
-
-function get_term_rows() {
-    if [[ -n $LINES ]]; then
-        echo $LINES
-    else
-        echo 40
-    fi
-}
-
-function get_type_emoji() {
+function get_file_type_emoji() {
     mime_type="$1"
     short_type="$(echo $mime_type | cut -d "/" -f 1)"
     desc_type="$(echo $mime_type | cut -d "/" -f 2)"
@@ -161,6 +135,32 @@ function get_type_emoji() {
         "video") echo "📼" ;;
         *) echo "❓" ;;
     esac
+}
+
+function get_md5() {
+    file="$1"
+    md5sum "$file" | cut -f 1 -d " "
+}
+
+function get_rkey_from_at_uri() {
+    at_uri="$1"
+    echo $at_uri | cut -d "/" -f 5
+}
+
+function get_term_cols() {
+    if [[ -n $COLUMNS ]]; then
+        echo $COLUMNS
+    else
+        echo 80
+    fi
+}
+
+function get_term_rows() {
+    if [[ -n $LINES ]]; then
+        echo $LINES
+    else
+        echo 40
+    fi
 }
 
 function is_xrpc_success() {
@@ -458,9 +458,9 @@ function invoke_get() {
     	file_hash_type="$(echo "$record" | jq -r '.value.checksum.type')"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
         file_size="$(echo "$record" | jq -r '.value.file.size')"
-        file_size_pretty="$(get_size_pretty $file_size)"
+        file_size_pretty="$(get_file_size_pretty $file_size)"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
-        file_type_emoji="$(get_type_emoji "$file_type")"
+        file_type_emoji="$(get_file_type_emoji "$file_type")"
         
         did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
@@ -511,7 +511,7 @@ function invoke_list() {
             while IFS=$"\n" read -r c; do
                 key=$(get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
                 name="$(echo "$c" | jq -r '.value.file.name')"
-                type_emoji="$(get_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
+                type_emoji="$(get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
 
                 echo -e "$key\t$type_emoji $name"
             done
@@ -633,7 +633,7 @@ function invoke_upload() {
             esac
         fi
         
-        file_type_emoji="$(get_type_emoji "$file_type")"
+        file_type_emoji="$(get_file_type_emoji "$file_type")"
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(is_xrpc_success $? "$blob")
         
