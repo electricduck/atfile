@@ -69,11 +69,34 @@ function get_date() {
 function get_envvar() {
     envvar="$1"
     default="$2"
+    envvar_from_envfile="$(get_envvar_from_envfile "$envvar")"
+    envvar_value=""
     
-    if [[ -z "${!envvar}" ]]; then
-        echo $default
-    else
-        echo "${!envvar}"
+    if [[ -n "${!envvar}" ]]; then
+        envvar_value="${!envvar}"
+    elif [[ -n "$envvar_from_envfile" ]]; then
+        envvar_value="$envvar_from_envfile"
+    fi
+    
+    if [[ -z "$envvar_value" ]]; then
+        envvar_value="$default"
+    fi
+    
+    echo "$envvar_value"
+}
+
+function get_envvar_from_envfile() {
+    if [[ -f "$_envfile" ]]; then
+        variable="$1"
+        found_line="$(cat "$_envfile" | grep "${variable}=")"
+        
+        if [[ -n "$found_line" ]] && [[ ! "$found_line" == \#* ]]; then
+            output="$(echo $found_line | sed "s|${variable}=||g")"
+            output="${output%\"}"
+            output="${output#\"}"
+            
+            echo "$output"
+        fi
     fi
 }
 
@@ -205,6 +228,11 @@ function override_actor() {
         else
             export _server="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             export _username="$(echo "$did_doc" | jq -r ".id")"
+            
+            # TODO: Maybe store blob URL format of choice on a record?
+            if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
+                export _fmt_blob_url="$_fmt_blob_url_default"
+            fi
         fi
     else
         die "Unable to resolve '$actor'"
@@ -519,11 +547,11 @@ function invoke_list() {
     
     records="$(com.atproto.repo.listRecords "$_username" "blue.zio.atfile.upload" "$cursor")"
     success="$(is_xrpc_success $? "$records")"
-    
-    echo -e "Key\t\tFile"
-    echo -e "---\t\t----"
    
     if [[ $success == 1 ]]; then
+        echo -e "Key\t\tFile"
+        echo -e "---\t\t----"
+    
         echo $records | jq -c '.records[]' |
             while IFS=$"\n" read -r c; do
                 key=$(get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
@@ -688,6 +716,29 @@ function invoke_upload() {
     fi
 }
 
+function invoke_test_vars() {
+    function print_var() {
+        variable_name="${_envvar_prefix}_$1"
+        variable_default="$2"
+        
+        output="$variable_name: $(get_envvar "$variable_name" "$variable_default")"
+        
+        if [[ -n "$variable_default" ]]; then
+            output="$output ($variable_default)"
+        fi
+        
+        echo "$output"
+    }
+    
+    print_var "USERNAME"
+    print_var "PASSWORD"
+    print_var "FMT_BLOB_URL" "$_fmt_blob_url_default"
+    print_var "MAX_LIST" "$_max_list_default"
+    print_var "PDS" "$_server_default"
+    print_var "SKIP_AUTH_CHECK" "$_skip_auth_check_default"
+    print_var "SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default"
+}
+
 function invoke_usage() {
 # ------------------------------------------------------------------------------
     echo -e "ATFile ($_prog) 📦➔🦋
@@ -746,7 +797,7 @@ Arguments
     <recipient> GPG recipient during file encryption
                 See 'gpg --help' for more information
 
-Enviroment Variables
+Environment Variables
     ${_envvar_prefix}_PDS <string> (default: $_server_default)
         Endpoint of the PDS
     ${_envvar_prefix}_USERNAME <string>
@@ -767,6 +818,11 @@ Enviroment Variables
         performance!
     ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <int> (default: $_skip_copyright_warn_default)
         Skip copyright warning when uploading files to https://bsky.social
+
+Files
+    $_envfile
+        List of key/values of the above environment variables. Exporting these
+        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 "
 # ------------------------------------------------------------------------------
 }
@@ -778,9 +834,10 @@ _now="$(get_date)"
 
 _command="$1"
 
-#_envvar_prefix="$(echo ${_prog^^} | cut -d "-" -f 1 | cut -d "." -f 1 | cut -d " " -f 1)"
 _envvar_prefix="ATFILE"
-_fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?repo=[did]&cid=[cid]"
+_envfile="$HOME/.config/atfile.env"
+
+_fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 accounting for the list header (2 lines) and the shell prompt (which is usually 1 line)
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
@@ -794,6 +851,10 @@ _skip_copyright_warn="$(get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_sk
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
+if [[ $_max_list > 100 ]]; then
+    _max_list="100"
+fi
+
 if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     invoke_usage
     exit 0
@@ -806,6 +867,11 @@ check_prog "xargs"
 
 [[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
+
+if [[ $_command == "test-vars" ]]; then
+    invoke_test_vars
+    exit 0
+fi
 
 if [[ $_skip_auth_check == 0 ]]; then
     session="$(com.atproto.server.getSession)"
