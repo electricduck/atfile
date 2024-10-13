@@ -861,8 +861,9 @@ function invoke_delete() {
     success=1
 
     lock_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
-    if [[ $(is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".lock") == true ]]; then
-        die "Unable to delete '$key'; file is lockedz\nUse \`$prog unlock $key\` to unlock file."
+
+    if [[ $(is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".value.lock") == true ]]; then
+        die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
     fi
 
     record="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.upload" "$key")"
