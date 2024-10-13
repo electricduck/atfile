@@ -1362,11 +1362,11 @@ if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command ==
 fi
 
 check_prog "curl"
-[[ $_skip_exiftool_warn == 0 ]] && check_prog "exiftool" "https://exiftool.org/"
 check_prog "jq" "https://jqlang.github.io/jq"
 check_prog "md5sum"
-[[ $_skip_mediainfo_warn == 0 ]] && check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 check_prog "xargs"
+[[ $_skip_exiftool_warn == 0 ]] && check_prog "exiftool" "https://exiftool.org/"
+[[ $_skip_mediainfo_warn == 0 ]] && check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 
 [[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
