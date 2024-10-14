@@ -1084,13 +1084,15 @@ function invoke_list() {
     success="$(is_xrpc_success $? "$records")"
    
     if [[ $success == 1 ]]; then
-        echo -e "Key\t\tFile"
-        echo -e "---\t\t----"
-    
+    	records="$(echo $records | jq -c '.records[]')"
+        [[ -z "$records" ]] && die "No files for '$_username'"
+        
         unset last_key
         unset record_count
     
-        records="$(echo $records | jq -c '.records[]')"
+        echo -e "Key\t\tFile"
+        echo -e "---\t\t----"
+        
         while IFS=$"\n" read -r c; do
             key=$(get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
             name="$(echo "$c" | jq -r '.value.file.name')"
@@ -1098,7 +1100,9 @@ function invoke_list() {
             last_key="$key"
             ((record_count++))
 
-            echo -e "$key\t$type_emoji $name"
+            if [[ -n $key ]]; then
+                echo -e "$key\t$type_emoji $name"
+            fi
         done <<< "$records"
          
         print_table_paginate_hint "$last_key" $record_count
@@ -1115,13 +1119,15 @@ function invoke_list_blobs() {
     success="$(is_xrpc_success $? "$blobs")"
 
     if [[ $success == 1 ]]; then
+    	records="$(echo $blobs | jq -c '.cids[]')"
+    	[[ -z "$records" ]] && die "No blobs for '$_username'"
+    
+    	unset last_cid
+        unset record_count
+    
         echo -e "URL"
         echo -e "---"
     
-        unset last_cid
-        unset record_count
-    
-        records="$(echo $blobs | jq -c '.cids[]')"
         while IFS=$"\n" read -r c; do
             cid="$(echo $c | jq -r ".")"
             last_cid="$cid"
