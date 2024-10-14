@@ -1392,7 +1392,7 @@ Arguments
                 See 'gpg --help' for more information
 
 Environment Variables
-    ${_envvar_prefix}_PDS <string> (default: $_server_default)
+    ${_envvar_prefix}_PDS <url> (default: $_server_default)
         Endpoint of the PDS
     ${_envvar_prefix}_USERNAME <string>
         Username of the PDS user (handle or DID)
@@ -1407,24 +1407,26 @@ Environment Variables
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
-    ${_envvar_prefix}_SKIP_AUTH_CHECK <int> (default: $_skip_auth_check_default)
+    ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
         is a DID (*not* a handle), this will drastically improve performance!
-    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <int> (default: $_skip_copyright_warn_default)
+    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <bool*> (default: $_skip_copyright_warn_default)
         Do not print copyright warning when uploading files to
         https://bsky.social
-    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <int> (default: $_skip_ni_exiftool_default)
+    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <bool*> (default: $_skip_ni_exiftool_default)
         Do not check if ExifTool is installed
         ⚠️  If Exiftool is not installed, the relevant metadata records will
            not be created:
            * image/*: blue.zio.atfile.meta#photo
-    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <int> (default: $_skip_ni_mediainfo_default)
+    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool*> (default: $_skip_ni_mediainfo_default)
         Do not check if MediaInfo is installed
         ⚠️  If MediaInfo is not installed, the relevant metadata records will
            not be created:
            * audio/*: blue.zio.atfile.meta#audio
            * video/*: blue.zio.atfile.meta#video
+           
+    * A bool in Bash is 1 (true) or 0 (false)
 
 Files
     $_envfile
