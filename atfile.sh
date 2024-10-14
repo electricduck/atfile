@@ -30,8 +30,13 @@ function check_prog() {
     fi
 }
 
-function check_gpg_prog() {
+function check_prog_gpg() {
     check_prog "gpg" "https://gnupg.org/download"
+}
+
+function check_prog_optional_metadata() {
+    [[ $_skip_ni_exiftool == 0 ]] && check_prog "exiftool" "https://exiftool.org/"
+    [[ $_skip_ni_mediainfo == 0 ]] && check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 }
 
 function get_blob_uri() {
@@ -395,19 +400,17 @@ function get_rkey_from_at_uri() {
     echo $at_uri | cut -d "/" -f 5
 }
 
-function get_term_cols() {
-    if [[ -n $COLUMNS ]]; then
-        echo $COLUMNS
-    else
-        echo 80
-    fi
-}
-
 function get_term_rows() {
-    if [[ -n $LINES ]]; then
-        echo $LINES
+    unset rows
+    
+    if [ -x "$(command -v tput)" ]; then
+        rows=$(tput lines)
+    fi
+
+    if [[ -n $rows ]]; then
+        echo $rows
     else
-        echo 40
+        echo 30
     fi
 }
 
@@ -466,6 +469,17 @@ function print_copyright_warning() {
  #    Do not upload copyrighted files!    #
  ##########################################
 "
+    fi
+}
+
+function print_table_paginate_hint() {
+    cursor="$1"
+    count="$2"
+    
+    if [[ -z $count ]] || (( ( $record_count + $_max_list_buffer ) >= $_max_list )); then
+        first_line="List is limited to $_max_list results. To print more results,"
+        first_line_length=$(( ${#first_line} + 3 ))
+        echo -e "$(repeat "-" $first_line_length)\nℹ️  $first_line\n   run \`$_prog $_command $cursor\`"
     fi
 }
 
@@ -991,14 +1005,21 @@ function invoke_list() {
         echo -e "Key\t\tFile"
         echo -e "---\t\t----"
     
-        echo $records | jq -c '.records[]' |
-            while IFS=$"\n" read -r c; do
-                key=$(get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
-                name="$(echo "$c" | jq -r '.value.file.name')"
-                type_emoji="$(get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
+        unset last_key
+        unset record_count
+    
+        records="$(echo $records | jq -c '.records[]')"
+        while IFS=$"\n" read -r c; do
+            key=$(get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
+            name="$(echo "$c" | jq -r '.value.file.name')"
+            type_emoji="$(get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
+            last_key="$key"
+            ((record_count++))
 
-                echo -e "$key\t$type_emoji $name"
-            done
+            echo -e "$key\t$type_emoji $name"
+        done <<< "$records"
+         
+        print_table_paginate_hint "$last_key" $record_count
     else
         die "Unable to list files"
     fi
@@ -1010,15 +1031,24 @@ function invoke_list_blobs() {
     
     blobs="$(com.atproto.sync.listBlobs "$_username" "$cursor")"
     success="$(is_xrpc_success $? "$blobs")"
-    
-    echo -e "CID"
-    echo -e "---"
-   
+
     if [[ $success == 1 ]]; then
-        echo $blobs | jq -c '.cids[]' |
-            while IFS=$"\n" read -r c; do
-                echo $c | jq -r "."
-            done
+        echo -e "URL"
+        echo -e "---"
+    
+        unset last_cid
+        unset record_count
+    
+        records="$(echo $blobs | jq -c '.cids[]')"
+        while IFS=$"\n" read -r c; do
+            cid="$(echo $c | jq -r ".")"
+            last_cid="$cid"
+            ((record_count++))
+            
+            echo "$(get_blob_uri "$_username" "$cid")"
+        done <<< "$records"
+        
+        print_table_paginate_hint "$last_cid" $record_count
     else
         die "Unable to list blobs"
     fi
@@ -1335,24 +1365,25 @@ _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
 _fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
-_max_list_default=$(( $(get_term_rows) - 3 )) # NOTE: -3 to accounti for the list header (2 lines) and the shell prompt (which is usually 1 line)
+_max_list_buffer=6
+_max_list_default=$(( $(get_term_rows) - $_max_list_buffer ))
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
 _skip_copyright_warn_default=0
-_skip_ni_exiftool=0
-_skip_ni_mediainfo=0
+_skip_ni_exiftool_default=0
+_skip_ni_mediainfo_default=0
 
 _fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
 _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _skip_copyright_warn="$(get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
-_skip_ni_exiftool="$(get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool")"
-_skip_ni_mediainfo="$(get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo")"
+_skip_ni_exiftool="$(get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
+_skip_ni_mediainfo="$(get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
-if [[ $_max_list > 100 ]]; then
+if [[ $(( $_max_list > 100 )) == 1 ]]; then
     _max_list="100"
 fi
 
@@ -1365,8 +1396,6 @@ check_prog "curl"
 check_prog "jq" "https://jqlang.github.io/jq"
 check_prog "md5sum"
 check_prog "xargs"
-[[ $_skip_exiftool_warn == 0 ]] && check_prog "exiftool" "https://exiftool.org/"
-[[ $_skip_mediainfo_warn == 0 ]] && check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 
 [[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
@@ -1405,7 +1434,7 @@ case "$_command" in
         invoke_download "$2" "$3"
         ;;
     "fetch-crypt"|"download-crypt"|"fc"|"dc")
-        check_gpg_prog
+        check_prog_gpg
         [[ -z "$2" ]] && die "<key> not set"
         [[ -n "$4" ]] && override_actor "$4"
         invoke_download "$2" "$3" 1
@@ -1438,11 +1467,13 @@ case "$_command" in
         invoke_profile "$2"
         ;;
     "upload"|"ul"|"u")
+        check_prog_optional_metadata
         [[ -z "$2" ]] && die "<file> not set"
         invoke_upload "$2" "" "$3"
         ;;
     "upload-crypt"|"uc")
-        check_gpg_prog
+        check_prog_optional_metadata
+        check_prog_gpg
         [[ -z "$2" ]] && die "<file> not set"
         [[ -z "$3" ]] && die "<recipient> not set"
         invoke_upload "$2" "$3" "$4"
