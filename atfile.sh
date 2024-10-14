@@ -2,6 +2,7 @@
 
 # ATFile
 # ------
+# Version 0.1.1
 # (c) 2024 Ducky <https://github.com/electricduck/atfile>
 # Licensed under MIT License ✨
 
