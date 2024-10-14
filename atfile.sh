@@ -45,7 +45,7 @@ function get_blob_uri() {
     cid="$2"
     pds="$_server"
 
-    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
+    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
 }
 
 function get_cdn_uri() {
@@ -1453,7 +1453,7 @@ _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
 _fingerprint_default=0
-_fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
+_fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
 _max_list_default=$(( $(get_term_rows) - $_max_list_buffer ))
 _server_default="https://bsky.social"
