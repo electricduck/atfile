@@ -1010,6 +1010,7 @@ function invoke_get() {
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         blob_uri="$(get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         cdn_uri="$(get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
+        encrypted="No"
         locked="No"
         finger="(None)"
         finger_type=""
@@ -1017,6 +1018,10 @@ function invoke_get() {
         
         if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
             file_hash_pretty="(None)"
+        fi
+        
+        if [[ "$file_type" == "application/prs.atfile.gpg-crypt" ]]; then
+            encrypted="Yes"
         fi
         
         locked_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
@@ -1041,6 +1046,7 @@ function invoke_get() {
         echo -e " ↳ Date: $(date --date "$file_date" "+%Y-%m-%d %H:%M:%S %Z")"
         echo -e " ↳ Hash: $file_hash_pretty"
         echo -e "↳ Locked: $locked"
+        echo -e "↳ Encrypted: $encrypted"
         echo -e "↳ Finger: $finger"
         case $finger_type in
             "browser")
