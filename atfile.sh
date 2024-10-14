@@ -1465,9 +1465,8 @@ _skip_ni_mediainfo="$(get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_n
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
-if [[ $(( $_max_list > 100 )) == 1 ]]; then
-    _max_list="100"
-fi
+[[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
+[[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
 
 if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     invoke_usage
