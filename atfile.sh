@@ -1180,7 +1180,7 @@ function invoke_print() {
         blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
-        curl "$blob_uri" --output -
+        curl -s -L "$blob_uri" --output -
         [[ $? != 0 ]] && success=0
     fi
     
