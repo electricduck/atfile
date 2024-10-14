@@ -255,7 +255,7 @@ function get_file_type_emoji() {
         "inode") echo "🔌" ;;
         "text") 
             case "$mime_type" in
-                "text/x-shellscript") echo "⚙️" ;;
+                "text/x-shellscript") echo "⚙️ " ;;
                 *) echo "📄" ;;
             esac
             ;;
