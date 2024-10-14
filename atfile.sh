@@ -1180,16 +1180,8 @@ function invoke_print() {
         blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
-        if [[ $file_type == "text/"* ]]; then
-             curl "$blob_uri"
-             [[ $? != 0 ]] && success=0
-        else
-            if [ -x "$(command -v xdg-open)" ]; then
-               xdg-open "$blob_uri"
-            else
-               die "Unable to open non-plain/text files"
-            fi
-        fi
+        curl "$blob_uri" --output -
+        [[ $? != 0 ]] && success=0
     fi
     
     if [[ $success != 1 ]]; then
@@ -1357,8 +1349,6 @@ Commands
         
     cat <key> [<actor>]
         Print (don't download) an uploaded file to the shell
-        ℹ️  Only text/* files will print to the shell. Other files will open in
-           a browser (using 'xdg-open'; if installed)
            
     url <key> [<actor>]
         Get blob URL for an uploaded file
