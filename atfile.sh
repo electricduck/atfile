@@ -1301,7 +1301,7 @@ function invoke_upload() {
         echo "---"
         echo "Uploaded: $file_type_emoji $file_name"
         echo -e "↳ Blob: $(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
-        echo -e "↳ Key:  $(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+        echo -e "↳ Key: $(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         if [[ -n "$recipient" ]]; then
             echo -e "↳ Recipient: $recipient ($(gpg --list-keys $recipient | sed -n 2p | xargs))"
         fi
