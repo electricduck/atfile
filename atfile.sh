@@ -1302,27 +1302,29 @@ function invoke_upload() {
     fi
 }
 
-function invoke_test_vars() {
-    function print_var() {
+function invoke_print_vars() {
+    function print_envvar() {
         variable_name="${_envvar_prefix}_$1"
         variable_default="$2"
         
+        unset output
+        
         output="$variable_name: $(get_envvar "$variable_name" "$variable_default")"
+        [[ -n "$variable_default" ]] && output+=" ($variable_default)"
         
-        if [[ -n "$variable_default" ]]; then
-            output="$output ($variable_default)"
-        fi
-        
-        echo "$output"
+        echo -e "$output"
     }
     
-    print_var "USERNAME"
-    print_var "PASSWORD"
-    print_var "FMT_BLOB_URL" "$_fmt_blob_url_default"
-    print_var "MAX_LIST" "$_max_list_default"
-    print_var "PDS" "$_server_default"
-    print_var "SKIP_AUTH_CHECK" "$_skip_auth_check_default"
-    print_var "SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default"
+    print_envvar "USERNAME"
+    echo "$(print_envvar "PASSWORD" | cut -d ":" -f 1): $(print_envvar "PASSWORD" | cut -d ":" -f 2 | xargs | sed -e "s/./\*/g")"
+    print_envvar "PDS" "$_server_default"
+    print_envvar "FINGERPRINT" "$_fingerprint_default"
+    print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default"
+    print_envvar "MAX_LIST" "$_max_list_default"
+    print_envvar "SKIP_AUTH_CHECK" "$_skip_auth_check_default"
+    print_envvar "SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default"
+    print_envvar "SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default"
+    print_envvar "SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default"
 }
 
 function invoke_usage() {
@@ -1398,12 +1400,12 @@ Environment Variables
         An App Password is recommended (https://bsky.app/settings/app-passwords)
     ${_envvar_prefix}_FINGERPRINT <int> (default $_fmt_blob_url_default)
         Apply machine fingerprint to uploaded files
-    ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
-        Format for blob URLs. See default (above) for example; includes
-        all possible fragments
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
         Maximum amount of items in any lists
         Default value is calculated from your terminal's height
+    ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
+        Format for blob URLs. See default (above) for example; includes
+        all possible fragments
     ${_envvar_prefix}_SKIP_AUTH_CHECK <int> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
@@ -1480,7 +1482,7 @@ check_prog "xargs"
 [[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
 
 if [[ $_command == "test-vars" ]]; then
-    invoke_test_vars
+    invoke_print_vars
     exit 0
 fi
 
