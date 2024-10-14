@@ -109,18 +109,29 @@ function get_envvar() {
 }
 
 function get_envvar_from_envfile() {
-    if [[ -f "$_envfile" ]]; then
-        variable="$1"
-        found_line="$(cat "$_envfile" | grep "${variable}=")"
-        
-        if [[ -n "$found_line" ]] && [[ ! "$found_line" == \#* ]]; then
-            output="$(echo $found_line | sed "s|${variable}=||g")"
-            output="${output%\"}"
-            output="${output#\"}"
-            
-            echo "$output"
+    variable="$1"
+    get_var "$_envfile" "$variable"
+}
+
+function get_exiftool_field() {
+    file="$1"
+    tag="$2"
+    default="$3"
+    output=""
+    
+    exiftool_output="$(eval "exiftool -c \"%+.6f\" -s -T -$tag \"$file\"")"
+    
+    if [[ -n "$exiftool_output" ]]; then
+        if [[ "$exiftool_output" == "-" ]]; then
+            output="$default"
+        else
+            output="$exiftool_output"
         fi
+    else
+        output="$default"
     fi
+    
+    echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
 }
 
 function get_file_name_pretty() {
@@ -240,6 +251,7 @@ function get_file_type_emoji() {
         "audio") echo "🎵" ;;
         "font") echo "✏️" ;;
         "image") echo "🖼️ " ;;
+        "inode") echo "🔌" ;;
         "text") 
             case "$mime_type" in
                 "text/x-shellscript") echo "⚙️" ;;
@@ -251,25 +263,8 @@ function get_file_type_emoji() {
     esac
 }
 
-function get_exiftool_field() {
-    file="$1"
-    tag="$2"
-    default="$3"
-    output=""
-    
-    exiftool_output="$(eval "exiftool -c \"%+.6f\" -s -T -$tag \"$file\"")"
-    
-    if [[ -n "$exiftool_output" ]]; then
-        if [[ "$exiftool_output" == "-" ]]; then
-            output="$default"
-        else
-            output="$exiftool_output"
-        fi
-    else
-        output="$default"
-    fi
-    
-    echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
+function get_finger_record() {
+    echo -e "$(blue.zio.atfile.finger__machine)"
 }
 
 function get_mediainfo_field() {
@@ -411,6 +406,23 @@ function get_term_rows() {
         echo $rows
     else
         echo 30
+    fi
+}
+
+function get_var() {
+    file="$1"
+
+    if [[ -f "$file" ]]; then
+        variable="$2"
+        found_line="$(cat "$file" | grep "\b${variable}=")"
+        
+        if [[ -n "$found_line" ]] && [[ ! "$found_line" == \#* ]]; then
+            output="$(echo $found_line | sed "s|${variable}=||g")"
+            output="${output%\"}"
+            output="${output#\"}"
+            
+            echo "$output"
+        fi
     fi
 }
 
@@ -752,6 +764,39 @@ function blue.zio.atfile.meta__video() {
 }"
 }
 
+# NOTE: Never intended to be used from ATFile. Here for reference
+function blue.zio.atfile.finger__browser() {
+    id="$1"
+    userAgent="$2"
+
+    echo "{
+    \"\$type\": \"blue.zio.atfile.finger#browser\",
+    \"id\": \"$id\",
+    \"userAgent\": \"$userAgent\"
+}"
+}
+
+function blue.zio.atfile.finger__machine() {
+    machine_id_file="/etc/machine-id"
+    os_release_file="/etc/os-release"
+    
+    [[ ! -f "$machine_id_file" ]] && die "Unable to fingerprint — '$machine_id_file' does not exist"
+    [[ ! -f "$os_release_file" ]] && die "Unable to fingerprint — '$os_release_file' does not exist"
+    
+    id="$(cat "$machine_id_file")"
+    hostname="$(hostname -s)"
+    os_name="$(get_var "$os_release_file" "NAME")"
+    os_version="$(get_var "$os_release_file" "VERSION")"
+    os="$os_name $os_version"
+    
+    echo "{
+    \"\$type\": \"blue.zio.atfile.finger#machine\",
+    \"id\": \"$id\",
+    \"host\": \"$hostname\",
+    \"os\": \"$os\"
+}"
+}
+
 function blue.zio.atfile.lock() {
     lock="$1"
     
@@ -770,6 +815,10 @@ function blue.zio.atfile.upload() {
     file_size="$7"
     file_type="$8"
     meta_record="$9"
+    finger_record="${10}"
+    
+    [[ -z $finger_record ]] && finger_record="null"
+    [[ -z $meta_record ]] && meta_record="null"
 
     echo "{
     \"createdAt\": \"$createdAt\",
@@ -783,6 +832,7 @@ function blue.zio.atfile.upload() {
         \"hash\": \"$file_hash\",
         \"type\": \"$file_hash_type\"
     },
+    \"finger\": $finger_record,
     \"meta\": $meta_record,
     \"blob\": $blob_record
 }"
@@ -960,22 +1010,47 @@ function invoke_get() {
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         blob_uri="$(get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         cdn_uri="$(get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
+        locked="No"
+        finger="(None)"
+        finger_type=""
         header="$file_name_pretty"
         
         if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
-            file_hash_pretty="(none)"
+            file_hash_pretty="(None)"
+        fi
+        
+        locked_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
+        if [[ $? == 0 ]] && [[ -n "$locked_record" ]]; then
+            if [[ $(echo $locked_record | jq -r ".value.lock") == true ]]; then
+                locked="Yes"
+            fi
+        fi
+        
+        if [[ "$(echo $record | jq -r ".value.finger")" != "null" ]]; then
+            finger_type="$(echo $record | jq -r ".value.finger.\"\$type\"" | cut -d "#" -f 2)"
+            finger="$(echo $record | jq -r ".value.finger.id")"
         fi
         
         echo "$header"
         echo -e "↳ Blob: $blob_uri"
         [[ -n "$cdn_uri" ]] && echo -e " ↳ CDN: $cdn_uri"
-        echo -e "↳ File"
+        echo -e "↳ File: $key"
         echo -e " ↳ Name: $file_name"
         echo -e " ↳ Type: $file_type"
         echo -e " ↳ Size: $file_size_pretty"
         echo -e " ↳ Date: $(date --date "$file_date" "+%Y-%m-%d %H:%M:%S %Z")"
-        echo -e "↳ Hash: $file_hash_pretty"
-        echo -e "↳ URI:  $(echo $record | jq -r ".uri")"
+        echo -e " ↳ Hash: $file_hash_pretty"
+        echo -e "↳ Locked: $locked"
+        echo -e "↳ Finger: $finger"
+        case $finger_type in
+            "browser")
+                echo -e " ↳ Hostname: $(echo $record | jq -r ".value.finger.userAgent")"
+                ;;
+            "machine")
+                echo -e " ↳ Hostname: $(echo $record | jq -r ".value.finger.host")"
+                echo -e " ↳ OS: $(echo $record | jq -r ".value.finger.os")"
+                ;;
+        esac
     else
         die "Unable to get '$key'"
     fi
@@ -1190,13 +1265,18 @@ function invoke_upload() {
         fi
         
         file_type_emoji="$(get_file_type_emoji "$file_type")"
-        file_meta="$(get_meta_record "$file" "$file_type")"
+        
+        unset file_finger_record
+        unset file_meta_record
+        
+        [[ $_fingerprint == 1 ]] && file_finger_record="$(get_finger_record)"
+        file_meta_record="$(get_meta_record "$file" "$file_type")"
         
         echo "Uploading '$file'..."
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(is_xrpc_success $? "$blob")
         
-        file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta")"
+        file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
         
         if [[ -n "$key" ]]; then
             record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.upload" "$key" "$file_record")"
@@ -1249,11 +1329,11 @@ function invoke_test_vars() {
 
 function invoke_usage() {
 # ------------------------------------------------------------------------------
-    echo -e "ATFile 📦➔🦋
+    echo -e "ATFile | 📦 ➔ 🦋
     Store and retrieve files on a PDS
     
     Version $_version
-    (c) $copy_year Ducky <https://github.com/electricduck/atfile>
+    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
     Licensed under MIT License ✨
     
 Commands
@@ -1288,9 +1368,8 @@ Commands
     unlock <key>
         Lock (or unlock) an uploaded file to prevent it from unintended
         deletions
-        ⚠️  This does not stop other clients being able to delete the file,
-           and is only intended as a safety-net in case you run \`delete\` on
-           the wrong file
+        ⚠️  Other clients may be able to delete the file. This is intended as a
+           safety-net in the case of inadvertently deleting the wrong file
 
     upload-crypt <file> <recipient> [<key>]
         Encrypt file (with GPG) for <recipient> and upload to the PDS
@@ -1321,6 +1400,8 @@ Environment Variables
     ${_envvar_prefix}_PASSWORD <string>
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
+    ${_envvar_prefix}_FINGERPRINT <int> (default $_fmt_blob_url_default)
+        Apply machine fingerprint to uploaded files
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
@@ -1364,6 +1445,7 @@ _command="$1"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
+_fingerprint_default=0
 _fmt_blob_url_default="[pds]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
 _max_list_default=$(( $(get_term_rows) - $_max_list_buffer ))
@@ -1373,6 +1455,7 @@ _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
+_fingerprint="$(get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
@@ -1491,6 +1574,9 @@ case "$_command" in
         ;;
     "temp-get-meta-jq")
         get_meta_record "$2" "$3" | jq
+        ;;
+    "temp-get-finger")
+        get_finger_record
         ;;
     *)
         die "Unknown command '$_command'; see 'help'"
