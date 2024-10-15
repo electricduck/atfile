@@ -518,7 +518,7 @@ function parse_exiftool_date() {
 function xrpc_jwt() {
     curl -s -X POST $_server/xrpc/com.atproto.server.createSession \
         -H "Content-Type: application/json" \
-        -H "User-Agent: ATFile/$_version" \
+        -H "User-Agent: $_uas" \
         -d '{"identifier": "'$_username'", "password": "'$_password'"}' | jq -r ".accessJwt"
 }
 
@@ -532,7 +532,7 @@ function xrpc_get() {
     curl -s -X GET $_server/xrpc/$lexi?$query \
         -H "Authorization: Bearer $(xrpc_jwt)" \
         -H "Content-Type: $type" \
-        -H "User-Agent: ATFile/$_version" \ | jq
+        -H "User-Agent: $_uas" \ | jq
 }
 
 function xrpc_post() {
@@ -545,7 +545,7 @@ function xrpc_post() {
     curl -s -X POST $_server/xrpc/$lexi \
         -H "Authorization: Bearer $(xrpc_jwt)" \
         -H "Content-Type: $type" \
-        -H "User-Agent: ATFile/$_version" \
+        -H "User-Agent: $_uas" \
         -d "$data" | jq
 }
 
@@ -560,7 +560,7 @@ function xrpc_post_blob() {
     curl -s -X POST $_server/xrpc/$lexi \
         -H "Authorization: Bearer $(xrpc_jwt)" \
         -H "Content-Type: $type" \
-        -H "User-Agent: ATFile/$_version" \
+        -H "User-Agent: $_uas" \
         --data-binary @"$file" | jq
 }
 
@@ -962,7 +962,7 @@ function invoke_download() {
         key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         downloaded_file="${out_dir}${key}__${file_name}"
         
-        curl --silent "$blob_uri" -o "$downloaded_file"
+        curl -H "User-Agent: $_uas" --silent "$blob_uri" -o "$downloaded_file"
         [[ $? != 0 ]] && success=0
     fi
     
@@ -1187,7 +1187,7 @@ function invoke_print() {
         blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
-        curl -s -L "$blob_uri" --output -
+        curl -H "$_uas" -s -L "$blob_uri" --output -
         [[ $? != 0 ]] && success=0
     fi
     
@@ -1471,6 +1471,7 @@ _skip_copyright_warn="$(get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_sk
 _skip_ni_exiftool="$(get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
 _skip_ni_mediainfo="$(get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
 _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
+_uas="ATFile/$_version"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
