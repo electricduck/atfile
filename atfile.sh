@@ -1397,32 +1397,6 @@ function invoke_upload() {
     fi
 }
 
-function invoke_print_vars() {
-    function print_envvar() {
-        variable_name="${_envvar_prefix}_$1"
-        variable_default="$2"
-        
-        unset output
-        
-        output="$variable_name: $(get_envvar "$variable_name" "$variable_default")"
-        [[ -n "$variable_default" ]] && output+=" ($variable_default)"
-        
-        echo -e "$output"
-    }
-    
-    print_envvar "USERNAME"
-    echo "$(print_envvar "PASSWORD" | cut -d ":" -f 1): $(print_envvar "PASSWORD" | cut -d ":" -f 2 | xargs | sed -e "s/./\*/g")"
-    print_envvar "PDS" "$_server_default"
-    print_envvar "ENABLE_RECORD_COMMAND" "$_hidden_command_record"
-    print_envvar "FINGERPRINT" "$_fingerprint_default"
-    print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default"
-    print_envvar "MAX_LIST" "$_max_list_default"
-    print_envvar "SKIP_AUTH_CHECK" "$_skip_auth_check_default"
-    print_envvar "SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default"
-    print_envvar "SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default"
-    print_envvar "SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default"
-}
-
 function invoke_usage() {
 # ------------------------------------------------------------------------------
     echo -e "ATFile | 📦 ➔ 🦋
@@ -1550,6 +1524,7 @@ fi
 _prog="$(basename "$(realpath -s "$0")")"
 _now="$(get_date)"
 _command="$1"
+_is_sourced="0"
 
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
@@ -1578,10 +1553,11 @@ _password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
 _uas="ATFile/$_version"
 _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
+[[ "$0" != "$BASH_SOURCE" ]] && _is_sourced=1
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
 
-if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
+if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     invoke_usage
     exit 0
 fi
@@ -1593,11 +1569,6 @@ check_prog "xargs"
 
 [[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
-
-if [[ $_command == "test-vars" ]]; then
-    invoke_print_vars
-    exit 0
-fi
 
 if [[ $_skip_auth_check == 0 ]]; then
     session="$(com.atproto.server.getSession)"
@@ -1612,99 +1583,101 @@ else
     fi
 fi
 
-case "$_command" in
-    "cat"|"open"|"print"|"c")
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_print "$2"
-        ;;
-    "delete"|"rm")
-        [[ -z "$2" ]] && die "<key> not set"
-        invoke_delete "$2"
-        ;;
-    "fetch"|"download"|"f"|"d")
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$4" ]] && override_actor "$4"
-        invoke_download "$2" "$3"
-        ;;
-    "fetch-crypt"|"download-crypt"|"fc"|"dc")
-        check_prog_gpg
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$4" ]] && override_actor "$4"
-        invoke_download "$2" "$3" 1
-        ;;
-    "info"|"get"|"i")
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_get "$2"
-        ;;
-    "list"|"ls")
-    	if [[ "$2" == *.* ]]; then
-    	    # NOTE: User has entered <actor> in the wrong place, so we'll fix it
-    	    #       for them
-    	    # BUG:  Keys with periods in them can't be used as a cursor
-    	    
-    	    override_actor "$2"
-            invoke_list "$3"
-    	else
-    	    [[ -n "$3" ]] && override_actor "$3"
-            invoke_list "$2"   
-    	fi
-        ;;
-    "list-blobs"|"lsb")
-        invoke_list_blobs "$2"
-        ;;
-    "lock")
-        invoke_lock "$2" 1
-        ;;
-    "nick")
-        invoke_profile "$2"
-        ;;
-    "record")
-        # NOTE: Performs no validation (apart from JSON)! Here be dragons.
-        if [[ "$_hidden_command_record" == 1 ]]; then
-            case "$2" in
-                "add"|"create"|"c") invoke_manage_record "create" "$3" "$4" ;;
-                "get"|"g") invoke_manage_record "get" "$3" "$4" "$5" ;;
-                "put"|"update"|"u") invoke_manage_record "put" "$3" "$4" ;;
-                "rm"|"delete"|"d") invoke_manage_record "delete" "$3" "$4" ;;
-                *) die_unknown_command "$(echo "$_command $2" | xargs)" ;;
-            esac
-        else
-            print_hidden_command_warning "ENABLE_RECORD_COMMAND"
-            exit 1
-        fi
-        ;;
-    "upload"|"ul"|"u")
-        check_prog_optional_metadata
-        [[ -z "$2" ]] && die "<file> not set"
-        invoke_upload "$2" "" "$3"
-        ;;
-    "upload-crypt"|"uc")
-        check_prog_optional_metadata
-        check_prog_gpg
-        [[ -z "$2" ]] && die "<file> not set"
-        [[ -z "$3" ]] && die "<recipient> not set"
-        invoke_upload "$2" "$3" "$4"
-        ;;
-    "unlock")
-        invoke_lock "$2" 0
-        ;;
-    "url"|"get-url"|"b")
-        [[ -z "$2" ]] && die "<key> not set"
-        [[ -n "$3" ]] && override_actor "$3"
-        invoke_get_url "$2"
-        ;;
-    "temp-get-finger")
-        get_finger_record
-        ;;
-    "temp-get-meta")
-        get_meta_record "$2" "$3"
-        ;;
-    "temp-get-meta-jq")
-        get_meta_record "$2" "$3" | jq
-        ;;
-    *)
-        die_unknown_command "$_command"
-        ;;
-esac
+if [[ $_is_sourced == 0 ]]; then
+	case "$_command" in
+		"cat"|"open"|"print"|"c")
+		    [[ -z "$2" ]] && die "<key> not set"
+		    [[ -n "$3" ]] && override_actor "$3"
+		    invoke_print "$2"
+		    ;;
+		"delete"|"rm")
+		    [[ -z "$2" ]] && die "<key> not set"
+		    invoke_delete "$2"
+		    ;;
+		"fetch"|"download"|"f"|"d")
+		    [[ -z "$2" ]] && die "<key> not set"
+		    [[ -n "$4" ]] && override_actor "$4"
+		    invoke_download "$2" "$3"
+		    ;;
+		"fetch-crypt"|"download-crypt"|"fc"|"dc")
+		    check_prog_gpg
+		    [[ -z "$2" ]] && die "<key> not set"
+		    [[ -n "$4" ]] && override_actor "$4"
+		    invoke_download "$2" "$3" 1
+		    ;;
+		"info"|"get"|"i")
+		    [[ -z "$2" ]] && die "<key> not set"
+		    [[ -n "$3" ]] && override_actor "$3"
+		    invoke_get "$2"
+		    ;;
+		"list"|"ls")
+			if [[ "$2" == *.* ]]; then
+			    # NOTE: User has entered <actor> in the wrong place, so we'll fix it
+			    #       for them
+			    # BUG:  Keys with periods in them can't be used as a cursor
+			    
+			    override_actor "$2"
+		        invoke_list "$3"
+			else
+			    [[ -n "$3" ]] && override_actor "$3"
+		        invoke_list "$2"   
+			fi
+		    ;;
+		"list-blobs"|"lsb")
+		    invoke_list_blobs "$2"
+		    ;;
+		"lock")
+		    invoke_lock "$2" 1
+		    ;;
+		"nick")
+		    invoke_profile "$2"
+		    ;;
+		"record")
+		    # NOTE: Performs no validation (apart from JSON)! Here be dragons.
+		    if [[ "$_hidden_command_record" == 1 ]]; then
+		        case "$2" in
+		            "add"|"create"|"c") invoke_manage_record "create" "$3" "$4" ;;
+		            "get"|"g") invoke_manage_record "get" "$3" "$4" "$5" ;;
+		            "put"|"update"|"u") invoke_manage_record "put" "$3" "$4" ;;
+		            "rm"|"delete"|"d") invoke_manage_record "delete" "$3" "$4" ;;
+		            *) die_unknown_command "$(echo "$_command $2" | xargs)" ;;
+		        esac
+		    else
+		        print_hidden_command_warning "ENABLE_RECORD_COMMAND"
+		        exit 1
+		    fi
+		    ;;
+		"upload"|"ul"|"u")
+		    check_prog_optional_metadata
+		    [[ -z "$2" ]] && die "<file> not set"
+		    invoke_upload "$2" "" "$3"
+		    ;;
+		"upload-crypt"|"uc")
+		    check_prog_optional_metadata
+		    check_prog_gpg
+		    [[ -z "$2" ]] && die "<file> not set"
+		    [[ -z "$3" ]] && die "<recipient> not set"
+		    invoke_upload "$2" "$3" "$4"
+		    ;;
+		"unlock")
+		    invoke_lock "$2" 0
+		    ;;
+		"url"|"get-url"|"b")
+		    [[ -z "$2" ]] && die "<key> not set"
+		    [[ -n "$3" ]] && override_actor "$3"
+		    invoke_get_url "$2"
+		    ;;
+		"temp-get-finger")
+		    get_finger_record
+		    ;;
+		"temp-get-meta")
+		    get_meta_record "$2" "$3"
+		    ;;
+		"temp-get-meta-jq")
+		    get_meta_record "$2" "$3" | jq
+		    ;;
+		*)
+		    die_unknown_command "$_command"
+		    ;;
+	esac
+fi
