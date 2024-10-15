@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # ATFile <https://github.com/electricduck/atfile>
+# Psst! You can 'source ./atfile.sh' in your own Bash scripts!
 
 _version="0.2.1"
 _c_year="2024"
@@ -937,7 +938,7 @@ function com.atproto.sync.uploadBlob() {
 
 # Commands
 
-function invoke_manage_record() {
+function atfile.invoke.manage_record() {
     function get_collection() {
         collection="blue.zio.atfile.upload"
         parameter_output="$1"
@@ -1008,7 +1009,7 @@ function invoke_manage_record() {
     esac
 }
 
-function invoke_delete() {
+function atfile.invoke.delete() {
     key="$1"
     success=1
 
@@ -1027,7 +1028,7 @@ function invoke_delete() {
     fi
 }
 
-function invoke_download() {
+function atfile.invoke.download() {
     key="$1"
     out_dir="$2"
     decrypt=$3
@@ -1076,7 +1077,7 @@ function invoke_download() {
     fi
 }
 
-function invoke_get() {
+function atfile.invoke.get() {
     key="$1"
     success=1
     
@@ -1150,7 +1151,7 @@ function invoke_get() {
     fi
 }
 
-function invoke_get_url() {
+function atfile.invoke.get_url() {
     key="$1"
     success=1
     
@@ -1163,7 +1164,7 @@ function invoke_get_url() {
     fi
 }
 
-function invoke_list() {
+function atfile.invoke.list() {
     cursor="$1"
     success=1
     
@@ -1198,7 +1199,7 @@ function invoke_list() {
     fi
 }
 
-function invoke_list_blobs() {
+function atfile.invoke.list_blobs() {
     cursor="$1"
     success=1
     
@@ -1229,7 +1230,7 @@ function invoke_list_blobs() {
     fi
 }
 
-function invoke_lock() {
+function atfile.invoke.lock() {
     key="$1"
     locked=$2
     
@@ -1263,7 +1264,7 @@ function invoke_lock() {
     fi
 }
 
-function invoke_print() {
+function atfile.invoke.print() {
     key="$1"
     success=1
     
@@ -1283,7 +1284,7 @@ function invoke_print() {
     fi
 }
 
-function invoke_profile() {
+function atfile.invoke.profile() {
     nick="$1"
     
     profile_record="$(blue.zio.meta.profile "$1")"
@@ -1302,7 +1303,7 @@ function invoke_profile() {
     fi
 }
 
-function invoke_upload() {
+function atfile.invoke.upload() {
     file="$1"
     recipient="$2"
     key="$3"
@@ -1396,7 +1397,7 @@ function invoke_upload() {
     fi
 }
 
-function invoke_usage() {
+function atfile.invoke.usage() {
 # ------------------------------------------------------------------------------
     echo -e "ATFile | 📦 ➔ 🦋
     Store and retrieve files on a PDS
@@ -1557,7 +1558,7 @@ _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
-    invoke_usage
+    atfile.invoke.usage
     exit 0
 fi
 
@@ -1587,27 +1588,27 @@ if [[ $_is_sourced == 0 ]]; then
 		"cat"|"open"|"print"|"c")
 		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
 		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
-		    invoke_print "$2"
+		    atfile.invoke.print "$2"
 		    ;;
 		"delete"|"rm")
 		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
-		    invoke_delete "$2"
+		    atfile.invoke.delete "$2"
 		    ;;
 		"fetch"|"download"|"f"|"d")
 		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
 		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
-		    invoke_download "$2" "$3"
+		    atfile.invoke.download "$2" "$3"
 		    ;;
 		"fetch-crypt"|"download-crypt"|"fc"|"dc")
 		    atfile.util.check_prog_gpg
 		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
 		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
-		    invoke_download "$2" "$3" 1
+		    atfile.invoke.download "$2" "$3" 1
 		    ;;
 		"info"|"get"|"i")
 		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
 		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
-		    invoke_get "$2"
+		    atfile.invoke.get "$2"
 		    ;;
 		"list"|"ls")
 			if [[ "$2" == *.* ]]; then
@@ -1616,29 +1617,29 @@ if [[ $_is_sourced == 0 ]]; then
 			    # BUG:  Keys with periods in them can't be used as a cursor
 			    
 			    atfile.util.override_actor "$2"
-		        invoke_list "$3"
+		        atfile.invoke.list "$3"
 			else
 			    [[ -n "$3" ]] && atfile.util.override_actor "$3"
-		        invoke_list "$2"   
+		        atfile.invoke.list "$2"   
 			fi
 		    ;;
 		"list-blobs"|"lsb")
-		    invoke_list_blobs "$2"
+		    atfile.invoke.list_blobs "$2"
 		    ;;
 		"lock")
-		    invoke_lock "$2" 1
+		    atfile.invoke.lock "$2" 1
 		    ;;
 		"nick")
-		    invoke_profile "$2"
+		    atfile.invoke.profile "$2"
 		    ;;
 		"record")
 		    # NOTE: Performs no validation (apart from JSON)! Here be dragons.
 		    if [[ "$_hidden_command_record" == 1 ]]; then
 		        case "$2" in
-		            "add"|"create"|"c") invoke_manage_record "create" "$3" "$4" ;;
-		            "get"|"g") invoke_manage_record "get" "$3" "$4" "$5" ;;
-		            "put"|"update"|"u") invoke_manage_record "put" "$3" "$4" ;;
-		            "rm"|"delete"|"d") invoke_manage_record "delete" "$3" "$4" ;;
+		            "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
+		            "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
+		            "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
+		            "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
 		            *) atfile.util.die_unknown_command "$(echo "$_command $2" | xargs)" ;;
 		        esac
 		    else
@@ -1649,22 +1650,22 @@ if [[ $_is_sourced == 0 ]]; then
 		"upload"|"ul"|"u")
 		    atfile.util.check_prog_optional_metadata
 		    [[ -z "$2" ]] && atfile.util.die "<file> not set"
-		    invoke_upload "$2" "" "$3"
+		    atfile.invoke.upload "$2" "" "$3"
 		    ;;
 		"upload-crypt"|"uc")
 		    atfile.util.check_prog_optional_metadata
 		    atfile.util.check_prog_gpg
 		    [[ -z "$2" ]] && atfile.util.die "<file> not set"
 		    [[ -z "$3" ]] && atfile.util.die "<recipient> not set"
-		    invoke_upload "$2" "$3" "$4"
+		    atfile.invoke.upload "$2" "$3" "$4"
 		    ;;
 		"unlock")
-		    invoke_lock "$2" 0
+		    atfile.invoke.lock "$2" 0
 		    ;;
 		"url"|"get-url"|"b")
 		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
 		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
-		    invoke_get_url "$2"
+		    atfile.invoke.get_url "$2"
 		    ;;
 		"temp-get-finger")
 		    atfile.util.get_finger_record
