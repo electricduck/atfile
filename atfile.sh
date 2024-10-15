@@ -497,6 +497,11 @@ function print_copyright_warning() {
     fi
 }
 
+function print_hidden_command_warning() {
+    envvar="$1"
+    echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_${envvar}=1"
+}
+
 function print_table_paginate_hint() {
     cursor="$1"
     count="$2"
@@ -932,7 +937,77 @@ function com.atproto.sync.uploadBlob() {
 
 # Commands
 
-# BUG: Locked files can still be deleted
+function invoke_manage_record() {
+    function get_collection() {
+        collection="blue.zio.atfile.upload"
+        parameter_output="$1"
+        [[ -n "$1" ]] && collection="$1" # fuck it, manage all the records from atfile!
+        echo "$collection"
+    }
+    
+    case "$1" in
+        "create")
+            collection="$(get_collection "$3")"
+            record="$2"
+            [[ -z "$record" ]] && die "<record> not set"
+            
+            record_json="$(echo "$record" | jq)"
+            [[ $? != 0 ]] && die "Invalid JSON"
+            
+            com.atproto.repo.createRecord "$_username" "$collection" "$record_json" | jq
+            ;;
+        "delete")
+            collection="$(get_collection "$3")"
+            key="$2"
+            [[ -z "$key" ]] && die "<key> not set"
+            
+            if [[ "$key" == at:* ]]; then
+                at_uri="$key"
+                collection="$(echo $at_uri | cut -d "/" -f 4)"
+                key="$(echo $at_uri | cut -d "/" -f 5)"
+                username="$(echo $at_uri | cut -d "/" -f 3)"
+                
+                [[ "$username" != "$_username" ]] && die "Unable to delete record — not owned by you ($_username)"
+            fi
+            
+            com.atproto.repo.deleteRecord "$_username" "$collection" "$key" | jq
+            ;;
+        "get")
+            collection="$(get_collection "$3")"
+            key="$2"
+            username="$4"
+            [[ -z "$key" ]] && die "<key/at-uri> not set"
+            
+            if [[ "$key" == at:* ]]; then
+                at_uri="$key"
+                collection="$(echo $at_uri | cut -d "/" -f 4)"
+                key="$(echo $at_uri | cut -d "/" -f 5)"
+                username="$(echo $at_uri | cut -d "/" -f 3)"
+            fi
+            
+            if [[ -z "$username" ]]; then
+                username="$_username"
+            else
+                override_actor "$username"
+            fi
+            
+            com.atproto.repo.getRecord "$username" "$collection" "$key" | jq
+            ;;
+        "put")
+            collection="$(get_collection "$3")"
+            key="$2"
+            record="$3"
+            [[ -z "$key" ]] && die "<key> not set"
+            [[ -z "$record" ]] && die "<record> not set"
+            
+            record_json="$(echo "$record" | jq)"
+            [[ $? != 0 ]] && die "Invalid JSON"
+            
+            com.atproto.repo.putRecord "$_username" "$collection" "$key" "$record" | jq
+            ;;
+    esac
+}
+
 function invoke_delete() {
     key="$1"
     success=1
@@ -1029,7 +1104,7 @@ function invoke_get() {
         finger_type=""
         header="$file_name_pretty"
         
-        if [[ ${#file_hash} != 32 || "$file_hash_type" == "none" ]]; then
+        if [[ $(is_null_or_empty "$file_hash_type") == 1 ]] || [[ "$file_hash_type" == "md5" && ${#file_hash} != 32 ]] || [[ "$file_hash_type" == "none" ]]; then
             file_hash_pretty="(None)"
         fi
         
@@ -1337,6 +1412,7 @@ function invoke_print_vars() {
     print_envvar "USERNAME"
     echo "$(print_envvar "PASSWORD" | cut -d ":" -f 1): $(print_envvar "PASSWORD" | cut -d ":" -f 2 | xargs | sed -e "s/./\*/g")"
     print_envvar "PDS" "$_server_default"
+    print_envvar "ENABLE_RECORD_COMMAND" "$_enable_record_command"
     print_envvar "FINGERPRINT" "$_fingerprint_default"
     print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default"
     print_envvar "MAX_LIST" "$_max_list_default"
@@ -1379,7 +1455,7 @@ Commands
 
     delete <key>
         Delete an uploaded file
-        ⚠️  This action is immediate and does not ask for confirmation!
+        ⚠️  No confirmation is asked before deletion
 
     lock <key>
     unlock <key>
@@ -1399,6 +1475,16 @@ Commands
     nick <nick>
         Set nickname
         ℹ️  Intended for future use
+        
+    $([[ $_enable_record_command == 1 ]] && echo "record add <record-json> [<collection>]
+    record get <key> [<collection>] [<actor>]
+    record get <at-uri>
+    record put <key> <record-json> [<collection>]
+    record rm <key> [<collection>]
+    record rm <at-uri>
+        Manage records on a repository
+        ⚠️  Intended for advanced users. Here be dragons.
+           Turn this feature off with ${_envvar_prefix}_ENABLE_RECORD_COMMAND=0")
        
 Arguments
     <actor>     Act upon another ATProto user (either by handle or DID)
@@ -1464,6 +1550,7 @@ _command="$1"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
+_enable_record_command_default=0
 _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
@@ -1474,6 +1561,7 @@ _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
+_enable_record_command="$(get_envvar "${_envvar_prefix}_ENABLE_RECORD_COMMAND" "$_enable_record_command_default")"
 _fingerprint="$(get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
@@ -1568,6 +1656,21 @@ case "$_command" in
     "nick")
         invoke_profile "$2"
         ;;
+    "record")
+        # NOTE: Performs no validation (apart from JSON)! Here be dragons.
+        if [[ "$_enable_record_command" == 1 ]]; then
+            case "$2" in
+                "add"|"create"|"c") invoke_manage_record "create" "$3" "$4" ;;
+                "get"|"g") invoke_manage_record "get" "$3" "$4" "$5" ;;
+                "put"|"update"|"u") invoke_manage_record "put" "$3" "$4" ;;
+                "rm"|"delete"|"d") invoke_manage_record "delete" "$3" "$4" ;;
+                *) die "Unknown record action '$2'" ;;
+            esac
+        else
+            print_hidden_command_warning "ENABLE_RECORD_COMMAND"
+            exit 1
+        fi
+        ;;
     "upload"|"ul"|"u")
         check_prog_optional_metadata
         [[ -z "$2" ]] && die "<file> not set"
@@ -1588,14 +1691,14 @@ case "$_command" in
         [[ -n "$3" ]] && override_actor "$3"
         invoke_get_url "$2"
         ;;
+    "temp-get-finger")
+        get_finger_record
+        ;;
     "temp-get-meta")
         get_meta_record "$2" "$3"
         ;;
     "temp-get-meta-jq")
         get_meta_record "$2" "$3" | jq
-        ;;
-    "temp-get-finger")
-        get_finger_record
         ;;
     *)
         die "Unknown command '$_command'; see 'help'"
