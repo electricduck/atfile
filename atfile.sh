@@ -1542,9 +1542,13 @@ Files
 
 # Main
 
+if [ -x "$(command -v git)" ] && [[ -d "$(dirname "$(realpath -s "$0")")/.git" ]]; then
+    git describe --exact-match --tags > /dev/null 2>&1
+    [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
+fi
+
 _prog="$(basename "$(realpath -s "$0")")"
 _now="$(get_date)"
-
 _command="$1"
 
 _envvar_prefix="ATFILE"
@@ -1576,11 +1580,6 @@ _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
-
-if [ -x "$(command -v git)" ] && [[ -d "$(dirname "$(realpath -s "$0")")/.git" ]]; then
-    git describe --exact-match --tags > /dev/null 2>&1
-    [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
-fi
 
 if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     invoke_usage
