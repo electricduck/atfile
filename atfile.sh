@@ -2,7 +2,7 @@
 
 # ATFile <https://github.com/electricduck/atfile>
 
-_version="0.2"
+_version="0.2.1"
 _c_year="2024"
 
 # Utilities
