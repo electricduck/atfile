@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
-# ATFile
-# ------
-# Version 0.2
-# (c) 2024 Ducky <https://github.com/electricduck/atfile>
-# Licensed under MIT License ✨
+# ATFile <https://github.com/electricduck/atfile>
 
 _version="0.2"
 _c_year="2024"
@@ -1580,6 +1576,10 @@ _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
+
+if [ -x "$(command -v git)" ] && [[ -d "$(dirname "$(realpath -s "$0")")/.git" ]]; then
+    _version+="+git.$(git rev-parse --short HEAD)"
+fi
 
 if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     invoke_usage
