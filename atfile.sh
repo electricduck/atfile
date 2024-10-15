@@ -1578,7 +1578,8 @@ _username="$(get_envvar "${_envvar_prefix}_USERNAME")"
 [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
 
 if [ -x "$(command -v git)" ] && [[ -d "$(dirname "$(realpath -s "$0")")/.git" ]]; then
-    _version+="+git.$(git rev-parse --short HEAD)"
+    git describe --exact-match --tags > /dev/null 2>&1
+    [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
 fi
 
 if [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
