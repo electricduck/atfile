@@ -7,17 +7,17 @@ _c_year="2024"
 
 # Utilities
 
-function die() {
+function atfile.util.die() {
     echo -e "\033[1;31mError: $1\033[0m"
     exit 255
 }
 
-function die_unknown_command() {
+function atfile.util.die_unknown_command() {
     command="$1"
-    die "Unknown command '$1'"
+    atfile.util.die "Unknown command '$1'"
 }
 
-function check_prog() {
+function atfile.util.check_prog() {
     command="$1"
     download_hint="$2"
     
@@ -28,20 +28,20 @@ function check_prog() {
             message="$message (download: $download_hint)"
         fi
     
-        die "$message"
+        atfile.util.die "$message"
     fi
 }
 
-function check_prog_gpg() {
-    check_prog "gpg" "https://gnupg.org/download"
+function atfile.util.check_prog_gpg() {
+    atfile.util.check_prog "gpg" "https://gnupg.org/download"
 }
 
-function check_prog_optional_metadata() {
-    [[ $_skip_ni_exiftool == 0 ]] && check_prog "exiftool" "https://exiftool.org/"
-    [[ $_skip_ni_mediainfo == 0 ]] && check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
+function atfile.util.check_prog_optional_metadata() {
+    [[ $_skip_ni_exiftool == 0 ]] && atfile.util.check_prog "exiftool" "https://exiftool.org/"
+    [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 }
 
-function get_blob_uri() {
+function atfile.util.get_blob_uri() {
     did="$1"
     cid="$2"
     pds="$_server"
@@ -49,7 +49,7 @@ function get_blob_uri() {
     echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
 }
 
-function get_cdn_uri() {
+function atfile.util.get_cdn_uri() {
     did="$1"
     blob_cid="$2"
     type="$3"
@@ -63,7 +63,7 @@ function get_cdn_uri() {
     echo "$cdn_uri"
 }
 
-function get_date() {
+function atfile.util.get_date() {
     date="$1"
     
     if [[ -z "$date" ]]; then
@@ -73,13 +73,13 @@ function get_date() {
     fi
 }
 
-function get_date_json() {
+function atfile.util.get_date_json() {
     date="$1"
     parsed="$2"
 
     if [[ -z "$parsed" ]]; then
         if [[ -n "$date" ]]; then
-            parsed_date="$(get_date "$date")"
+            parsed_date="$(atfile.util.get_date "$date")"
             [[ $? == 0 ]] && parsed="$parsed_date"
         fi
     fi
@@ -91,10 +91,10 @@ function get_date_json() {
     fi
 }
 
-function get_envvar() {
+function atfile.util.get_envvar() {
     envvar="$1"
     default="$2"
-    envvar_from_envfile="$(get_envvar_from_envfile "$envvar")"
+    envvar_from_envfile="$(atfile.util.get_envvar_from_envfile "$envvar")"
     envvar_value=""
     
     if [[ -n "${!envvar}" ]]; then
@@ -110,12 +110,12 @@ function get_envvar() {
     echo "$envvar_value"
 }
 
-function get_envvar_from_envfile() {
+function atfile.util.get_envvar_from_envfile() {
     variable="$1"
-    get_var "$_envfile" "$variable"
+    atfile.util.get_var_from_file "$_envfile" "$variable"
 }
 
-function get_exiftool_field() {
+function atfile.util.get_exiftool_field() {
     file="$1"
     tag="$2"
     default="$3"
@@ -136,15 +136,14 @@ function get_exiftool_field() {
     echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
 }
 
-function get_file_name_pretty() {
+function atfile.util.get_file_name_pretty() {
     file_record="$1"
-    emoji="$(get_file_type_emoji "$(echo "$file_record" | jq -r '.file.mimeType')")"
+    emoji="$(atfile.util.get_file_type_emoji "$(echo "$file_record" | jq -r '.file.mimeType')")"
     file_name_no_ext="$(echo "$file_record" | jq -r ".file.name" | cut -d "." -f 1)"
     output="$file_name_no_ext"
     
     meta_type="$(echo "$file_record" | jq -r ".meta.\"\$type\"")"
     
-    # TODO: json_is_null_or_empty()
     if [[ -n "$meta_type" ]]; then
         case $meta_type in
             "blue.zio.atfile.meta#audio")
@@ -155,14 +154,14 @@ function get_file_name_pretty() {
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
                 track="$(echo "$file_record" | jq -r ".meta.tags.track.position")"
                 
-                [[ $(is_null_or_empty "$album") == 1 ]] && album="(Unknown Album)"
-                [[ $(is_null_or_empty "$album_artist") == 1 ]] && album_artist="(Unknown Artist)"
-                [[ $(is_null_or_empty "$disc") == 1 ]] && disc=0
-                [[ $(is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
-                [[ $(is_null_or_empty "$track") == 1 ]] && track=0
+                [[ $(atfile.util.is_null_or_empty "$album") == 1 ]] && album="(Unknown Album)"
+                [[ $(atfile.util.is_null_or_empty "$album_artist") == 1 ]] && album_artist="(Unknown Artist)"
+                [[ $(atfile.util.is_null_or_empty "$disc") == 1 ]] && disc=0
+                [[ $(atfile.util.is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
+                [[ $(atfile.util.is_null_or_empty "$track") == 1 ]] && track=0
                 
                 output="$title\n   $album_artist — $album"
-                [[ $(is_null_or_empty "$date") == 0 ]] && output+=" ($(date --date="$date" +%Y))"
+                [[ $(atfile.util.is_null_or_empty "$date") == 0 ]] && output+=" ($(date --date="$date" +%Y))"
                 [[ $disc != 0 || $track != 0 ]] && output+=" [$disc.$track]"
                 ;;
             "blue.zio.atfile.meta#photo")
@@ -175,10 +174,10 @@ function get_file_name_pretty() {
                 
                 output="$title"
                 
-                if [[ $(is_null_or_empty "$lat") == 0 && $(is_null_or_empty "$long") == 0 ]]; then
+                if [[ $(atfile.util.is_null_or_empty "$lat") == 0 && $(atfile.util.is_null_or_empty "$long") == 0 ]]; then
                    output+="\n   $long $lat"
                    
-                   if [[ $(is_null_or_empty "$date") == 0 ]]; then
+                   if [[ $(atfile.util.is_null_or_empty "$date") == 0 ]]; then
                        output+=" — $(date --date="$date")"
                    fi
                 fi
@@ -186,7 +185,7 @@ function get_file_name_pretty() {
             "blue.zio.atfile.meta#video")
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
                 
-                [[ $(is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
+                [[ $(atfile.util.is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
                 
                 output="$title"
                 ;;
@@ -199,10 +198,10 @@ function get_file_name_pretty() {
     output_last_line_length="${#output_last_line}"
     
     echo -e "$output"
-    echo -e "$(repeat "-" $output_last_line_length)"
+    echo -e "$(atfile.util.repeat_char "-" $output_last_line_length)"
 }
 
-function get_file_size_pretty() {
+function atfile.util.get_file_size_pretty() {
     size="$1"
     suffix=""
     
@@ -219,7 +218,7 @@ function get_file_size_pretty() {
     echo "$size $suffix"
 }
 
-function get_file_type_emoji() {
+function atfile.util.get_file_type_emoji() {
     mime_type="$1"
     short_type="$(echo $mime_type | cut -d "/" -f 1)"
     desc_type="$(echo $mime_type | cut -d "/" -f 2)"
@@ -269,11 +268,18 @@ function get_file_type_emoji() {
     esac
 }
 
-function get_finger_record() {
+function atfile.util.get_finger_record() {
     echo -e "$(blue.zio.atfile.finger__machine)"
 }
 
-function get_mediainfo_field() {
+function atfile.util.get_line() {
+    input="$1"
+    index=$(( $2 + 1 ))
+    
+    echo "$(echo -e "$input" | sed -n "$(( $index ))"p)"
+}
+
+function atfile.util.get_mediainfo_field() {
     file="$1"
     category="$2"
     field="$3"
@@ -295,19 +301,19 @@ function get_mediainfo_field() {
     echo "$(echo "$output" | sed "s|\"|\\\\\"|g")"
 }
 
-function get_mediainfo_audio_json() {
+function atfile.util.get_mediainfo_audio_json() {
     file="$1"
 
-    bitRates=$(get_mediainfo_field "$file" "Audio" "BitRate" 0)
-    bitRate_modes=$(get_mediainfo_field "$file" "Audio" "BitRate_Mode" "")
-    channelss=$(get_mediainfo_field "$file" "Audio" "Channels" 0)
-    compressions="$(get_mediainfo_field "$file" "Audio" "Compression_Mode" "")"
-    durations=$(get_mediainfo_field "$file" "Audio" "Duration" 0)
-    formats="$(get_mediainfo_field "$file" "Audio" "Format" "")"
-    format_ids="$(get_mediainfo_field "$file" "Audio" "CodecID" "")"
-    format_profiles="$(get_mediainfo_field "$file" "Audio" "Format_Profile" "")"
-    samplings=$(get_mediainfo_field "$file" "Audio" "SamplingRate" 0)
-    titles="$(get_mediainfo_field "$file" "Audio" "Title" "")"
+    bitRates=$(atfile.util.get_mediainfo_field "$file" "Audio" "BitRate" 0)
+    bitRate_modes=$(atfile.util.get_mediainfo_field "$file" "Audio" "BitRate_Mode" "")
+    channelss=$(atfile.util.get_mediainfo_field "$file" "Audio" "Channels" 0)
+    compressions="$(atfile.util.get_mediainfo_field "$file" "Audio" "Compression_Mode" "")"
+    durations=$(atfile.util.get_mediainfo_field "$file" "Audio" "Duration" 0)
+    formats="$(atfile.util.get_mediainfo_field "$file" "Audio" "Format" "")"
+    format_ids="$(atfile.util.get_mediainfo_field "$file" "Audio" "CodecID" "")"
+    format_profiles="$(atfile.util.get_mediainfo_field "$file" "Audio" "Format_Profile" "")"
+    samplings=$(atfile.util.get_mediainfo_field "$file" "Audio" "SamplingRate" 0)
+    titles="$(atfile.util.get_mediainfo_field "$file" "Audio" "Title" "")"
     
     lines="$(echo "$bitrates" | wc -l)"
     output=""
@@ -315,67 +321,67 @@ function get_mediainfo_audio_json() {
     for ((i = 0 ; i < $lines ; i++ )); do
         lossy=true
         
-        [[ \"$(get_line "$compressionss" $i)\" == "Lossless" ]] && lossy=false
+        [[ \"$(atfile.util.get_line "$compressionss" $i)\" == "Lossless" ]] && lossy=false
     
         output+="{
-    \"bitRate\": $(get_line "$bitRates" $i),
-    \"channels\": $(get_line "$channelss" $i),
-    \"duration\": $(get_line "$durations" $i),
+    \"bitRate\": $(atfile.util.get_line "$bitRates" $i),
+    \"channels\": $(atfile.util.get_line "$channelss" $i),
+    \"duration\": $(atfile.util.get_line "$durations" $i),
     \"format\": {
-        \"id\": \"$(get_line "$format_ids" $i)\",
-        \"name\": \"$(get_line "$formats" $i)\",
-        \"profile\": \"$(get_line "$format_profiles" $i)\"
+        \"id\": \"$(atfile.util.get_line "$format_ids" $i)\",
+        \"name\": \"$(atfile.util.get_line "$formats" $i)\",
+        \"profile\": \"$(atfile.util.get_line "$format_profiles" $i)\"
     },
-    \"mode\": \"$(get_line "$bitrate_modes" $i)\",
+    \"mode\": \"$(atfile.util.get_line "$bitrate_modes" $i)\",
     \"lossy\": $lossy,
-    \"sampling\": $(get_line "$samplings" $i),
-    \"title\": \"$(get_line "$titles" $i)\"
+    \"sampling\": $(atfile.util.get_line "$samplings" $i),
+    \"title\": \"$(atfile.util.get_line "$titles" $i)\"
 },"
     done
     
     echo "${output::-1}"
 }
 
-function get_mediainfo_video_json() {
+function atfile.util.get_mediainfo_video_json() {
     file="$1"
 
-    bitRates=$(get_mediainfo_field "$file" "Video" "BitRate" 0)
-    dim_height=$(get_mediainfo_field "$file" "Video" "Height" 0)
-    dim_width=$(get_mediainfo_field "$file" "Video" "Width" 0)
-    durations=$(get_mediainfo_field "$file" "Video" "Duration" 0)
-    formats="$(get_mediainfo_field "$file" "Video" "Format" "")"
-    format_ids="$(get_mediainfo_field "$file" "Video" "CodecID" "")"
-    format_profiles="$(get_mediainfo_field "$file" "Video" "Format_Profile" "")"
-    frameRates="$(get_mediainfo_field "$file" "Video" "FrameRate" "")"
-    frameRate_modes="$(get_mediainfo_field "$file" "Video" "FrameRate_Mode" "")"
-    titles="$(get_mediainfo_field "$file" "Video" "Title" "")"
+    bitRates=$(atfile.util.get_mediainfo_field "$file" "Video" "BitRate" 0)
+    dim_height=$(atfile.util.get_mediainfo_field "$file" "Video" "Height" 0)
+    dim_width=$(atfile.util.get_mediainfo_field "$file" "Video" "Width" 0)
+    durations=$(atfile.util.get_mediainfo_field "$file" "Video" "Duration" 0)
+    formats="$(atfile.util.get_mediainfo_field "$file" "Video" "Format" "")"
+    format_ids="$(atfile.util.get_mediainfo_field "$file" "Video" "CodecID" "")"
+    format_profiles="$(atfile.util.get_mediainfo_field "$file" "Video" "Format_Profile" "")"
+    frameRates="$(atfile.util.get_mediainfo_field "$file" "Video" "FrameRate" "")"
+    frameRate_modes="$(atfile.util.get_mediainfo_field "$file" "Video" "FrameRate_Mode" "")"
+    titles="$(atfile.util.get_mediainfo_field "$file" "Video" "Title" "")"
     
     lines="$(echo "$bitrates" | wc -l)"
     output=""
 
     for ((i = 0 ; i < $lines ; i++ )); do    
         output+="{
-    \"bitRate\": $(get_line "$bitRates" $i),
+    \"bitRate\": $(atfile.util.get_line "$bitRates" $i),
     \"dimensions\": {
         \"height\": $dim_height,
         \"width\": $dim_width
     },
-    \"duration\": $(get_line "$durations" $i),
+    \"duration\": $(atfile.util.get_line "$durations" $i),
     \"format\": {
-        \"id\": \"$(get_line "$format_ids" $i)\",
-        \"name\": \"$(get_line "$formats" $i)\",
-        \"profile\": \"$(get_line "$format_profiles" $i)\"
+        \"id\": \"$(atfile.util.get_line "$format_ids" $i)\",
+        \"name\": \"$(atfile.util.get_line "$formats" $i)\",
+        \"profile\": \"$(atfile.util.get_line "$format_profiles" $i)\"
     },
-    \"frameRate\": $(get_line "$frameRates" $i),
-    \"mode\": \"$(get_line "$frameRate_modes" $i)\",
-    \"title\": \"$(get_line "$titles" $i)\"
+    \"frameRate\": $(atfile.util.get_line "$frameRates" $i),
+    \"mode\": \"$(atfile.util.get_line "$frameRate_modes" $i)\",
+    \"title\": \"$(atfile.util.get_line "$titles" $i)\"
 },"
     done
     
     echo "${output::-1}"
 }
 
-function get_meta_record() {
+function atfile.util.get_meta_record() {
     file="$1"
     type="$2"
     
@@ -387,7 +393,7 @@ function get_meta_record() {
     esac
 }
 
-function get_md5() {
+function atfile.util.get_md5() {
     file="$1"
     
     hash="$(md5sum "$file" | cut -f 1 -d " ")"
@@ -396,12 +402,12 @@ function get_md5() {
     fi
 }
 
-function get_rkey_from_at_uri() {
+function atfile.util.get_rkey_from_at_uri() {
     at_uri="$1"
     echo $at_uri | cut -d "/" -f 5
 }
 
-function get_term_rows() {
+function atfile.util.get_term_rows() {
     unset rows
     
     if [ -x "$(command -v tput)" ]; then
@@ -415,7 +421,7 @@ function get_term_rows() {
     fi
 }
 
-function get_var() {
+function atfile.util.get_var_from_file() {
     file="$1"
 
     if [[ -f "$file" ]]; then
@@ -432,7 +438,7 @@ function get_var() {
     fi
 }
 
-function is_null_or_empty() {
+function atfile.util.is_null_or_empty() {
     if [[ -z "$1" ]] || [[ "$1" == null ]]; then
         echo 1
     else
@@ -440,7 +446,7 @@ function is_null_or_empty() {
     fi
 }
 
-function is_xrpc_success() {
+function atfile.util.is_xrpc_success() {
     exit_code="$1"
     data="$2"
 
@@ -453,12 +459,12 @@ function is_xrpc_success() {
 
 # HACK: This essentially breaks the entire session (it overrides $_username and
 #       $_server) but where it's currently used should not cause any issues 🤞
-function override_actor() {
+function atfile.util.override_actor() {
     actor="$1"
 
     if [[ "$actor" != "did:"* ]]; then
         resolved_handle="$(com.atproto.identity.resolveHandle "$actor")"
-        if [[ $(is_xrpc_success $? "$resolved_handle") == 1 ]]; then
+        if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
             actor="$(echo "$resolved_handle" | jq -r ".did")"
         fi
     fi
@@ -472,7 +478,7 @@ function override_actor() {
         esac
             
         if [[ $? != 0 || -z "$did_doc" ]]; then
-            die "Unable to fetch DID Doc for '$actor'"
+            atfile.util.die "Unable to fetch DID Doc for '$actor'"
         else
             export _server="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             export _username="$(echo "$did_doc" | jq -r ".id")"
@@ -483,11 +489,11 @@ function override_actor() {
             fi
         fi
     else
-        die "Unable to resolve '$actor'"
+        atfile.util.die "Unable to resolve '$actor'"
     fi
 }
 
-function print_copyright_warning() {
+function atfile.util.print_copyright_warning() {
     if [[ $_skip_copyright_warn == 0 ]]; then
         echo "
  ##########################################
@@ -498,30 +504,30 @@ function print_copyright_warning() {
     fi
 }
 
-function print_hidden_command_warning() {
+function atfile.util.print_hidden_command_warning() {
     envvar="$1"
     echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_${envvar}=1"
 }
 
-function print_table_paginate_hint() {
+function atfile.util.print_table_paginate_hint() {
     cursor="$1"
     count="$2"
     
     if [[ -z $count ]] || (( ( $record_count + $_max_list_buffer ) >= $_max_list )); then
         first_line="List is limited to $_max_list results. To print more results,"
         first_line_length=$(( ${#first_line} + 3 ))
-        echo -e "$(repeat "-" $first_line_length)\nℹ️  $first_line\n   run \`$_prog $_command $cursor\`"
+        echo -e "$(atfile.util.repeat_char "-" $first_line_length)\nℹ️  $first_line\n   run \`$_prog $_command $cursor\`"
     fi
 }
 
-function repeat() {
+function atfile.util.repeat_char() {
     char="$1"
     amount="$2"
     
     printf "%0.s$char" $(seq 1 $amount)
 }
 
-function parse_exiftool_date() {
+function atfile.util.parse_exiftool_date() {
     in_date="$1"
     tz="$2"
         
@@ -533,14 +539,14 @@ function parse_exiftool_date() {
 
 # XRPC
 
-function xrpc_jwt() {
+function atfile.xrpc.jwt() {
     curl -s -X POST $_server/xrpc/com.atproto.server.createSession \
         -H "Content-Type: application/json" \
         -H "User-Agent: $_uas" \
         -d '{"identifier": "'$_username'", "password": "'$_password'"}' | jq -r ".accessJwt"
 }
 
-function xrpc_get() {
+function atfile.xrpc.get() {
     lexi="$1"
     query="$2"
     type="$3"
@@ -548,12 +554,12 @@ function xrpc_get() {
     [[ -z $type ]] && type="application/json"
 
     curl -s -X GET $_server/xrpc/$lexi?$query \
-        -H "Authorization: Bearer $(xrpc_jwt)" \
+        -H "Authorization: Bearer $(atfile.xrpc.jwt)" \
         -H "Content-Type: $type" \
         -H "User-Agent: $_uas" \ | jq
 }
 
-function xrpc_post() {
+function atfile.xrpc.post() {
     lexi="$1"
     data="$2"
     type="$3"
@@ -561,13 +567,13 @@ function xrpc_post() {
     [[ -z $type ]] && type="application/json"
 
     curl -s -X POST $_server/xrpc/$lexi \
-        -H "Authorization: Bearer $(xrpc_jwt)" \
+        -H "Authorization: Bearer $(atfile.xrpc.jwt)" \
         -H "Content-Type: $type" \
         -H "User-Agent: $_uas" \
         -d "$data" | jq
 }
 
-function xrpc_post_blob() {
+function atfile.xrpc.post_blob() {
     file="$1"
     type="$2"
     lexi="$3"
@@ -576,7 +582,7 @@ function xrpc_post_blob() {
     [[ -z $type ]] && type="*/*"
 
     curl -s -X POST $_server/xrpc/$lexi \
-        -H "Authorization: Bearer $(xrpc_jwt)" \
+        -H "Authorization: Bearer $(atfile.xrpc.jwt)" \
         -H "Content-Type: $type" \
         -H "User-Agent: $_uas" \
         --data-binary @"$file" | jq
@@ -585,13 +591,6 @@ function xrpc_post_blob() {
 # Lexicons
 
 ## Records
-
-function get_line() {
-    input="$1"
-    index=$(( $2 + 1 ))
-    
-    echo "$(echo -e "$input" | sed -n "$(( $index ))"p)"
-}
 
 function blue.zio.atfile.meta__unknown() {
     reason="$1"
@@ -615,25 +614,25 @@ function blue.zio.atfile.meta__audio() {
         return
     fi
     
-    audio="$(get_mediainfo_audio_json "$file")"
-    duration=$(get_mediainfo_field "$file" "General" "Duration" null)
-    format="$(get_mediainfo_field "$file" "General" "Format")"
-    tag_album="$(get_mediainfo_field "$file" "General" "Album")"
-    tag_albumArtist="$(get_mediainfo_field "$file" "General" "Album/Performer")"
-    tag_artist="$(get_mediainfo_field "$file" "General" "Performer")"
-    tag_date="$(get_mediainfo_field "$file" "General" "Original/Released_Date")"
-    tag_disc=$(get_mediainfo_field "$file" "General" "Part/Position" null)
-    tag_discTotal=$(get_mediainfo_field "$file" "General" "Part/Position_Total" null)
-    tag_title="$(get_mediainfo_field "$file" "General" "Title")"
-    tag_track=$(get_mediainfo_field "$file" "General" "Track/Position" null)
-    tag_trackTotal=$(get_mediainfo_field "$file" "General" "Track/Position_Total" null)
+    audio="$(atfile.util.get_mediainfo_audio_json "$file")"
+    duration=$(atfile.util.get_mediainfo_field "$file" "General" "Duration" null)
+    format="$(atfile.util.get_mediainfo_field "$file" "General" "Format")"
+    tag_album="$(atfile.util.get_mediainfo_field "$file" "General" "Album")"
+    tag_albumArtist="$(atfile.util.get_mediainfo_field "$file" "General" "Album/Performer")"
+    tag_artist="$(atfile.util.get_mediainfo_field "$file" "General" "Performer")"
+    tag_date="$(atfile.util.get_mediainfo_field "$file" "General" "Original/Released_Date")"
+    tag_disc=$(atfile.util.get_mediainfo_field "$file" "General" "Part/Position" null)
+    tag_discTotal=$(atfile.util.get_mediainfo_field "$file" "General" "Part/Position_Total" null)
+    tag_title="$(atfile.util.get_mediainfo_field "$file" "General" "Title")"
+    tag_track=$(atfile.util.get_mediainfo_field "$file" "General" "Track/Position" null)
+    tag_trackTotal=$(atfile.util.get_mediainfo_field "$file" "General" "Track/Position_Total" null)
     
     parsed_tag_date=""
     
     if [[ "${#tag_date}" > 4 ]]; then
-        parsed_tag_date="$(get_date "$tag_date")"
+        parsed_tag_date="$(atfile.util.get_date "$tag_date")"
     elif [[ "${#tag_date}" == 4 ]]; then
-        parsed_tag_date="$(get_date "${tag_date}-01-01")"
+        parsed_tag_date="$(atfile.util.get_date "${tag_date}-01-01")"
     fi
     
     echo "{
@@ -645,7 +644,7 @@ function blue.zio.atfile.meta__audio() {
         \"album\": \"$tag_album\",
         \"album_artist\": \"$tag_albumArtist\",
         \"artist\": \"$tag_artist\",
-        \"date\": $(get_date_json "$tag_date" "$parsed_tag_date"),
+        \"date\": $(atfile.util.get_date_json "$tag_date" "$parsed_tag_date"),
         \"disc\": {
             \"position\": $tag_disc,
             \"total\": $tag_discTotal
@@ -667,29 +666,29 @@ function blue.zio.atfile.meta__photo() {
         return
     fi
 
-    artist="$(get_exiftool_field "$file" "Artist")"
-    camera_aperture="$(get_exiftool_field "$file" "Aperture")"
-    camera_exposure="$(get_exiftool_field "$file" "ExposureTime")"
-    camera_flash="$(get_exiftool_field "$file" "Flash")"
-    camera_focalLength="$(get_exiftool_field "$file" "FocalLength")"
-    camera_iso="$(get_exiftool_field "$file" "ISO" null)"
-    camera_make="$(get_exiftool_field "$file" "Make")"
-    camera_mpx="$(get_exiftool_field "$file" "Megapixels" null)"
-    camera_model="$(get_exiftool_field "$file" "Model")"
-    date_create="$(get_exiftool_field "$file" "CreateDate")"
-    date_modify="$(get_exiftool_field "$file" "ModifyDate")"
-    date_tz="$(get_exiftool_field "$file" "OffsetTime" "+00:00")"
-    dim_height="$(get_exiftool_field "$file" "ImageHeight" null)"
-    dim_width="$(get_exiftool_field "$file" "ImageWidth" null)"
-    gps_alt="$(get_exiftool_field "$file" "GPSAltitude" null)"
-    gps_lat="$(get_exiftool_field "$file" "GPSLatitude" null)"
-    gps_long="$(get_exiftool_field "$file" "GPSLongitude" null)"
-    orientation="$(get_exiftool_field "$file" "Orientation")"
-    software="$(get_exiftool_field "$file" "Software")"
-    title="$(get_exiftool_field "$file" "Title")"
+    artist="$(atfile.util.get_exiftool_field "$file" "Artist")"
+    camera_aperture="$(atfile.util.get_exiftool_field "$file" "Aperture")"
+    camera_exposure="$(atfile.util.get_exiftool_field "$file" "ExposureTime")"
+    camera_flash="$(atfile.util.get_exiftool_field "$file" "Flash")"
+    camera_focalLength="$(atfile.util.get_exiftool_field "$file" "FocalLength")"
+    camera_iso="$(atfile.util.get_exiftool_field "$file" "ISO" null)"
+    camera_make="$(atfile.util.get_exiftool_field "$file" "Make")"
+    camera_mpx="$(atfile.util.get_exiftool_field "$file" "Megapixels" null)"
+    camera_model="$(atfile.util.get_exiftool_field "$file" "Model")"
+    date_create="$(atfile.util.get_exiftool_field "$file" "CreateDate")"
+    date_modify="$(atfile.util.get_exiftool_field "$file" "ModifyDate")"
+    date_tz="$(atfile.util.get_exiftool_field "$file" "OffsetTime" "+00:00")"
+    dim_height="$(atfile.util.get_exiftool_field "$file" "ImageHeight" null)"
+    dim_width="$(atfile.util.get_exiftool_field "$file" "ImageWidth" null)"
+    gps_alt="$(atfile.util.get_exiftool_field "$file" "GPSAltitude" null)"
+    gps_lat="$(atfile.util.get_exiftool_field "$file" "GPSLatitude" null)"
+    gps_long="$(atfile.util.get_exiftool_field "$file" "GPSLongitude" null)"
+    orientation="$(atfile.util.get_exiftool_field "$file" "Orientation")"
+    software="$(atfile.util.get_exiftool_field "$file" "Software")"
+    title="$(atfile.util.get_exiftool_field "$file" "Title")"
     
-    date_create="$(parse_exiftool_date "$date_create" "$date_tz")"
-    date_modify="$(parse_exiftool_date "$date_modify" "$date_tz")"
+    date_create="$(atfile.util.parse_exiftool_date "$date_create" "$date_tz")"
+    date_modify="$(atfile.util.parse_exiftool_date "$date_modify" "$date_tz")"
     
     [[ $gps_alt == +* ]] && gps_alt="${gps_alt:1}"
     [[ $gps_lat == +* ]] && gps_lat="${gps_lat:1}"
@@ -711,8 +710,8 @@ function blue.zio.atfile.meta__photo() {
         \"megapixels\": $camera_mpx
     },
     \"date\": {
-        \"create\": $(get_date_json "$date_create"),
-        \"modify\": $(get_date_json "$date_modify")
+        \"create\": $(atfile.util.get_date_json "$date_create"),
+        \"modify\": $(atfile.util.get_date_json "$date_modify")
     },
     \"dimensions\": {
         \"height\": $dim_height,
@@ -737,29 +736,29 @@ function blue.zio.atfile.meta__video() {
         return
     fi
     
-    artist="$(get_mediainfo_field "$file" "General" "Artist")"
-    audio="$(get_mediainfo_audio_json "$file")"
-    bitRate=$(get_mediainfo_field "$file" "General" "BitRate" null)
+    artist="$(atfile.util.get_mediainfo_field "$file" "General" "Artist")"
+    audio="$(atfile.util.get_mediainfo_audio_json "$file")"
+    bitRate=$(atfile.util.get_mediainfo_field "$file" "General" "BitRate" null)
     date_create="",
     date_modify="",
-    duration=$(get_mediainfo_field "$file" "General" "Duration" null)
-    format="$(get_mediainfo_field "$file" "General" "Format")"
+    duration=$(atfile.util.get_mediainfo_field "$file" "General" "Duration" null)
+    format="$(atfile.util.get_mediainfo_field "$file" "General" "Format")"
     gps_alt=0
     gps_lat=0
     gps_long=0
-    title="$(get_mediainfo_field "$file" "General" "Title")"
-    video="$(get_mediainfo_video_json "$file")"
+    title="$(atfile.util.get_mediainfo_field "$file" "General" "Title")"
+    video="$(atfile.util.get_mediainfo_video_json "$file")"
     
     if [ -x "$(command -v exiftool)" ]; then
-        date_create="$(get_exiftool_field "$file" "CreateDate")"
-        date_modify="$(get_exiftool_field "$file" "ModifyDate")"
-        date_tz="$(get_exiftool_field "$file" "OffsetTime" "+00:00")"
-        gps_alt="$(get_exiftool_field "$file" "GPSAltitude" null)"
-        gps_lat="$(get_exiftool_field "$file" "GPSLatitude" null)"
-        gps_long="$(get_exiftool_field "$file" "GPSLongitude" null)"
+        date_create="$(atfile.util.get_exiftool_field "$file" "CreateDate")"
+        date_modify="$(atfile.util.get_exiftool_field "$file" "ModifyDate")"
+        date_tz="$(atfile.util.get_exiftool_field "$file" "OffsetTime" "+00:00")"
+        gps_alt="$(atfile.util.get_exiftool_field "$file" "GPSAltitude" null)"
+        gps_lat="$(atfile.util.get_exiftool_field "$file" "GPSLatitude" null)"
+        gps_long="$(atfile.util.get_exiftool_field "$file" "GPSLongitude" null)"
         
-        date_create="$(parse_exiftool_date "$date_create" "$date_tz")"
-        date_modify="$(parse_exiftool_date "$date_modify" "$date_tz")"
+        date_create="$(atfile.util.parse_exiftool_date "$date_create" "$date_tz")"
+        date_modify="$(atfile.util.parse_exiftool_date "$date_modify" "$date_tz")"
     fi
     
     echo "{
@@ -768,8 +767,8 @@ function blue.zio.atfile.meta__video() {
     \"audio\": [ $audio ],
     \"biteRate\": $bitRate,
     \"date\": {
-        \"create\": $(get_date_json "$date_create"),
-        \"modify\": $(get_date_json "$date_modify")
+        \"create\": $(atfile.util.get_date_json "$date_create"),
+        \"modify\": $(atfile.util.get_date_json "$date_modify")
     },
     \"duration\": $duration,
     \"format\": \"$format\",
@@ -799,13 +798,13 @@ function blue.zio.atfile.finger__machine() {
     machine_id_file="/etc/machine-id"
     os_release_file="/etc/os-release"
     
-    [[ ! -f "$machine_id_file" ]] && die "Unable to fingerprint — '$machine_id_file' does not exist"
-    [[ ! -f "$os_release_file" ]] && die "Unable to fingerprint — '$os_release_file' does not exist"
+    [[ ! -f "$machine_id_file" ]] && atfile.util.die "Unable to fingerprint — '$machine_id_file' does not exist"
+    [[ ! -f "$os_release_file" ]] && atfile.util.die "Unable to fingerprint — '$os_release_file' does not exist"
     
     id="$(cat "$machine_id_file")"
     hostname="$(hostname -s)"
-    os_name="$(get_var "$os_release_file" "NAME")"
-    os_version="$(get_var "$os_release_file" "VERSION")"
+    os_name="$(atfile.util.get_var_from_file "$os_release_file" "NAME")"
+    os_version="$(atfile.util.get_var_from_file "$os_release_file" "VERSION")"
     os="$os_name $os_version"
     
     echo "{
@@ -870,7 +869,7 @@ function blue.zio.meta.profile() {
 function app.bsky.actor.getProfile() {
     actor="$1"
     
-    xrpc_get "app.bsky.actor.getProfile" "actor=$actor" 
+    atfile.xrpc.get "app.bsky.actor.getProfile" "actor=$actor" 
 }
 
 function com.atproto.repo.createRecord() {
@@ -878,7 +877,7 @@ function com.atproto.repo.createRecord() {
     collection="$2"
     record="$3"
     
-    xrpc_post "com.atproto.repo.createRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"record\": $record }"
+    atfile.xrpc.post "com.atproto.repo.createRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"record\": $record }"
 }
 
 function com.atproto.repo.deleteRecord() {
@@ -886,7 +885,7 @@ function com.atproto.repo.deleteRecord() {
     collection="$2"
     rkey="$3"
 
-    xrpc_post "com.atproto.repo.deleteRecord" "{ \"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\" }"
+    atfile.xrpc.post "com.atproto.repo.deleteRecord" "{ \"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\" }"
 }
 
 function com.atproto.repo.getRecord() {
@@ -894,7 +893,7 @@ function com.atproto.repo.getRecord() {
     collection="$2"
     key="$3"
 
-    xrpc_get "com.atproto.repo.getRecord" "repo=$repo&collection=$collection&rkey=$key"
+    atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$repo&collection=$collection&rkey=$key"
 }
 
 function com.atproto.repo.listRecords() {
@@ -902,7 +901,7 @@ function com.atproto.repo.listRecords() {
     collection="$2"
     cursor="$3"
     
-    xrpc_get "com.atproto.repo.listRecords" "repo=$repo&collection=$collection&limit=$_max_list&cursor=$cursor"
+    atfile.xrpc.get "com.atproto.repo.listRecords" "repo=$repo&collection=$collection&limit=$_max_list&cursor=$cursor"
 }
 
 function com.atproto.repo.putRecord() {
@@ -911,29 +910,29 @@ function com.atproto.repo.putRecord() {
     rkey="$3"
     record="$4"
     
-    xrpc_post "com.atproto.repo.putRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\", \"record\": $record }"
+    atfile.xrpc.post "com.atproto.repo.putRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\", \"record\": $record }"
 }
 
 function com.atproto.identity.resolveHandle() {
     handle="$1"
 
-    xrpc_get "com.atproto.identity.resolveHandle" "handle=$handle"
+    atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$handle"
 }
 
 function com.atproto.server.getSession() {
-    xrpc_get "com.atproto.server.getSession"
+    atfile.xrpc.get "com.atproto.server.getSession"
 }
 
 function com.atproto.sync.listBlobs() {
     did="$1"
     cursor="$2"
     
-    xrpc_get "com.atproto.sync.listBlobs" "did=$did&limit=$_max_list&cursor=$cursor"
+    atfile.xrpc.get "com.atproto.sync.listBlobs" "did=$did&limit=$_max_list&cursor=$cursor"
 }
 
 function com.atproto.sync.uploadBlob() {
     file="$1"
-    xrpc_post_blob "$1" | jq -r ".blob"
+    atfile.xrpc.post_blob "$1" | jq -r ".blob"
 }
 
 # Commands
@@ -950,17 +949,17 @@ function invoke_manage_record() {
         "create")
             collection="$(get_collection "$3")"
             record="$2"
-            [[ -z "$record" ]] && die "<record> not set"
+            [[ -z "$record" ]] && atfile.util.die "<record> not set"
             
             record_json="$(echo "$record" | jq)"
-            [[ $? != 0 ]] && die "Invalid JSON"
+            [[ $? != 0 ]] && atfile.util.die "Invalid JSON"
             
             com.atproto.repo.createRecord "$_username" "$collection" "$record_json" | jq
             ;;
         "delete")
             collection="$(get_collection "$3")"
             key="$2"
-            [[ -z "$key" ]] && die "<key> not set"
+            [[ -z "$key" ]] && atfile.util.die "<key> not set"
             
             if [[ "$key" == at:* ]]; then
                 at_uri="$key"
@@ -968,7 +967,7 @@ function invoke_manage_record() {
                 key="$(echo $at_uri | cut -d "/" -f 5)"
                 username="$(echo $at_uri | cut -d "/" -f 3)"
                 
-                [[ "$username" != "$_username" ]] && die "Unable to delete record — not owned by you ($_username)"
+                [[ "$username" != "$_username" ]] && atfile.util.die "Unable to delete record — not owned by you ($_username)"
             fi
             
             com.atproto.repo.deleteRecord "$_username" "$collection" "$key" | jq
@@ -977,7 +976,7 @@ function invoke_manage_record() {
             collection="$(get_collection "$3")"
             key="$2"
             username="$4"
-            [[ -z "$key" ]] && die "<key/at-uri> not set"
+            [[ -z "$key" ]] && atfile.util.die "<key/at-uri> not set"
             
             if [[ "$key" == at:* ]]; then
                 at_uri="$key"
@@ -989,7 +988,7 @@ function invoke_manage_record() {
             if [[ -z "$username" ]]; then
                 username="$_username"
             else
-                override_actor "$username"
+                atfile.util.override_actor "$username"
             fi
             
             com.atproto.repo.getRecord "$username" "$collection" "$key" | jq
@@ -998,11 +997,11 @@ function invoke_manage_record() {
             collection="$(get_collection "$3")"
             key="$2"
             record="$3"
-            [[ -z "$key" ]] && die "<key> not set"
-            [[ -z "$record" ]] && die "<record> not set"
+            [[ -z "$key" ]] && atfile.util.die "<key> not set"
+            [[ -z "$record" ]] && atfile.util.die "<record> not set"
             
             record_json="$(echo "$record" | jq)"
-            [[ $? != 0 ]] && die "Invalid JSON"
+            [[ $? != 0 ]] && atfile.util.die "Invalid JSON"
             
             com.atproto.repo.putRecord "$_username" "$collection" "$key" "$record" | jq
             ;;
@@ -1015,16 +1014,16 @@ function invoke_delete() {
 
     lock_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
 
-    if [[ $(is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".value.lock") == true ]]; then
-        die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
+    if [[ $(atfile.util.is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".value.lock") == true ]]; then
+        atfile.util.die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
     fi
 
     record="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.upload" "$key")"
     
-    if [[ $(is_xrpc_success $? "$record") == 1 ]]; then
+    if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
         echo "Deleted: $key"
     else
-        die "Unable to delete '$key'"
+        atfile.util.die "Unable to delete '$key'"
     fi
 }
 
@@ -1037,7 +1036,7 @@ function invoke_download() {
     
     if [[ -n "$out_dir" ]]; then
         mkdir -p "$out_dir"
-        [[ $? != 0 ]] && die "Unable to create '$out_dir'"
+        [[ $? != 0 ]] && atfile.util.die "Unable to create '$out_dir'"
         out_dir="$(realpath "$out_dir")/"
     fi
     
@@ -1045,9 +1044,9 @@ function invoke_download() {
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
-        blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
-        key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+        key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         downloaded_file="${out_dir}${key}__${file_name}"
         
         curl -H "User-Agent: $_uas" --silent "$blob_uri" -o "$downloaded_file"
@@ -1073,7 +1072,7 @@ function invoke_download() {
         echo -e "↳ Path: $(realpath "$downloaded_file")"
     else
         [[ -f "$downloaded_file" ]] && rm -f "$downloaded_file"
-        die "Unable to download '$key'"
+        atfile.util.die "Unable to download '$key'"
     fi
 }
 
@@ -1090,22 +1089,22 @@ function invoke_get() {
     	file_hash_type="$(echo "$record" | jq -r '.value.checksum.type')"
     	file_hash_pretty="$file_hash ($file_hash_type)"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
-        file_name_pretty="$(get_file_name_pretty "$(echo "$record" | jq -r '.value')")"
+        file_name_pretty="$(atfile.util.get_file_name_pretty "$(echo "$record" | jq -r '.value')")"
         file_size="$(echo "$record" | jq -r '.value.file.size')"
-        file_size_pretty="$(get_file_size_pretty $file_size)"
+        file_size_pretty="$(atfile.util.get_file_size_pretty $file_size)"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
         did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
-        key="$(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
-        blob_uri="$(get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
-        cdn_uri="$(get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
+        key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+        blob_uri="$(atfile.util.get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        cdn_uri="$(atfile.util.get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
         encrypted="No"
         locked="No"
         finger="(None)"
         finger_type=""
         header="$file_name_pretty"
         
-        if [[ $(is_null_or_empty "$file_hash_type") == 1 ]] || [[ "$file_hash_type" == "md5" && ${#file_hash} != 32 ]] || [[ "$file_hash_type" == "none" ]]; then
+        if [[ $(atfile.util.is_null_or_empty "$file_hash_type") == 1 ]] || [[ "$file_hash_type" == "md5" && ${#file_hash} != 32 ]] || [[ "$file_hash_type" == "none" ]]; then
             file_hash_pretty="(None)"
         fi
         
@@ -1147,7 +1146,7 @@ function invoke_get() {
                 ;;
         esac
     else
-        die "Unable to get '$key'"
+        atfile.util.die "Unable to get '$key'"
     fi
 }
 
@@ -1158,9 +1157,9 @@ function invoke_get_url() {
     record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
     
     if [[ $success == 1 ]]; then
-        echo "$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        echo "$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
     else
-        die "Unable to get '$key'"
+        atfile.util.die "Unable to get '$key'"
     fi
 }
 
@@ -1169,11 +1168,11 @@ function invoke_list() {
     success=1
     
     records="$(com.atproto.repo.listRecords "$_username" "blue.zio.atfile.upload" "$cursor")"
-    success="$(is_xrpc_success $? "$records")"
+    success="$(atfile.util.is_xrpc_success $? "$records")"
    
     if [[ $success == 1 ]]; then
     	records="$(echo $records | jq -c '.records[]')"
-        [[ -z "$records" ]] && die "No files for '$_username'"
+        [[ -z "$records" ]] && atfile.util.die "No files for '$_username'"
         
         unset last_key
         unset record_count
@@ -1182,9 +1181,9 @@ function invoke_list() {
         echo -e "---\t\t----"
         
         while IFS=$"\n" read -r c; do
-            key=$(get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
+            key=$(atfile.util.get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
             name="$(echo "$c" | jq -r '.value.file.name')"
-            type_emoji="$(get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
+            type_emoji="$(atfile.util.get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
             last_key="$key"
             ((record_count++))
 
@@ -1193,9 +1192,9 @@ function invoke_list() {
             fi
         done <<< "$records"
          
-        print_table_paginate_hint "$last_key" $record_count
+        atfile.util.print_table_paginate_hint "$last_key" $record_count
     else
-        die "Unable to list files"
+        atfile.util.die "Unable to list files"
     fi
 }
 
@@ -1204,11 +1203,11 @@ function invoke_list_blobs() {
     success=1
     
     blobs="$(com.atproto.sync.listBlobs "$_username" "$cursor")"
-    success="$(is_xrpc_success $? "$blobs")"
+    success="$(atfile.util.is_xrpc_success $? "$blobs")"
 
     if [[ $success == 1 ]]; then
     	records="$(echo $blobs | jq -c '.cids[]')"
-    	[[ -z "$records" ]] && die "No blobs for '$_username'"
+    	[[ -z "$records" ]] && atfile.util.die "No blobs for '$_username'"
     
     	unset last_cid
         unset record_count
@@ -1221,12 +1220,12 @@ function invoke_list_blobs() {
             last_cid="$cid"
             ((record_count++))
             
-            echo "$(get_blob_uri "$_username" "$cid")"
+            echo "$(atfile.util.get_blob_uri "$_username" "$cid")"
         done <<< "$records"
         
-        print_table_paginate_hint "$last_cid" $record_count
+        atfile.util.print_table_paginate_hint "$last_cid" $record_count
     else
-        die "Unable to list blobs"
+        atfile.util.die "Unable to list blobs"
     fi
 }
 
@@ -1235,7 +1234,7 @@ function invoke_lock() {
     locked=$2
     
     upload_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
-    success=$(is_xrpc_success $? "$upload_record")
+    success=$(atfile.util.is_xrpc_success $? "$upload_record")
     
     if [[ $success == 1 ]]; then        
         if [[ $locked == 1 ]]; then
@@ -1246,10 +1245,10 @@ function invoke_lock() {
         
         lock_record="$(blue.zio.atfile.lock $locked)"
         record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.lock" "$key" "$lock_record")"
-        success=$(is_xrpc_success $? "$record")
+        success=$(atfile.util.is_xrpc_success $? "$record")
     fi
     
-    if [[ $(is_xrpc_success $? "$record") == 1 ]]; then
+    if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
         if [[ $locked == true ]]; then
             echo "Locked: $key"
         else
@@ -1257,9 +1256,9 @@ function invoke_lock() {
         fi
     else
          if [[ $locked == true ]]; then
-            die "Unable to lock '$key'"
+            atfile.util.die "Unable to lock '$key'"
         else
-            die "Unable to unlock '$key'"
+            atfile.util.die "Unable to unlock '$key'"
         fi
     fi
 }
@@ -1272,7 +1271,7 @@ function invoke_print() {
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
-        blob_uri="$(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
         curl -H "$_uas" -s -L "$blob_uri" --output -
@@ -1280,7 +1279,7 @@ function invoke_print() {
     fi
     
     if [[ $success != 1 ]]; then
-        die "Unable to cat '$key'"
+        atfile.util.die "Unable to cat '$key'"
     fi
 }
 
@@ -1293,13 +1292,13 @@ function invoke_profile() {
     # HACK: Renamed record to "blue.zio.meta.profile". Remove this in the future.
     dummy="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.profile" "self")"
     
-    if [[ $(is_xrpc_success $? "$record") == 1 ]]; then
+    if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
         record="$(com.atproto.repo.getRecord "$_username" "blue.zio.meta.profile" "self")"
     
         echo "Updated profile"
         echo "↳ Nickname: $(echo "$record" | jq -r ".value.nickname")"
     else
-        die "Unable to update profile"
+        atfile.util.die "Unable to update profile"
     fi
 }
 
@@ -1310,13 +1309,13 @@ function invoke_upload() {
     success=1
     
     if [ ! -f "$file" ]; then
-        die "File '$file' does not exist"
+        atfile.util.die "File '$file' does not exist"
     else
         file="$(realpath "$file")"
     fi
     
     if [[ "$_server" == "https://bsky.social" ]]; then
-        print_copyright_warning
+        atfile.util.print_copyright_warning
     fi
     
     if [[ -n $recipient ]]; then
@@ -1330,13 +1329,13 @@ function invoke_upload() {
             file="$file_crypt"
         else
             rm -f "$file_crypt"
-            die "Unable to encrypt '$(basename "$file")'"
+            atfile.util.die "Unable to encrypt '$(basename "$file")'"
         fi
     fi
 
     if [[ $success == 1 ]]; then
-        file_date="$(get_date "$(stat -c '%y' "$file")")"
-        file_hash="$(get_md5 "$file")"
+        file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
+        file_hash="$(atfile.util.get_md5 "$file")"
         file_hash_type="md5"
         file_name="$(basename "$file")"
         file_size="$(wc -c "$file" | cut -d " " -f 1)"
@@ -1357,26 +1356,26 @@ function invoke_upload() {
             esac
         fi
         
-        file_type_emoji="$(get_file_type_emoji "$file_type")"
+        file_type_emoji="$(atfile.util.get_file_type_emoji "$file_type")"
         
         unset file_finger_record
         unset file_meta_record
         
-        [[ $_fingerprint == 1 ]] && file_finger_record="$(get_finger_record)"
-        file_meta_record="$(get_meta_record "$file" "$file_type")"
+        [[ $_fingerprint == 1 ]] && file_finger_record="$(atfile.util.get_finger_record)"
+        file_meta_record="$(atfile.util.get_meta_record "$file" "$file_type")"
         
         echo "Uploading '$file'..."
         blob="$(com.atproto.sync.uploadBlob "$file")"
-        success=$(is_xrpc_success $? "$blob")
+        success=$(atfile.util.is_xrpc_success $? "$blob")
         
         file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
         
         if [[ -n "$key" ]]; then
             record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.upload" "$key" "$file_record")"
-            success=$(is_xrpc_success $? "$record")
+            success=$(atfile.util.is_xrpc_success $? "$record")
         else
             record="$(com.atproto.repo.createRecord "$_username" "blue.zio.atfile.upload" "$file_record")"
-            success=$(is_xrpc_success $? "$record")
+            success=$(atfile.util.is_xrpc_success $? "$record")
         fi
     fi
     
@@ -1387,13 +1386,13 @@ function invoke_upload() {
     if [[ $success == 1 ]]; then
         echo "---"
         echo "Uploaded: $file_type_emoji $file_name"
-        echo -e "↳ Blob: $(get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
-        echo -e "↳ Key: $(get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+        echo -e "↳ Blob: $(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
+        echo -e "↳ Key: $(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         if [[ -n "$recipient" ]]; then
             echo -e "↳ Recipient: $recipient ($(gpg --list-keys $recipient | sed -n 2p | xargs))"
         fi
     else
-        die "Unable to upload '$file'"
+        atfile.util.die "Unable to upload '$file'"
     fi
 }
 
@@ -1522,7 +1521,7 @@ if [ -x "$(command -v git)" ] && [[ -d "$(dirname "$(realpath -s "$0")")/.git" ]
 fi
 
 _prog="$(basename "$(realpath -s "$0")")"
-_now="$(get_date)"
+_now="$(atfile.util.get_date)"
 _command="$1"
 _is_sourced="0"
 
@@ -1533,25 +1532,25 @@ _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _hidden_command_record_default=0
 _max_list_buffer=6
-_max_list_default=$(( $(get_term_rows) - $_max_list_buffer ))
+_max_list_default=$(( $(atfile.util.get_term_rows) - $_max_list_buffer ))
 _server_default="https://bsky.social"
 _skip_auth_check_default=0
 _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
-_fingerprint="$(get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
-_fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
-_hidden_command_record="$(get_envvar "${_envvar_prefix}_HIDDEN_COMMAND_RECORD" "$_hidden_command_record_default")"
-_max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
-_server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
-_skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
-_skip_copyright_warn="$(get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
-_skip_ni_exiftool="$(get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
-_skip_ni_mediainfo="$(get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
-_password="$(get_envvar "${_envvar_prefix}_PASSWORD")"
+_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
+_fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
+_hidden_command_record="$(atfile.util.get_envvar "${_envvar_prefix}_HIDDEN_COMMAND_RECORD" "$_hidden_command_record_default")"
+_max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
+_server="$(atfile.util.get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
+_skip_auth_check="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
+_skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
+_skip_ni_exiftool="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
+_skip_ni_mediainfo="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
+_password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
 _uas="ATFile/$_version"
-_username="$(get_envvar "${_envvar_prefix}_USERNAME")"
+_username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 
 [[ "$0" != "$BASH_SOURCE" ]] && _is_sourced=1
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
@@ -1562,52 +1561,52 @@ if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_com
     exit 0
 fi
 
-check_prog "curl"
-check_prog "jq" "https://jqlang.github.io/jq"
-check_prog "md5sum"
-check_prog "xargs"
+atfile.util.check_prog "curl"
+atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
+atfile.util.check_prog "md5sum"
+atfile.util.check_prog "xargs"
 
-[[ -z "$_username" ]] && die "\$${_envvar_prefix}_USERNAME not set"
-[[ -z "$_password" ]] && die "\$${_envvar_prefix}_PASSWORD not set"
+[[ -z "$_username" ]] && atfile.util.die "\$${_envvar_prefix}_USERNAME not set"
+[[ -z "$_password" ]] && atfile.util.die "\$${_envvar_prefix}_PASSWORD not set"
 
 if [[ $_skip_auth_check == 0 ]]; then
     session="$(com.atproto.server.getSession)"
-    if [[ $(is_xrpc_success $? "$session") == 0 ]]; then
-        die "Unable to authenticate as \"$_username\" on \"$_server\""
+    if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
+        atfile.util.die "Unable to authenticate as \"$_username\" on \"$_server\""
     else
         _username="$(echo $session | jq -r ".did")"
     fi
 else
     if [[ "$_username" != "did:"* ]]; then
-        die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
+        atfile.util.die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
     fi
 fi
 
 if [[ $_is_sourced == 0 ]]; then
 	case "$_command" in
 		"cat"|"open"|"print"|"c")
-		    [[ -z "$2" ]] && die "<key> not set"
-		    [[ -n "$3" ]] && override_actor "$3"
+		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		    invoke_print "$2"
 		    ;;
 		"delete"|"rm")
-		    [[ -z "$2" ]] && die "<key> not set"
+		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
 		    invoke_delete "$2"
 		    ;;
 		"fetch"|"download"|"f"|"d")
-		    [[ -z "$2" ]] && die "<key> not set"
-		    [[ -n "$4" ]] && override_actor "$4"
+		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
 		    invoke_download "$2" "$3"
 		    ;;
 		"fetch-crypt"|"download-crypt"|"fc"|"dc")
-		    check_prog_gpg
-		    [[ -z "$2" ]] && die "<key> not set"
-		    [[ -n "$4" ]] && override_actor "$4"
+		    atfile.util.check_prog_gpg
+		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
 		    invoke_download "$2" "$3" 1
 		    ;;
 		"info"|"get"|"i")
-		    [[ -z "$2" ]] && die "<key> not set"
-		    [[ -n "$3" ]] && override_actor "$3"
+		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		    invoke_get "$2"
 		    ;;
 		"list"|"ls")
@@ -1616,10 +1615,10 @@ if [[ $_is_sourced == 0 ]]; then
 			    #       for them
 			    # BUG:  Keys with periods in them can't be used as a cursor
 			    
-			    override_actor "$2"
+			    atfile.util.override_actor "$2"
 		        invoke_list "$3"
 			else
-			    [[ -n "$3" ]] && override_actor "$3"
+			    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		        invoke_list "$2"   
 			fi
 		    ;;
@@ -1640,44 +1639,44 @@ if [[ $_is_sourced == 0 ]]; then
 		            "get"|"g") invoke_manage_record "get" "$3" "$4" "$5" ;;
 		            "put"|"update"|"u") invoke_manage_record "put" "$3" "$4" ;;
 		            "rm"|"delete"|"d") invoke_manage_record "delete" "$3" "$4" ;;
-		            *) die_unknown_command "$(echo "$_command $2" | xargs)" ;;
+		            *) atfile.util.die_unknown_command "$(echo "$_command $2" | xargs)" ;;
 		        esac
 		    else
-		        print_hidden_command_warning "ENABLE_RECORD_COMMAND"
+		        atfile.util.print_hidden_command_warning "ENABLE_RECORD_COMMAND"
 		        exit 1
 		    fi
 		    ;;
 		"upload"|"ul"|"u")
-		    check_prog_optional_metadata
-		    [[ -z "$2" ]] && die "<file> not set"
+		    atfile.util.check_prog_optional_metadata
+		    [[ -z "$2" ]] && atfile.util.die "<file> not set"
 		    invoke_upload "$2" "" "$3"
 		    ;;
 		"upload-crypt"|"uc")
-		    check_prog_optional_metadata
-		    check_prog_gpg
-		    [[ -z "$2" ]] && die "<file> not set"
-		    [[ -z "$3" ]] && die "<recipient> not set"
+		    atfile.util.check_prog_optional_metadata
+		    atfile.util.check_prog_gpg
+		    [[ -z "$2" ]] && atfile.util.die "<file> not set"
+		    [[ -z "$3" ]] && atfile.util.die "<recipient> not set"
 		    invoke_upload "$2" "$3" "$4"
 		    ;;
 		"unlock")
 		    invoke_lock "$2" 0
 		    ;;
 		"url"|"get-url"|"b")
-		    [[ -z "$2" ]] && die "<key> not set"
-		    [[ -n "$3" ]] && override_actor "$3"
+		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		    invoke_get_url "$2"
 		    ;;
 		"temp-get-finger")
-		    get_finger_record
+		    atfile.util.get_finger_record
 		    ;;
 		"temp-get-meta")
-		    get_meta_record "$2" "$3"
+		    atfile.util.get_meta_record "$2" "$3"
 		    ;;
 		"temp-get-meta-jq")
-		    get_meta_record "$2" "$3" | jq
+		    atfile.util.get_meta_record "$2" "$3" | jq
 		    ;;
 		*)
-		    die_unknown_command "$_command"
+		    atfile.util.die_unknown_command "$_command"
 		    ;;
 	esac
 fi
