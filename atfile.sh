@@ -138,10 +138,12 @@ function get_exiftool_field() {
 function get_file_name_pretty() {
     file_record="$1"
     emoji="$(get_file_type_emoji "$(echo "$file_record" | jq -r '.file.mimeType')")"
-    output="$(echo "$file_record" | jq -r ".file.name" | cut -d "." -f 1)"
+    file_name_no_ext="$(echo "$file_record" | jq -r ".file.name" | cut -d "." -f 1)"
+    output="$file_name_no_ext"
     
     meta_type="$(echo "$file_record" | jq -r ".meta.\"\$type\"")"
     
+    # TODO: json_is_null_or_empty()
     if [[ -n "$meta_type" ]]; then
         case $meta_type in
             "blue.zio.atfile.meta#audio")
@@ -152,13 +154,15 @@ function get_file_name_pretty() {
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
                 track="$(echo "$file_record" | jq -r ".meta.tags.track.position")"
                 
-                [[ -z "$album" ]] && title="(Unknown Album)"
-                [[ -z "$album_artist" ]] && title="(Unknown Artist)"
-                [[ -z "$title" ]] && title="(No Title)"
+                [[ $(is_null_or_empty "$album") == 1 ]] && album="(Unknown Album)"
+                [[ $(is_null_or_empty "$album_artist") == 1 ]] && album_artist="(Unknown Artist)"
+                [[ $(is_null_or_empty "$disc") == 1 ]] && disc=0
+                [[ $(is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
+                [[ $(is_null_or_empty "$track") == 1 ]] && track=0
                 
                 output="$title\n   $album_artist — $album"
-                [[ -n $date ]] && output+=" ($(date --date="$date" +%Y))"
-                output+=" [$disc.$track]"
+                [[ $(is_null_or_empty "$date") == 0 ]] && output+=" ($(date --date="$date" +%Y))"
+                [[ $disc != 0 || $track != 0 ]] && output+=" [$disc.$track]"
                 ;;
             "blue.zio.atfile.meta#photo")
                 date="$(echo "$file_record" | jq -r ".meta.date.create.parsed")"
@@ -166,14 +170,14 @@ function get_file_name_pretty() {
                 long="$(echo "$file_record" | jq -r ".meta.gps.long")"
                 title="$(echo "$file_record" | jq -r ".meta.title")"
                 
-                [[ -z "$title" ]] && title="(No Title)"
+                [[ -z "$title" ]] && title="$file_name_no_ext"
                 
                 output="$title"
                 
-                if [[ -n "$lat" && -n "$long" ]]; then
+                if [[ $(is_null_or_empty "$lat") == 0 && $(is_null_or_empty "$long") == 0 ]]; then
                    output+="\n   $long $lat"
                    
-                   if [[ -n "$date" ]]; then
+                   if [[ $(is_null_or_empty "$date") == 0 ]]; then
                        output+=" — $(date --date="$date")"
                    fi
                 fi
@@ -181,7 +185,7 @@ function get_file_name_pretty() {
             "blue.zio.atfile.meta#video")
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
                 
-                [[ -z "$title" ]] && title="(No Title)"
+                [[ $(is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
                 
                 output="$title"
                 ;;
@@ -424,6 +428,14 @@ function get_var() {
             
             echo "$output"
         fi
+    fi
+}
+
+function is_null_or_empty() {
+    if [[ -z "$1" ]] || [[ "$1" == null ]]; then
+        echo 1
+    else
+        echo 0
     fi
 }
 
