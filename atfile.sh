@@ -16,6 +16,11 @@ function die() {
     exit 255
 }
 
+function die_unknown_command() {
+    command="$1"
+    die "Unknown command '$1'"
+}
+
 function check_prog() {
     command="$1"
     download_hint="$2"
@@ -1412,7 +1417,7 @@ function invoke_print_vars() {
     print_envvar "USERNAME"
     echo "$(print_envvar "PASSWORD" | cut -d ":" -f 1): $(print_envvar "PASSWORD" | cut -d ":" -f 2 | xargs | sed -e "s/./\*/g")"
     print_envvar "PDS" "$_server_default"
-    print_envvar "ENABLE_RECORD_COMMAND" "$_enable_record_command"
+    print_envvar "ENABLE_RECORD_COMMAND" "$_hidden_command_record"
     print_envvar "FINGERPRINT" "$_fingerprint_default"
     print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default"
     print_envvar "MAX_LIST" "$_max_list_default"
@@ -1475,8 +1480,7 @@ Commands
     nick <nick>
         Set nickname
         ℹ️  Intended for future use
-        
-    $([[ $_enable_record_command == 1 ]] && echo "record add <record-json> [<collection>]
+    $([[ $_hidden_command_record == 1 ]] && echo -e "\n    record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
     record get <at-uri>
     record put <key> <record-json> [<collection>]
@@ -1484,7 +1488,7 @@ Commands
     record rm <at-uri>
         Manage records on a repository
         ⚠️  Intended for advanced users. Here be dragons.
-           Turn this feature off with ${_envvar_prefix}_ENABLE_RECORD_COMMAND=0")
+           Turn this feature off with ${_envvar_prefix}_HIDDEN_COMMAND_RECORD=0")
        
 Arguments
     <actor>     Act upon another ATProto user (either by handle or DID)
@@ -1550,9 +1554,9 @@ _command="$1"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
-_enable_record_command_default=0
 _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
+_hidden_command_record_default=0
 _max_list_buffer=6
 _max_list_default=$(( $(get_term_rows) - $_max_list_buffer ))
 _server_default="https://bsky.social"
@@ -1561,9 +1565,9 @@ _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
-_enable_record_command="$(get_envvar "${_envvar_prefix}_ENABLE_RECORD_COMMAND" "$_enable_record_command_default")"
 _fingerprint="$(get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
+_hidden_command_record="$(get_envvar "${_envvar_prefix}_HIDDEN_COMMAND_RECORD" "$_hidden_command_record_default")"
 _max_list="$(get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _server="$(get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
 _skip_auth_check="$(get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
@@ -1658,13 +1662,13 @@ case "$_command" in
         ;;
     "record")
         # NOTE: Performs no validation (apart from JSON)! Here be dragons.
-        if [[ "$_enable_record_command" == 1 ]]; then
+        if [[ "$_hidden_command_record" == 1 ]]; then
             case "$2" in
                 "add"|"create"|"c") invoke_manage_record "create" "$3" "$4" ;;
                 "get"|"g") invoke_manage_record "get" "$3" "$4" "$5" ;;
                 "put"|"update"|"u") invoke_manage_record "put" "$3" "$4" ;;
                 "rm"|"delete"|"d") invoke_manage_record "delete" "$3" "$4" ;;
-                *) die "Unknown record action '$2'" ;;
+                *) die_unknown_command "$(echo "$_command $2" | xargs)" ;;
             esac
         else
             print_hidden_command_warning "ENABLE_RECORD_COMMAND"
@@ -1701,6 +1705,6 @@ case "$_command" in
         get_meta_record "$2" "$3" | jq
         ;;
     *)
-        die "Unknown command '$_command'; see 'help'"
+        die_unknown_command "$_command"
         ;;
 esac
