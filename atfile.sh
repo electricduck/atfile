@@ -6,9 +6,9 @@
 _version="0.2.1"
 _c_year="2024"
 
-# Utilities
+# Die
 
-function atfile.util.die() {
+function atfile.die() {
     if [[ $_output_json == 0 ]]; then
         echo -e "\033[1;31mError: $1\033[0m"
     else
@@ -17,10 +17,12 @@ function atfile.util.die() {
     exit 255
 }
 
-function atfile.util.die_unknown_command() {
+function atfile.die.unknown_command() {
     command="$1"
-    atfile.util.die "Unknown command '$1'"
+    atfile.die "Unknown command '$1'"
 }
+
+# Utilities
 
 function atfile.util.check_prog() {
     command="$1"
@@ -33,7 +35,7 @@ function atfile.util.check_prog() {
             message="$message (download: $download_hint)"
         fi
     
-        atfile.util.die "$message"
+        atfile.die "$message"
     fi
 }
 
@@ -204,6 +206,16 @@ function atfile.util.get_file_name_pretty() {
     
     echo -e "$output"
     echo -e "$(atfile.util.repeat_char "-" $output_last_line_length)"
+}
+
+function atfile.util.get_file_path() {
+    file="$1"
+    
+    if [ ! -f "$file" ]; then
+        atfile.die "File '$file' does not exist"
+    else
+        echo "$(realpath "$file")"
+    fi
 }
 
 function atfile.util.get_file_size_pretty() {
@@ -518,7 +530,7 @@ function atfile.util.override_actor() {
         esac
             
         if [[ $? != 0 || -z "$did_doc" ]]; then
-            atfile.util.die "Unable to fetch DID Doc for '$actor'"
+            atfile.die "Unable to fetch DID Doc for '$actor'"
         else
             export _server="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             export _username="$(echo "$did_doc" | jq -r ".id")"
@@ -529,7 +541,7 @@ function atfile.util.override_actor() {
             fi
         fi
     else
-        atfile.util.die "Unable to resolve '$actor'"
+        atfile.die "Unable to resolve '$actor'"
     fi
 }
 
@@ -859,8 +871,8 @@ function blue.zio.atfile.finger__machine() {
     machine_id_file="/etc/machine-id"
     os_release_file="/etc/os-release"
     
-    [[ ! -f "$machine_id_file" ]] && atfile.util.die "Unable to fingerprint — '$machine_id_file' does not exist"
-    [[ ! -f "$os_release_file" ]] && atfile.util.die "Unable to fingerprint — '$os_release_file' does not exist"
+    [[ ! -f "$machine_id_file" ]] && atfile.die "Unable to fingerprint — '$machine_id_file' does not exist"
+    [[ ! -f "$os_release_file" ]] && atfile.die "Unable to fingerprint — '$os_release_file' does not exist"
     
     id="$(cat "$machine_id_file")"
     hostname="$(hostname -s)"
@@ -1010,17 +1022,17 @@ function atfile.invoke.manage_record() {
         "create")
             collection="$(get_collection "$3")"
             record="$2"
-            [[ -z "$record" ]] && atfile.util.die "<record> not set"
+            [[ -z "$record" ]] && atfile.die "<record> not set"
             
             record_json="$(echo "$record" | jq)"
-            [[ $? != 0 ]] && atfile.util.die "Invalid JSON"
+            [[ $? != 0 ]] && atfile.die "Invalid JSON"
             
             com.atproto.repo.createRecord "$_username" "$collection" "$record_json" | jq
             ;;
         "delete")
             collection="$(get_collection "$3")"
             key="$2"
-            [[ -z "$key" ]] && atfile.util.die "<key> not set"
+            [[ -z "$key" ]] && atfile.die "<key> not set"
             
             if [[ "$key" == at:* ]]; then
                 at_uri="$key"
@@ -1028,7 +1040,7 @@ function atfile.invoke.manage_record() {
                 key="$(echo $at_uri | cut -d "/" -f 5)"
                 username="$(echo $at_uri | cut -d "/" -f 3)"
                 
-                [[ "$username" != "$_username" ]] && atfile.util.die "Unable to delete record — not owned by you ($_username)"
+                [[ "$username" != "$_username" ]] && atfile.die "Unable to delete record — not owned by you ($_username)"
             fi
             
             com.atproto.repo.deleteRecord "$_username" "$collection" "$key" | jq
@@ -1037,7 +1049,7 @@ function atfile.invoke.manage_record() {
             collection="$(get_collection "$3")"
             key="$2"
             username="$4"
-            [[ -z "$key" ]] && atfile.util.die "<key/at-uri> not set"
+            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
             
             if [[ "$key" == at:* ]]; then
                 at_uri="$key"
@@ -1059,11 +1071,11 @@ function atfile.invoke.manage_record() {
             collection="$(get_collection "$3")"
             key="$2"
             record="$3"
-            [[ -z "$key" ]] && atfile.util.die "<key> not set"
-            [[ -z "$record" ]] && atfile.util.die "<record> not set"
+            [[ -z "$key" ]] && atfile.die "<key> not set"
+            [[ -z "$record" ]] && atfile.die "<record> not set"
             
             record_json="$(echo "$record" | jq)"
-            [[ $? != 0 ]] && atfile.util.die "Invalid JSON"
+            [[ $? != 0 ]] && atfile.die "Invalid JSON"
             
             com.atproto.repo.putRecord "$_username" "$collection" "$key" "$record" | jq
             ;;
@@ -1077,7 +1089,7 @@ function atfile.invoke.delete() {
     lock_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
 
     if [[ $(atfile.util.is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".value.lock") == true ]]; then
-        atfile.util.die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
+        atfile.die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
     fi
 
     record="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.upload" "$key")"
@@ -1089,7 +1101,7 @@ function atfile.invoke.delete() {
             echo "Deleted: $key"
         fi
     else
-        atfile.util.die "Unable to delete '$key'"
+        atfile.die "Unable to delete '$key'"
     fi
 }
 
@@ -1102,7 +1114,7 @@ function atfile.invoke.download() {
     
     if [[ -n "$out_dir" ]]; then
         mkdir -p "$out_dir"
-        [[ $? != 0 ]] && atfile.util.die "Unable to create '$out_dir'"
+        [[ $? != 0 ]] && atfile.die "Unable to create '$out_dir'"
         out_dir="$(realpath "$out_dir")/"
     fi
     
@@ -1144,7 +1156,7 @@ function atfile.invoke.download() {
         fi
     else
         [[ -f "$downloaded_file" ]] && rm -f "$downloaded_file"
-        atfile.util.die "Unable to download '$key'"
+        atfile.die "Unable to download '$key'"
     fi
 }
 
@@ -1230,7 +1242,7 @@ function atfile.invoke.get() {
             esac
         fi
     else
-        atfile.util.die "Unable to get '$key'"
+        atfile.die "Unable to get '$key'"
     fi
 }
 
@@ -1250,7 +1262,7 @@ function atfile.invoke.get_url() {
             echo "$blob_url"
         fi
     else
-        atfile.util.die "Unable to get '$key'"
+        atfile.die "Unable to get '$key'"
     fi
 }
 
@@ -1263,7 +1275,7 @@ function atfile.invoke.list() {
    
     if [[ $success == 1 ]]; then
         records="$(echo $records | jq -c '.records[]')"
-        [[ -z "$records" ]] && atfile.util.die "No files for '$_username'"
+        [[ -z "$records" ]] && atfile.die "No files for '$_username'"
         
         unset last_key
         unset record_count
@@ -1301,7 +1313,7 @@ function atfile.invoke.list() {
             echo -e "$json_output" | jq
         fi
     else
-        atfile.util.die "Unable to list files"
+        atfile.die "Unable to list files"
     fi
 }
 
@@ -1314,7 +1326,7 @@ function atfile.invoke.list_blobs() {
 
     if [[ $success == 1 ]]; then
         records="$(echo $blobs | jq -c '.cids[]')"
-        [[ -z "$records" ]] && atfile.util.die "No blobs for '$_username'"
+        [[ -z "$records" ]] && atfile.die "No blobs for '$_username'"
     
         unset last_cid
         unset record_count
@@ -1351,7 +1363,7 @@ function atfile.invoke.list_blobs() {
             echo -e "$json_output" | jq
         fi
     else
-        atfile.util.die "Unable to list blobs"
+        atfile.die "Unable to list blobs"
     fi
 }
 
@@ -1386,9 +1398,9 @@ function atfile.invoke.lock() {
         fi
     else
          if [[ $locked == true ]]; then
-            atfile.util.die "Unable to lock '$key'"
+            atfile.die "Unable to lock '$key'"
         else
-            atfile.util.die "Unable to unlock '$key'"
+            atfile.die "Unable to unlock '$key'"
         fi
     fi
 }
@@ -1409,7 +1421,7 @@ function atfile.invoke.print() {
     fi
     
     if [[ $success != 1 ]]; then
-        atfile.util.die "Unable to cat '$key'"
+        atfile.die "Unable to cat '$key'"
     fi
 }
 
@@ -1432,21 +1444,15 @@ function atfile.invoke.profile() {
             echo "↳ Nickname: $(echo "$record" | jq -r ".value.nickname")"
         fi
     else
-        atfile.util.die "Unable to update profile"
+        atfile.die "Unable to update profile"
     fi
 }
 
 function atfile.invoke.upload() {
-    file="$1"
+    file="$(atfile.util.get_file_path "$1")"
     recipient="$2"
     key="$3"
     success=1
-    
-    if [ ! -f "$file" ]; then
-        atfile.util.die "File '$file' does not exist"
-    else
-        file="$(realpath "$file")"
-    fi
     
     if [[ $_output_json == 0 ]]; then
         if [[ "$_server" == "https://bsky.social" ]] || [[ "$_server" == *".bsky.network" ]]; then
@@ -1465,7 +1471,7 @@ function atfile.invoke.upload() {
             file="$file_crypt"
         else
             rm -f "$file_crypt"
-            atfile.util.die "Unable to encrypt '$(basename "$file")'"
+            atfile.die "Unable to encrypt '$(basename "$file")'"
         fi
     fi
 
@@ -1548,13 +1554,18 @@ function atfile.invoke.upload() {
             fi
         fi
     else
-        atfile.util.die "Unable to upload '$file'"
+        atfile.die "Unable to upload '$file'"
     fi
+}
+
+function atfile.invoke.upload_blob() {
+    file="$(atfile.util.get_file_path "$1")"
+    com.atproto.sync.uploadBlob "$file" | jq
 }
 
 function atfile.invoke.usage() {
     if [[ $_output_json == 1 ]]; then
-        atfile.util.die "Cannot output usage as JSON"
+        atfile.die "Cannot output usage as JSON"
     fi
 
     usage_commands="upload <file> [<key>]
@@ -1603,8 +1614,9 @@ function atfile.invoke.usage() {
 
     if [[ $_enable_hidden_commands == 1 ]]; then
         usage_commands+="\n\nCommands (Hidden)
-    list-blobs
-        List all blobs
+    blob list
+    blob upload <path>
+        Manage blobs on a repository
 
     record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
@@ -1731,6 +1743,11 @@ if [[ "$0" != "$BASH_SOURCE" ]]; then
     _is_sourced=1
     _output_json=1
 fi
+
+if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
+    _max_list=100
+fi
+
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
 
@@ -1749,46 +1766,58 @@ atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
 atfile.util.check_prog "md5sum"
 atfile.util.check_prog "xargs"
 
-[[ -z "$_username" ]] && atfile.util.die "\$${_envvar_prefix}_USERNAME not set"
-[[ -z "$_password" ]] && atfile.util.die "\$${_envvar_prefix}_PASSWORD not set"
+[[ -z "$_username" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
+[[ -z "$_password" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
 
 if [[ $_skip_auth_check == 0 ]]; then
     session="$(com.atproto.server.getSession)"
     if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
-        atfile.util.die "Unable to authenticate as \"$_username\" on \"$_server\""
+        atfile.die "Unable to authenticate as \"$_username\" on \"$_server\""
     else
         _username="$(echo $session | jq -r ".did")"
     fi
 else
     if [[ "$_username" != "did:"* ]]; then
-        atfile.util.die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
+        atfile.die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
     fi
 fi
 
 if [[ $_is_sourced == 0 ]]; then
 	case "$_command" in
+	    "blob")
+		    if [[ "$_enable_hidden_commands" == 1 ]]; then
+		        case "$2" in
+		            "list"|"l") atfile.invoke.list_blobs "$3" ;;
+		            "upload"|"u") atfile.invoke.upload_blob "$3" ;;
+		            *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+		        esac
+		    else
+		        atfile.util.print_hidden_command_warning
+		        exit 1
+		    fi	    
+	        ;;
 		"cat"|"open"|"print"|"c")
-		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		    atfile.invoke.print "$2"
 		    ;;
 		"delete"|"rm")
-		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    atfile.invoke.delete "$2"
 		    ;;
 		"fetch"|"download"|"f"|"d")
-		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
 		    atfile.invoke.download "$2" "$3"
 		    ;;
 		"fetch-crypt"|"download-crypt"|"fc"|"dc")
 		    atfile.util.check_prog_gpg
-		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
 		    atfile.invoke.download "$2" "$3" 1
 		    ;;
 		"info"|"get"|"i")
-		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		    atfile.invoke.get "$2"
 		    ;;
@@ -1805,14 +1834,6 @@ if [[ $_is_sourced == 0 ]]; then
 		        atfile.invoke.list "$2"   
 			fi
 		    ;;
-		"list-blobs"|"lsb")
-		    if [[ "$_enable_hidden_commands" == 1 ]]; then
-		        atfile.invoke.list_blobs "$2"
-		    else
-		        atfile.util.print_hidden_command_warning
-		        exit 1
-		    fi
-		    ;;
 		"lock")
 		    atfile.invoke.lock "$2" 1
 		    ;;
@@ -1827,7 +1848,7 @@ if [[ $_is_sourced == 0 ]]; then
 		            "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
 		            "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
 		            "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
-		            *) atfile.util.die_unknown_command "$(echo "$_command $2" | xargs)" ;;
+		            *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
 		        esac
 		    else
 		        atfile.util.print_hidden_command_warning
@@ -1836,21 +1857,21 @@ if [[ $_is_sourced == 0 ]]; then
 		    ;;
 		"upload"|"ul"|"u")
 		    atfile.util.check_prog_optional_metadata
-		    [[ -z "$2" ]] && atfile.util.die "<file> not set"
+		    [[ -z "$2" ]] && atfile.die "<file> not set"
 		    atfile.invoke.upload "$2" "" "$3"
 		    ;;
 		"upload-crypt"|"uc")
 		    atfile.util.check_prog_optional_metadata
 		    atfile.util.check_prog_gpg
-		    [[ -z "$2" ]] && atfile.util.die "<file> not set"
-		    [[ -z "$3" ]] && atfile.util.die "<recipient> not set"
+		    [[ -z "$2" ]] && atfile.die "<file> not set"
+		    [[ -z "$3" ]] && atfile.die "<recipient> not set"
 		    atfile.invoke.upload "$2" "$3" "$4"
 		    ;;
 		"unlock")
 		    atfile.invoke.lock "$2" 0
 		    ;;
 		"url"|"get-url"|"b")
-		    [[ -z "$2" ]] && atfile.util.die "<key> not set"
+		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
 		    atfile.invoke.get_url "$2"
 		    ;;
@@ -1864,7 +1885,7 @@ if [[ $_is_sourced == 0 ]]; then
 		    atfile.util.get_meta_record "$2" "$3" | jq
 		    ;;
 		*)
-		    atfile.util.die_unknown_command "$_command"
+		    atfile.die.unknown_command "$_command"
 		    ;;
 	esac
 fi
