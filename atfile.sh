@@ -1634,6 +1634,7 @@ if [[ $_is_sourced == 0 ]]; then
 		    ;;
 		"record")
 		    # NOTE: Performs no validation (apart from JSON)! Here be dragons.
+            #       Enable this command with ATFILE_ENABLE_RECORD_COMMAND=1
 		    if [[ "$_hidden_command_record" == 1 ]]; then
 		        case "$2" in
 		            "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
