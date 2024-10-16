@@ -3,9 +3,6 @@
 # ATFile <https://github.com/electricduck/atfile>
 # Psst! You can 'source ./atfile.sh' in your own Bash scripts!
 
-_version="0.2.1"
-_c_year="2024"
-
 # Die
 
 function atfile.die() {
@@ -1698,15 +1695,21 @@ Files
 
 # Main
 
-if [ -x "$(command -v git)" ] && [[ -d "$(dirname "$(realpath -s "$0")")/.git" ]]; then
+_prog="$(basename "$(realpath -s "$0")")"
+_prog_dir="$(dirname "$(realpath -s "$0")")"
+_work_dir="$(realpath -s "$(pwd)")"
+_version="0.2.1"
+_c_year="2024"
+_command="$1"
+_is_git=0
+_is_sourced=0
+_now="$(atfile.util.get_date)"
+
+if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
     git describe --exact-match --tags > /dev/null 2>&1
     [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
+    _is_git=1
 fi
-
-_prog="$(basename "$(realpath -s "$0")")"
-_now="$(atfile.util.get_date)"
-_command="$1"
-_is_sourced=0
 
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
