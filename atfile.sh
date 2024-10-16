@@ -150,7 +150,7 @@ function atfile.util.get_file_name_pretty() {
     
     if [[ -n "$meta_type" ]]; then
         case $meta_type in
-            "blue.zio.atfile.meta#audio")
+            "$_nsid_meta#audio")
                 album="$(echo "$file_record" | jq -r ".meta.tags.album")"
                 album_artist="$(echo "$file_record" | jq -r ".meta.tags.album_artist")"
                 date="$(echo "$file_record" | jq -r ".meta.tags.date.parsed")"
@@ -168,7 +168,7 @@ function atfile.util.get_file_name_pretty() {
                 [[ $(atfile.util.is_null_or_empty "$date") == 0 ]] && output+=" ($(date --date="$date" +%Y))"
                 [[ $disc != 0 || $track != 0 ]] && output+=" [$disc.$track]"
                 ;;
-            "blue.zio.atfile.meta#photo")
+            "$_nsid_meta#photo")
                 date="$(echo "$file_record" | jq -r ".meta.date.create.parsed")"
                 lat="$(echo "$file_record" | jq -r ".meta.gps.lat")"
                 long="$(echo "$file_record" | jq -r ".meta.gps.long")"
@@ -186,7 +186,7 @@ function atfile.util.get_file_name_pretty() {
                    fi
                 fi
                 ;;
-            "blue.zio.atfile.meta#video")
+            "$_nsid_meta#video")
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
                 
                 [[ $(atfile.util.is_null_or_empty "$title") == 1 ]] && title="$file_name_no_ext"
@@ -671,7 +671,7 @@ function blue.zio.atfile.meta__unknown() {
     fi
 
     echo "{
-    \"\$type\": \"blue.zio.atfile.meta#unknown\",
+    \"\$type\": \"$_nsid_meta#unknown\",
     \"reason\": \"$reason\"
 }"
 }
@@ -706,7 +706,7 @@ function blue.zio.atfile.meta__audio() {
     fi
     
     echo "{
-    \"\$type\": \"blue.zio.atfile.meta#audio\",
+    \"\$type\": \"$_nsid_meta#audio\",
     \"audio\": [ $audio ],
     \"duration\": $duration,
     \"format\": \"$format\",
@@ -765,7 +765,7 @@ function blue.zio.atfile.meta__photo() {
     [[ $gps_long == +* ]] && gps_long="${gps_long:1}"
 
     echo "{
-    \"\$type\": \"blue.zio.atfile.meta#photo\",
+    \"\$type\": \"$_nsid_meta#photo\",
     \"artist\": \"$artist\",
     \"camera\": {
         \"aperture\": \"$camera_aperture\",
@@ -832,7 +832,7 @@ function blue.zio.atfile.meta__video() {
     fi
     
     echo "{
-    \"\$type\": \"blue.zio.atfile.meta#video\",
+    \"\$type\": \"$_nsid_meta#video\",
     \"artist\": \"$artist\",
     \"audio\": [ $audio ],
     \"biteRate\": $bitRate,
@@ -1009,7 +1009,7 @@ function com.atproto.sync.uploadBlob() {
 
 function atfile.invoke.manage_record() {
     function get_collection() {
-        collection="blue.zio.atfile.upload"
+        collection="$_nsid_upload"
         parameter_output="$1"
         [[ -n "$1" ]] && collection="$1" # fuck it, manage all the records from atfile!
         echo "$collection"
@@ -1098,7 +1098,7 @@ function atfile.invoke.delete() {
         atfile.die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
     fi
 
-    record="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    record="$(com.atproto.repo.deleteRecord "$_username" "$_nsid_upload" "$key")"
     
     if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
         if [[ $_output_json == 1 ]]; then
@@ -1124,7 +1124,7 @@ function atfile.invoke.download() {
         out_dir="$(realpath "$out_dir")/"
     fi
     
-    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
@@ -1170,7 +1170,7 @@ function atfile.invoke.get() {
     key="$1"
     success=1
     
-    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
@@ -1256,7 +1256,7 @@ function atfile.invoke.get_url() {
     key="$1"
     success=1
     
-    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     success="$(atfile.util.is_xrpc_success $? "$record")"
     
     if [[ $success == 1 ]]; then
@@ -1276,7 +1276,7 @@ function atfile.invoke.list() {
     cursor="$1"
     success=1
     
-    records="$(com.atproto.repo.listRecords "$_username" "blue.zio.atfile.upload" "$cursor")"
+    records="$(com.atproto.repo.listRecords "$_username" "$_nsid_upload" "$cursor")"
     success="$(atfile.util.is_xrpc_success $? "$records")"
    
     if [[ $success == 1 ]]; then
@@ -1377,7 +1377,7 @@ function atfile.invoke.lock() {
     key="$1"
     locked=$2
     
-    upload_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    upload_record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     success=$(atfile.util.is_xrpc_success $? "$upload_record")
     
     if [[ $success == 1 ]]; then        
@@ -1415,7 +1415,7 @@ function atfile.invoke.print() {
     key="$1"
     success=1
     
-    record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.upload" "$key")"
+    record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
@@ -1435,13 +1435,13 @@ function atfile.invoke.profile() {
     nick="$1"
     
     profile_record="$(blue.zio.meta.profile "$1")"
-    record="$(com.atproto.repo.putRecord "$_username" "blue.zio.meta.profile" "self" "$profile_record")"
+    record="$(com.atproto.repo.putRecord "$_username" "$_nsid_profile" "self" "$profile_record")"
     
     # HACK: Renamed record to "blue.zio.meta.profile". Remove this in the future.
-    dummy="$(com.atproto.repo.deleteRecord "$_username" "blue.zio.atfile.profile" "self")"
+    dummy="$(com.atproto.repo.deleteRecord "$_username" "$_nsid_profile" "self")"
     
     if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
-        record="$(com.atproto.repo.getRecord "$_username" "blue.zio.meta.profile" "self")"
+        record="$(com.atproto.repo.getRecord "$_username" "$_nsid_profile" "self")"
     
         if [[ $_output_json == 1 ]]; then
             echo -e "{ \"profile\": $(echo "$record" | jq -r ".value") }" | jq
@@ -1519,10 +1519,10 @@ function atfile.invoke.upload() {
         file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
         
         if [[ -n "$key" ]]; then
-            record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.upload" "$key" "$file_record")"
+            record="$(com.atproto.repo.putRecord "$_username" "$_nsid_upload" "$key" "$file_record")"
             success=$(atfile.util.is_xrpc_success $? "$record")
         else
-            record="$(com.atproto.repo.createRecord "$_username" "blue.zio.atfile.upload" "$file_record")"
+            record="$(com.atproto.repo.createRecord "$_username" "$_nsid_upload" "$file_record")"
             success=$(atfile.util.is_xrpc_success $? "$record")
         fi
     fi
@@ -1633,7 +1633,7 @@ function atfile.invoke.usage() {
     record rm <at-uri>
         Manage records on a repository
         ⚠️  Intended for advanced users. Here be dragons
-        ℹ️  <collection> defaults to 'blue.zio.atfile.upload'"
+        ℹ️  <collection> defaults to '$_nsid_upload'"
     fi
 
 # ------------------------------------------------------------------------------
@@ -1691,13 +1691,13 @@ Environment Variables
         Do not check if ExifTool is installed
         ⚠️  If Exiftool is not installed, the relevant metadata records will
            not be created:
-           * image/*: blue.zio.atfile.meta#photo
+           * image/*: $_nsid_meta#photo
     ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool*> (default: $_skip_ni_mediainfo_default)
         Do not check if MediaInfo is installed
         ⚠️  If MediaInfo is not installed, the relevant metadata records will
            not be created:
-           * audio/*: blue.zio.atfile.meta#audio
-           * video/*: blue.zio.atfile.meta#video
+           * audio/*: $_nsid_meta#audio
+           * video/*: $_nsid_meta#video
            
     * A bool in Bash is 1 (true) or 0 (false)
 
@@ -1756,6 +1756,11 @@ _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
 _test_desktop_uas="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 _uas="ATFile/$_version"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
+
+_nsid_prefix="blue.zio"
+_nsid_meta="${_nsid_prefix}.atfile.meta"
+_nsid_profile="${_nsid_prefix}.meta.profile"
+_nsid_upload="${_nsid_prefix}.atfile.upload"
 
 if [[ "$0" != "$BASH_SOURCE" ]]; then
     _enable_hidden_commands=1
