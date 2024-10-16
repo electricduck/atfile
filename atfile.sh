@@ -1646,13 +1646,13 @@ Arguments
                 See 'gpg --help' for more information
 
 Environment Variables
-    ${_envvar_prefix}_PDS <url> (default: $_server_default)
-        Endpoint of the PDS
     ${_envvar_prefix}_USERNAME <string>
         Username of the PDS user (handle or DID)
     ${_envvar_prefix}_PASSWORD <string>
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
+    ${_envvar_prefix}_PDS <url> (default: $_server_default)
+        Endpoint of the PDS
         
     ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default $_enable_hidden_commands_default)
         Enable hidden commands
