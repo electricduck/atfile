@@ -1653,14 +1653,19 @@ Environment Variables
     ${_envvar_prefix}_PASSWORD <string>
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
+        
+    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default $_enable_hidden_commands_default)
+        Enable hidden commands
+        ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_OUTPUT_JSON <bool> (default $_output_json_default)
         Print all commands (and errors) as JSON
-        ⚠️  When sourcing, this always defaults to 1
+        ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_FINGERPRINT <int> (default $_fmt_blob_url_default)
         Apply machine fingerprint to uploaded files
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
         Maximum amount of items in any lists
-        Default value is calculated from your terminal's height
+        ℹ️  Default value is calculated from your terminal's height
+        ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 100
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
