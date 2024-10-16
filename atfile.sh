@@ -447,6 +447,18 @@ function atfile.util.is_null_or_empty() {
     fi
 }
 
+function atfile.util.is_url_accessible_in_browser() {
+    url="$1"
+
+    code="$(curl -H "User-Agent: $_test_desktop_uas" -s -o /dev/null -w "%{http_code}" "$url")"
+    
+    if [[ "$code" == 2* || "$code" == 3* ]]; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
 function atfile.util.is_xrpc_success() {
     exit_code="$1"
     data="$2"
@@ -507,13 +519,26 @@ function atfile.util.override_actor_reset() {
 	[[ -n "$_fmt_blob_url_original" ]] && _fmt_blob_url="$_fmt_blob_url_original"; unset _fmt_blob_url_original
 }
 
+function atfile.util.print_blob_url_output() {
+    blob_uri="$1"
+    
+    run_cmd="$_prog url $key"
+    [[ -n "$_username_original" ]] && run_cmd+=" $_username"
+   
+    if [[ $(atfile.util.is_url_accessible_in_browser "$blob_uri") == 0 ]]; then
+        echo -e "↳ Blob: ⚠️  Blob cannot be viewed in a browser\n           Run '$run_cmd' to get URL"
+    else
+        echo -e "↳ Blob: $blob_uri"
+    fi
+}
+
 function atfile.util.print_copyright_warning() {
     if [[ $_skip_copyright_warn == 0 ]]; then
         echo "
- ##########################################
- # You are uploading files to bsky.social #
- #    Do not upload copyrighted files!    #
- ##########################################
+ ######################################
+ # You are uploading files to Bluesky #
+ #  Do not upload copyrighted files!  #
+ ######################################
 "
     fi
 }
@@ -534,13 +559,6 @@ function atfile.util.print_table_paginate_hint() {
     fi
 }
 
-function atfile.util.repeat_char() {
-    char="$1"
-    amount="$2"
-    
-    printf "%0.s$char" $(seq 1 $amount)
-}
-
 function atfile.util.parse_exiftool_date() {
     in_date="$1"
     tz="$2"
@@ -549,6 +567,13 @@ function atfile.util.parse_exiftool_date() {
     time="$(echo "$in_date" | cut -d " " -f 2)"
       
     echo "$date $time $tz"
+}
+
+function atfile.util.repeat_char() {
+    char="$1"
+    amount="$2"
+    
+    printf "%0.s$char" $(seq 1 $amount)
 }
 
 # XRPC
@@ -1140,7 +1165,7 @@ function atfile.invoke.get() {
         fi
         
         echo "$header"
-        echo -e "↳ Blob: $blob_uri"
+        atfile.util.print_blob_url_output "$blob_uri"
         [[ -n "$cdn_uri" ]] && echo -e " ↳ CDN: $cdn_uri"
         echo -e "↳ File: $key"
         echo -e " ↳ Name: $file_name"
@@ -1329,7 +1354,7 @@ function atfile.invoke.upload() {
         file="$(realpath "$file")"
     fi
     
-    if [[ "$_server" == "https://bsky.social" ]]; then
+    if [[ "$_server" == "https://bsky.social" ]] || [[ "$_server" == *".bsky.network" ]]; then
         atfile.util.print_copyright_warning
     fi
     
@@ -1401,7 +1426,7 @@ function atfile.invoke.upload() {
     if [[ $success == 1 ]]; then
         echo "---"
         echo "Uploaded: $file_type_emoji $file_name"
-        echo -e "↳ Blob: $(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
+        atfile.util.print_blob_url_output "$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
         echo -e "↳ Key: $(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         if [[ -n "$recipient" ]]; then
             echo -e "↳ Recipient: $recipient ($(gpg --list-keys $recipient | sed -n 2p | xargs))"
@@ -1564,6 +1589,7 @@ _skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT
 _skip_ni_exiftool="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
 _skip_ni_mediainfo="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
 _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
+_test_desktop_uas="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 _uas="ATFile/$_version"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 
