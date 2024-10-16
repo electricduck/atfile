@@ -567,7 +567,7 @@ function atfile.util.print_copyright_warning() {
 
 function atfile.util.print_hidden_command_warning() {
     envvar="$1"
-    echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_${envvar}=1"
+    echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS=1"
 }
 
 function atfile.util.print_table_paginate_hint() {
@@ -1557,16 +1557,7 @@ function atfile.invoke.usage() {
         atfile.util.die "Cannot output usage as JSON"
     fi
 
-# ------------------------------------------------------------------------------
-    echo -e "ATFile | 📦 ➔ 🦋
-    Store and retrieve files on a PDS
-    
-    Version $_version
-    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
-    Licensed under MIT License ✨
-    
-Commands
-    upload <file> [<key>]
+    usage_commands="upload <file> [<key>]
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
         
@@ -1608,17 +1599,34 @@ Commands
         
     nick <nick>
         Set nickname
-        ℹ️  Intended for future use
-    $([[ $_hidden_command_record == 1 ]] && echo -e "\n    record add <record-json> [<collection>]
+        ℹ️  Intended for future use"
+
+    if [[ $_enable_hidden_commands == 1 ]]; then
+        usage_commands+="\n\nCommands (Hidden)
+    list-blobs
+        List all blobs
+
+    record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
     record get <at-uri>
     record put <key> <record-json> [<collection>]
     record rm <key> [<collection>]
     record rm <at-uri>
         Manage records on a repository
-        ⚠️  Intended for advanced users. Here be dragons.
-           Turn this feature off with ${_envvar_prefix}_HIDDEN_COMMAND_RECORD=0")
-       
+        ⚠️  Intended for advanced users. Here be dragons"
+    fi
+
+# ------------------------------------------------------------------------------
+    echo -e "ATFile | 📦 ➔ 🦋
+    Store and retrieve files on a PDS
+    
+    Version $_version
+    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
+    Licensed under MIT License ✨
+    
+Commands
+    $usage_commands
+
 Arguments
     <actor>     Act upon another ATProto user (either by handle or DID)
     <cursor>    Key or CID used as a reference to paginate through lists
@@ -1691,9 +1699,9 @@ _is_sourced=0
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 
+_enable_hidden_commands_default=0
 _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
-_hidden_command_record_default=0
 _max_list_buffer=6
 _max_list_default=$(( $(atfile.util.get_term_rows) - $_max_list_buffer ))
 _output_json_default=0
@@ -1705,7 +1713,7 @@ _skip_ni_mediainfo_default=0
 
 _fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
-_hidden_command_record="$(atfile.util.get_envvar "${_envvar_prefix}_HIDDEN_COMMAND_RECORD" "$_hidden_command_record_default")"
+_enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
 _server="$(atfile.util.get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
@@ -1719,6 +1727,7 @@ _uas="ATFile/$_version"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 
 if [[ "$0" != "$BASH_SOURCE" ]]; then
+    _enable_hidden_commands=1
     _is_sourced=1
     _output_json=1
 fi
@@ -1797,7 +1806,12 @@ if [[ $_is_sourced == 0 ]]; then
 			fi
 		    ;;
 		"list-blobs"|"lsb")
-		    atfile.invoke.list_blobs "$2"
+		    if [[ "$_enable_hidden_commands" == 1 ]]; then
+		        atfile.invoke.list_blobs "$2"
+		    else
+		        atfile.util.print_hidden_command_warning
+		        exit 1
+		    fi
 		    ;;
 		"lock")
 		    atfile.invoke.lock "$2" 1
@@ -1806,9 +1820,8 @@ if [[ $_is_sourced == 0 ]]; then
 		    atfile.invoke.profile "$2"
 		    ;;
 		"record")
-		    # NOTE: Performs no validation (apart from JSON)! Here be dragons.
-            #       Enable this command with ATFILE_ENABLE_RECORD_COMMAND=1
-		    if [[ "$_hidden_command_record" == 1 ]]; then
+		    # NOTE: Performs no validation (apart from JSON)! Here be dragons
+		    if [[ "$_enable_hidden_commands" == 1 ]]; then
 		        case "$2" in
 		            "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
 		            "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
@@ -1817,7 +1830,7 @@ if [[ $_is_sourced == 0 ]]; then
 		            *) atfile.util.die_unknown_command "$(echo "$_command $2" | xargs)" ;;
 		        esac
 		    else
-		        atfile.util.print_hidden_command_warning "ENABLE_RECORD_COMMAND"
+		        atfile.util.print_hidden_command_warning
 		        exit 1
 		    fi
 		    ;;
