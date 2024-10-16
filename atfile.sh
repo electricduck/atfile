@@ -1074,6 +1074,15 @@ function atfile.invoke.manage_record() {
             record_json="$(echo "$record" | jq)"
             [[ $? != 0 ]] && atfile.die "Invalid JSON"
             
+            if [[ "$key" == at:* ]]; then
+                at_uri="$key"
+                collection="$(echo $at_uri | cut -d "/" -f 4)"
+                key="$(echo $at_uri | cut -d "/" -f 5)"
+                username="$(echo $at_uri | cut -d "/" -f 3)"
+                
+                [[ "$username" != "$_username" ]] && atfile.die "Unable to put record — not owned by you ($_username)"
+            fi
+            
             com.atproto.repo.putRecord "$_username" "$collection" "$key" "$record" | jq
             ;;
     esac
@@ -1619,10 +1628,12 @@ function atfile.invoke.usage() {
     record get <key> [<collection>] [<actor>]
     record get <at-uri>
     record put <key> <record-json> [<collection>]
+    record put <at-uri> <record-json>
     record rm <key> [<collection>]
     record rm <at-uri>
         Manage records on a repository
-        ⚠️  Intended for advanced users. Here be dragons"
+        ⚠️  Intended for advanced users. Here be dragons
+        ℹ️  <collection> defaults to 'blue.zio.atfile.upload'"
     fi
 
 # ------------------------------------------------------------------------------
