@@ -443,6 +443,24 @@ function atfile.util.get_var_from_file() {
     fi
 }
 
+function atfile.util.get_yn() {
+    yn="$1"
+    
+    if [[ $_output_json == 0 ]]; then
+        if [[ $yn == 0 ]]; then
+            echo "No"
+        else
+            echo "Yes"
+        fi
+    else
+        if [[ $yn == 0 ]]; then
+            echo "false"
+        else
+            echo "true"
+        fi 
+    fi
+}
+
 function atfile.util.is_null_or_empty() {
     if [[ -z "$1" ]] || [[ "$1" == null ]]; then
         echo 1
@@ -1066,7 +1084,7 @@ function atfile.invoke.delete() {
     
     if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
         if [[ $_output_json == 1 ]]; then
-            echo "{ \"upload\": $record }" | jq
+            echo "{ \"deleted\": true }" | jq
         else
             echo "Deleted: $key"
         fi
@@ -1138,8 +1156,35 @@ function atfile.invoke.get() {
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
+        file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
+        did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
+        key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+        blob_uri="$(atfile.util.get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        cdn_uri="$(atfile.util.get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
+
+        unset locked
+        unset encrypted
+        
+        locked_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
+        if [[ $? == 0 ]] && [[ -n "$locked_record" ]]; then
+            if [[ $(echo $locked_record | jq -r ".value.lock") == true ]]; then
+                locked="$(atfile.util.get_yn 1)"
+            else
+                locked="$(atfile.util.get_yn 0)"
+            fi
+        fi
+        
+        if [[ "$file_type" == "application/prs.atfile.gpg-crypt" ]]; then
+            encrypted="$(atfile.util.get_yn 1)"
+        else
+            encrypted="$(atfile.util.get_yn 0)"
+        fi
+    
         if [[ $_output_json == 1 ]]; then
-            echo "{ \"upload\": $record }" | jq
+            browser_warn=false
+            [[ $(atfile.util.is_url_accessible_in_browser "$blob_uri") == 0 ]] && browser_warn=true
+        
+            echo "{ \"encrypted\": $encrypted, \"locked\": $locked, \"upload\": $(echo "$record" | jq -r ".value"), \"url\": { \"blob\": \"$blob_uri\", \"browser_warn\": $browser_warn, \"cdn\": { \"bsky\": \"$cdn_uri\" } } }" | jq
         else
             file_date="$(echo "$record" | jq -r '.value.file.modifiedAt')"
             file_hash="$(echo "$record" | jq -r '.value.checksum.hash')"
@@ -1149,31 +1194,13 @@ function atfile.invoke.get() {
             file_name_pretty="$(atfile.util.get_file_name_pretty "$(echo "$record" | jq -r '.value')")"
             file_size="$(echo "$record" | jq -r '.value.file.size')"
             file_size_pretty="$(atfile.util.get_file_size_pretty $file_size)"
-            file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
-        
-            did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
-            key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
-            blob_uri="$(atfile.util.get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
-            cdn_uri="$(atfile.util.get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
-            encrypted="No"
-            locked="No"
+
             finger="(None)"
             finger_type=""
             header="$file_name_pretty"
         
             if [[ $(atfile.util.is_null_or_empty "$file_hash_type") == 1 ]] || [[ "$file_hash_type" == "md5" && ${#file_hash} != 32 ]] || [[ "$file_hash_type" == "none" ]]; then
                 file_hash_pretty="(None)"
-            fi
-        
-            if [[ "$file_type" == "application/prs.atfile.gpg-crypt" ]]; then
-                encrypted="Yes"
-            fi
-        
-            locked_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
-            if [[ $? == 0 ]] && [[ -n "$locked_record" ]]; then
-                if [[ $(echo $locked_record | jq -r ".value.lock") == true ]]; then
-                    locked="Yes"
-                fi
             fi
         
             if [[ "$(echo $record | jq -r ".value.finger")" != "null" ]]; then
@@ -1236,31 +1263,43 @@ function atfile.invoke.list() {
     success="$(atfile.util.is_xrpc_success $? "$records")"
    
     if [[ $success == 1 ]]; then
-        if [[ $_output_json == 1 ]]; then
-            echo -e "$records" | jq
-        else
-            	records="$(echo $records | jq -c '.records[]')"
-            [[ -z "$records" ]] && atfile.util.die "No files for '$_username'"
+        records="$(echo $records | jq -c '.records[]')"
+        [[ -z "$records" ]] && atfile.util.die "No files for '$_username'"
         
-            unset last_key
-            unset record_count
+        unset last_key
+        unset record_count
+        unset json_output
             
+        if [[ $_output_json == 0 ]]; then
             echo -e "Key\t\tFile"
             echo -e "---\t\t----"
+        else
+            json_output="{\"uploads\":["
+        fi
         
-            while IFS=$"\n" read -r c; do
-                key=$(atfile.util.get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
-                name="$(echo "$c" | jq -r '.value.file.name')"
-                type_emoji="$(atfile.util.get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
-                last_key="$key"
-                ((record_count++))
+        while IFS=$"\n" read -r c; do
+            key=$(atfile.util.get_rkey_from_at_uri "$(echo $c | jq -r ".uri")")
+            name="$(echo "$c" | jq -r '.value.file.name')"
+            type_emoji="$(atfile.util.get_file_type_emoji "$(echo "$c" | jq -r '.value.file.mimeType')")"
+            last_key="$key"
+            ((record_count++))
 
-                if [[ -n $key ]]; then
+            if [[ -n $key ]]; then
+                if [[ $_output_json == 1 ]]; then
+                    json_output+="$c,"
+                else
                     echo -e "$key\t$type_emoji $name"
                 fi
-            done <<< "$records"
-         
+            fi
+        done <<< "$records"
+
+        if [[ $_output_json == 0 ]]; then
             atfile.util.print_table_paginate_hint "$last_key" $record_count
+        else
+            json_output="${json_output::-1}"
+            json_output+="],"
+            json_output+="\"cursor\": \"$last_key\"}"
+            echo -e "$json_output" | jq
         fi
     else
         atfile.util.die "Unable to list files"
@@ -1275,27 +1314,41 @@ function atfile.invoke.list_blobs() {
     success="$(atfile.util.is_xrpc_success $? "$blobs")"
 
     if [[ $success == 1 ]]; then
-       if [[ $_output_json == 1 ]]; then
-           echo -e "$blobs" | jq
-       else
-           records="$(echo $blobs | jq -c '.cids[]')"
-           [[ -z "$records" ]] && atfile.util.die "No blobs for '$_username'"
+        records="$(echo $blobs | jq -c '.cids[]')"
+        [[ -z "$records" ]] && atfile.util.die "No blobs for '$_username'"
     
-            unset last_cid
-           unset record_count
+        unset last_cid
+        unset record_count
+        unset json_output
     
+        if [[ $_output_json == 0 ]]; then
             echo -e "URL"
             echo -e "---"
+        else
+            json_output="{\"blobs\":["
+        fi
     
-            while IFS=$"\n" read -r c; do
-                cid="$(echo $c | jq -r ".")"
-                last_cid="$cid"
-                ((record_count++))
+        while IFS=$"\n" read -r c; do
+            cid="$(echo $c | jq -r ".")"
+            last_cid="$cid"
+            ((record_count++))
             
-                echo "$(atfile.util.get_blob_uri "$_username" "$cid")"
-            done <<< "$records"
+            if [[ -n $cid ]]; then
+                if [[ $_output_json == 1 ]]; then
+                    json_output+="\"$cid\","
+                else
+                    echo "$(atfile.util.get_blob_uri "$_username" "$cid")"
+                fi
+            fi
+        done <<< "$records"
         
+        if [[ $_output_json == 0 ]]; then
             atfile.util.print_table_paginate_hint "$last_cid" $record_count
+        else
+            json_output="${json_output::-1}"
+            json_output+="],"
+            json_output+="\"cursor\": \"$last_cid\"}"
+            echo -e "$json_output" | jq
         fi
     else
         atfile.util.die "Unable to list blobs"
@@ -1468,6 +1521,8 @@ function atfile.invoke.upload() {
 
     if [[ $success == 1 ]]; then
         unset recipient_key
+        blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
+        key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         
         if [[ -n "$recipient" ]]; then
             recipient_key="$(gpg --list-keys $recipient | sed -n 2p | xargs)"
@@ -1482,12 +1537,12 @@ function atfile.invoke.upload() {
                 recipient_json="null"
             fi
 
-            echo -e "{ \"upload\": $record, \"recipient\": $recipient_json }" | jq
+            echo -e "{ \"blob\": \"$blob_uri\", \"key\": \"$key\", \"upload\": $record, \"recipient\": $recipient_json }" | jq
         else
             echo "---"
             echo "Uploaded: $file_type_emoji $file_name"
-            atfile.util.print_blob_url_output "$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
-            echo -e "↳ Key: $(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
+            atfile.util.print_blob_url_output "$blob_uri"
+            echo -e "↳ Key: $key"
             if [[ -n "$recipient" ]]; then
                 echo -e "↳ Recipient: $recipient ($recipient_key)"
             fi
