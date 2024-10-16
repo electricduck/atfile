@@ -1562,6 +1562,11 @@ if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_com
     exit 0
 fi
 
+if [[ $_command == "version" || $_command == "--version" ]]; then
+    echo -e "$_version"
+    exit 0
+fi
+
 atfile.util.check_prog "curl"
 atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
 atfile.util.check_prog "md5sum"
