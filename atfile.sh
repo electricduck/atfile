@@ -1136,7 +1136,7 @@ function atfile.invoke.download() {
         if [[ $_output_json == 1 ]]; then
             is_decrypted="false"
             [[ $decrypt == 1 ]] && is_decrypted="true"
-            echo -e "{ \"decrypted\": $is_decrypted, \"path\": \"$downloaded_file\" }" | jq
+            echo -e "{ \"decrypted\": $is_decrypted, \"name\": \"$(basename "${downloaded_file}")\", \"path\": \"$(realpath "${downloaded_file}")\" }" | jq
         else
             echo -e "Downloaded: $key"
             [[ $decrypt == 1 ]] && echo "Decrypted: $downloaded_file"
