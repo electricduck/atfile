@@ -1181,10 +1181,9 @@ function atfile.invoke.get() {
         fi
     
         if [[ $_output_json == 1 ]]; then
-            browser_warn=false
-            [[ $(atfile.util.is_url_accessible_in_browser "$blob_uri") == 0 ]] && browser_warn=true
+            browser_accessible=$(atfile.util.get_yn $(atfile.util.is_url_accessible_in_browser "$blob_uri"))
         
-            echo "{ \"encrypted\": $encrypted, \"locked\": $locked, \"upload\": $(echo "$record" | jq -r ".value"), \"url\": { \"blob\": \"$blob_uri\", \"browser_warn\": $browser_warn, \"cdn\": { \"bsky\": \"$cdn_uri\" } } }" | jq
+            echo "{ \"encrypted\": $encrypted, \"locked\": $locked, \"upload\": $(echo "$record" | jq -r ".value"), \"url\": { \"blob\": \"$blob_uri\", \"browser_accessible\": $browser_accessible, \"cdn\": { \"bsky\": \"$cdn_uri\" } } }" | jq
         else
             file_date="$(echo "$record" | jq -r '.value.file.modifiedAt')"
             file_hash="$(echo "$record" | jq -r '.value.checksum.hash')"
@@ -1330,14 +1329,15 @@ function atfile.invoke.list_blobs() {
     
         while IFS=$"\n" read -r c; do
             cid="$(echo $c | jq -r ".")"
+            blob_uri="$(atfile.util.get_blob_uri "$_username" "$cid")"
             last_cid="$cid"
             ((record_count++))
             
             if [[ -n $cid ]]; then
                 if [[ $_output_json == 1 ]]; then
-                    json_output+="\"$cid\","
+                    json_output+="{ \"cid\": \"$cid\", \"url\": \"$blob_uri\" },"
                 else
-                    echo "$(atfile.util.get_blob_uri "$_username" "$cid")"
+                    echo "$blob_uri"
                 fi
             fi
         done <<< "$records"
