@@ -459,9 +459,14 @@ function atfile.util.is_xrpc_success() {
 }
 
 # HACK: This essentially breaks the entire session (it overrides $_username and
-#       $_server) but where it's currently used should not cause any issues 🤞
+#       $_server). If sourcing, use atfile.util.override_actor_reset() to
+#       reset
 function atfile.util.override_actor() {
     actor="$1"
+    
+    [[ -z "$_server_original" ]] && _server_original="$_server"
+    [[ -z "$_username_original" ]] && _username_original="$_username"
+    [[ -z "$_fmt_blob_url_original" ]] && _fmt_blob_url_original="$fmt_blob_url"
 
     if [[ "$actor" != "did:"* ]]; then
         resolved_handle="$(com.atproto.identity.resolveHandle "$actor")"
@@ -492,6 +497,14 @@ function atfile.util.override_actor() {
     else
         atfile.util.die "Unable to resolve '$actor'"
     fi
+}
+
+# NOTE: This is to help during sourcing if atfile.uitl.override_actor() has
+#       been called
+function atfile.util.override_actor_reset() {
+    [[ -n "$_server_original" ]] && _server="$_server_original"; unset _server_original
+    [[ -n "$_username_original" ]] && _username="$_username_original"; unset _username_original
+	[[ -n "$_fmt_blob_url_original" ]] && _fmt_blob_url="$_fmt_blob_url_original"; unset _fmt_blob_url_original
 }
 
 function atfile.util.print_copyright_warning() {
@@ -993,6 +1006,7 @@ function atfile.invoke.manage_record() {
             fi
             
             com.atproto.repo.getRecord "$username" "$collection" "$key" | jq
+            atfile.util.override_actor_reset
             ;;
         "put")
             collection="$(get_collection "$3")"
