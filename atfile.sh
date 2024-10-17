@@ -6,17 +6,77 @@
 # Die
 
 function atfile.die() {
+    message="$1"
+    
     if [[ $_output_json == 0 ]]; then
-        echo -e "\033[1;31mError: $1\033[0m"
+        atfile.say.die "$message"
     else
         echo -e "{ \"error\": \"$1\" }" | jq
     fi
+    
     exit 255
 }
 
 function atfile.die.unknown_command() {
     command="$1"
     atfile.die "Unknown command '$1'"
+}
+
+# Say
+
+function atfile.say() {
+    message="$1"
+    prefix="$2"
+    color_prefix="$3"
+    color_message="$4"
+    color_prefix_message="$5"
+    suffix="$6"
+    
+    prefix_length=0
+    
+    [[ -z $color_prefix_message ]] && color_prefix_message=0
+    [[ -z $suffix ]] && suffix="\n"
+    [[ $suffix == "\\" ]] && suffix=""
+    
+    if [[ -z $color_message ]]; then
+        color_message="\033[0m"
+    else
+        color_message="\033[${color_prefix_message};${color_message}m"
+    fi
+    
+    if [[ -z $color_prefix ]]; then
+        color_prefix="\033[0m"
+    else
+        color_prefix="\033[1;${color_prefix}m"
+    fi
+    
+    if [[ -n $prefix ]]; then
+        prefix_length=$(( ${#prefix} + 2 ))
+        prefix="${color_prefix}${prefix}: \033[0m"
+    fi
+    
+    message="$(echo "$message" | sed -e "s|\\\n|\\\n$(atfile.util.repeat_char " " $prefix_length)|g")"
+    
+    echo -n -e "${prefix}${color_message}$message\033[0m${suffix}"
+}
+
+function atfile.say.debug() {
+    message="$1"
+
+    if [[ $_debug == 1 ]]; then
+        atfile.say "$message" "Debug" 35
+    fi
+}
+
+function atfile.say.die() {
+    message="$1"
+    atfile.say "$message" "Error" 31 31 1
+}
+
+function atfile.say.inline() {
+    message="$1"
+    color="$2"
+    atfile.say "$message" "" "" $color "" "\\"
 }
 
 # Utilities
@@ -452,6 +512,10 @@ function atfile.util.get_var_from_file() {
     fi
 }
 
+function atfile.util.get_uas() {
+    echo "ATFile/$_version"
+}
+
 function atfile.util.get_yn() {
     yn="$1"
     
@@ -501,25 +565,18 @@ function atfile.util.is_xrpc_success() {
     fi
 }
 
-# HACK: This essentially breaks the entire session (it overrides $_username and
-#       $_server). If sourcing, use atfile.util.override_actor_reset() to
-#       reset
-function atfile.util.override_actor() {
+function atfile.util.resolve_identity() {
     actor="$1"
     
-    [[ -z "$_server_original" ]] && _server_original="$_server"
-    [[ -z "$_username_original" ]] && _username_original="$_username"
-    [[ -z "$_fmt_blob_url_original" ]] && _fmt_blob_url_original="$fmt_blob_url"
-
     if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(com.atproto.identity.resolveHandle "$actor")"
+        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_resolve_handle_endpoint")"
         if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
             actor="$(echo "$resolved_handle" | jq -r ".did")"
         fi
     fi
-
+    
     if [[ "$actor" == "did:"* ]]; then
-        did_doc=""
+        unset did_doc
         
         case "$actor" in
             "did:plc:"*) did_doc="$(curl -s -L -X GET "https://plc.directory/$actor")" ;; # TODO: What if they're not on plc.directory?
@@ -529,16 +586,34 @@ function atfile.util.override_actor() {
         if [[ $? != 0 || -z "$did_doc" ]]; then
             atfile.die "Unable to fetch DID Doc for '$actor'"
         else
-            export _server="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
-            export _username="$(echo "$did_doc" | jq -r ".id")"
+            did="$(echo "$did_doc" | jq -r ".id")"
+            pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             
-            # TODO: Maybe store blob URL format of choice on a record?
-            if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
-                export _fmt_blob_url="$_fmt_blob_url_default"
-            fi
+            echo "$did@$pds"
         fi
     else
         atfile.die "Unable to resolve '$actor'"
+    fi
+}
+
+# HACK: This essentially breaks the entire session (it overrides $_username and
+#       $_server). If sourcing, use atfile.util.override_actor_reset() to
+#       reset
+function atfile.util.override_actor() {
+    actor="$1"
+    
+    [[ -z "$_server_original" ]] && _server_original="$_server"
+    [[ -z "$_username_original" ]] && _username_original="$_username"
+    [[ -z "$_fmt_blob_url_original" ]] && _fmt_blob_url_original="$fmt_blob_url"
+    
+    if ! [[ $actor == $_username ]]; then
+        resolved_id="$(atfile.util.resolve_identity "$actor")"
+        _username="$(echo $resolved_id | cut -d "@" -f 1)"
+        _server="$(echo $resolved_id | cut -d "@" -f 2)"
+    
+        if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
+            export _fmt_blob_url="$_fmt_blob_url_default"
+        fi
     fi
 }
 
@@ -579,6 +654,13 @@ function atfile.util.print_hidden_command_warning() {
     echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS=1"
 }
 
+# HACK: We don't normally atfile.say() in the atfile.util.* namespace, but
+#       atfile.until.override_actor() is in this namespace and it would be nice
+#       to have a debug output for it when called in the main command case
+function atfile.util.print_override_actor_debug() {
+    atfile.say.debug "Overridden identity\n↳ DID: $_username\n↳ PDS: $_server\n↳ Blob URL: $_fmt_blob_url"
+}
+
 function atfile.util.print_table_paginate_hint() {
     cursor="$1"
     count="$2"
@@ -612,7 +694,7 @@ function atfile.util.repeat_char() {
 function atfile.xrpc.jwt() {
     curl -s -X POST $_server/xrpc/com.atproto.server.createSession \
         -H "Content-Type: application/json" \
-        -H "User-Agent: $_uas" \
+        -H "User-Agent: $(atfile.util.get_uas)" \
         -d '{"identifier": "'$_username'", "password": "'$_password'"}' | jq -r ".accessJwt"
 }
 
@@ -620,13 +702,15 @@ function atfile.xrpc.get() {
     lexi="$1"
     query="$2"
     type="$3"
+    endpoint="$4"
 
     [[ -z $type ]] && type="application/json"
+    [[ -z $endpoint ]] && endpoint="$_server"
 
-    curl -s -X GET $_server/xrpc/$lexi?$query \
+    curl -s -X GET $endpoint/xrpc/$lexi?$query \
         -H "Authorization: Bearer $(atfile.xrpc.jwt)" \
         -H "Content-Type: $type" \
-        -H "User-Agent: $_uas" \ | jq
+        -H "User-Agent: $(atfile.util.get_uas)" \ | jq
 }
 
 function atfile.xrpc.post() {
@@ -639,7 +723,7 @@ function atfile.xrpc.post() {
     curl -s -X POST $_server/xrpc/$lexi \
         -H "Authorization: Bearer $(atfile.xrpc.jwt)" \
         -H "Content-Type: $type" \
-        -H "User-Agent: $_uas" \
+        -H "User-Agent: $(atfile.util.get_uas)" \
         -d "$data" | jq
 }
 
@@ -654,7 +738,7 @@ function atfile.xrpc.post_blob() {
     curl -s -X POST $_server/xrpc/$lexi \
         -H "Authorization: Bearer $(atfile.xrpc.jwt)" \
         -H "Content-Type: $type" \
-        -H "User-Agent: $_uas" \
+        -H "User-Agent: $(atfile.util.get_uas)" \
         --data-binary @"$file" | jq
 }
 
@@ -1007,87 +1091,6 @@ function com.atproto.sync.uploadBlob() {
 
 # Commands
 
-function atfile.invoke.manage_record() {
-    function get_collection() {
-        collection="$_nsid_upload"
-        parameter_output="$1"
-        [[ -n "$1" ]] && collection="$1" # fuck it, manage all the records from atfile!
-        echo "$collection"
-    }
-    
-    case "$1" in
-        "create")
-            collection="$(get_collection "$3")"
-            record="$2"
-            [[ -z "$record" ]] && atfile.die "<record> not set"
-            
-            record_json="$(echo "$record" | jq)"
-            [[ $? != 0 ]] && atfile.die "Invalid JSON"
-            
-            com.atproto.repo.createRecord "$_username" "$collection" "$record_json" | jq
-            ;;
-        "delete")
-            collection="$(get_collection "$3")"
-            key="$2"
-            [[ -z "$key" ]] && atfile.die "<key> not set"
-            
-            if [[ "$key" == at:* ]]; then
-                at_uri="$key"
-                collection="$(echo $at_uri | cut -d "/" -f 4)"
-                key="$(echo $at_uri | cut -d "/" -f 5)"
-                username="$(echo $at_uri | cut -d "/" -f 3)"
-                
-                [[ "$username" != "$_username" ]] && atfile.die "Unable to delete record — not owned by you ($_username)"
-            fi
-            
-            com.atproto.repo.deleteRecord "$_username" "$collection" "$key" | jq
-            ;;
-        "get")
-            collection="$(get_collection "$3")"
-            key="$2"
-            username="$4"
-            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
-            
-            if [[ "$key" == at:* ]]; then
-                at_uri="$key"
-                collection="$(echo $at_uri | cut -d "/" -f 4)"
-                key="$(echo $at_uri | cut -d "/" -f 5)"
-                username="$(echo $at_uri | cut -d "/" -f 3)"
-            fi
-            
-            if [[ -z "$username" ]]; then
-                username="$_username"
-            else
-                atfile.util.override_actor "$username"
-            fi
-            
-            com.atproto.repo.getRecord "$username" "$collection" "$key" | jq
-            atfile.util.override_actor_reset
-            ;;
-        "put")
-            collection="$(get_collection "$3")"
-            key="$2"
-            record="$3"
-            [[ -z "$key" ]] && atfile.die "<key> not set"
-            [[ -z "$record" ]] && atfile.die "<record> not set"
-            
-            record_json="$(echo "$record" | jq)"
-            [[ $? != 0 ]] && atfile.die "Invalid JSON"
-            
-            if [[ "$key" == at:* ]]; then
-                at_uri="$key"
-                collection="$(echo $at_uri | cut -d "/" -f 4)"
-                key="$(echo $at_uri | cut -d "/" -f 5)"
-                username="$(echo $at_uri | cut -d "/" -f 3)"
-                
-                [[ "$username" != "$_username" ]] && atfile.die "Unable to put record — not owned by you ($_username)"
-            fi
-            
-            com.atproto.repo.putRecord "$_username" "$collection" "$key" "$record" | jq
-            ;;
-    esac
-}
-
 function atfile.invoke.delete() {
     key="$1"
     success=1
@@ -1124,6 +1127,7 @@ function atfile.invoke.download() {
         out_dir="$(realpath "$out_dir")/"
     fi
     
+    atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
@@ -1133,7 +1137,7 @@ function atfile.invoke.download() {
         key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         downloaded_file="${out_dir}${key}__${file_name}"
         
-        curl -H "User-Agent: $_uas" --silent "$blob_uri" -o "$downloaded_file"
+        curl -H "User-Agent: $(atfile.util.get_uas)" --silent "$blob_uri" -o "$downloaded_file"
         [[ $? != 0 ]] && success=0
     fi
     
@@ -1170,6 +1174,7 @@ function atfile.invoke.get() {
     key="$1"
     success=1
     
+    atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
@@ -1183,7 +1188,8 @@ function atfile.invoke.get() {
         unset locked
         unset encrypted
         
-        locked_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
+        atfile.say.debug "Getting record...\n↳ NSID: $_nsid_lock\n↳ Repo: $_username\n↳ Key: $key"
+        locked_record="$(com.atproto.repo.getRecord "$_username" "$_nsid_lock" "$key")"
         if [[ $? == 0 ]] && [[ -n "$locked_record" ]]; then
             if [[ $(echo $locked_record | jq -r ".value.lock") == true ]]; then
                 locked="$(atfile.util.get_yn 1)"
@@ -1256,6 +1262,7 @@ function atfile.invoke.get_url() {
     key="$1"
     success=1
     
+    atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     success="$(atfile.util.is_xrpc_success $? "$record")"
     
@@ -1276,6 +1283,7 @@ function atfile.invoke.list() {
     cursor="$1"
     success=1
     
+    atfile.say.debug "Getting records...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username"
     records="$(com.atproto.repo.listRecords "$_username" "$_nsid_upload" "$cursor")"
     success="$(atfile.util.is_xrpc_success $? "$records")"
    
@@ -1327,6 +1335,7 @@ function atfile.invoke.list_blobs() {
     cursor="$1"
     success=1
     
+    atfile.say.debug "Getting blobs...\n↳ Repo: $_username"
     blobs="$(com.atproto.sync.listBlobs "$_username" "$cursor")"
     success="$(atfile.util.is_xrpc_success $? "$blobs")"
 
@@ -1377,6 +1386,7 @@ function atfile.invoke.lock() {
     key="$1"
     locked=$2
     
+    atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     upload_record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     success=$(atfile.util.is_xrpc_success $? "$upload_record")
     
@@ -1388,7 +1398,9 @@ function atfile.invoke.lock() {
         fi
         
         lock_record="$(blue.zio.atfile.lock $locked)"
-        record="$(com.atproto.repo.putRecord "$_username" "blue.zio.atfile.lock" "$key" "$lock_record")"
+        
+        atfile.say.debug "Updating record...\n↳ NSID: $_nsid_lock\n↳ Repo: $_username\n↳ Key: $key"
+        record="$(com.atproto.repo.putRecord "$_username" "$_nsid_lock" "$key" "$lock_record")"
         success=$(atfile.util.is_xrpc_success $? "$record")
     fi
     
@@ -1411,10 +1423,95 @@ function atfile.invoke.lock() {
     fi
 }
 
+function atfile.invoke.manage_record() {
+    function get_collection() {
+        collection="$_nsid_upload"
+        parameter_output="$1"
+        [[ -n "$1" ]] && collection="$1" # fuck it, manage all the records from atfile!
+        echo "$collection"
+    }
+    
+    case "$1" in
+        "create")
+            collection="$(get_collection "$3")"
+            record="$2"
+            [[ -z "$record" ]] && atfile.die "<record> not set"
+            
+            record_json="$(echo "$record" | jq)"
+            [[ $? != 0 ]] && atfile.die "Invalid JSON"
+            
+            com.atproto.repo.createRecord "$_username" "$collection" "$record_json" | jq
+            ;;
+        "delete")
+            collection="$(get_collection "$3")"
+            key="$2"
+            [[ -z "$key" ]] && atfile.die "<key> not set"
+            
+            if [[ "$key" == at:* ]]; then
+                at_uri="$key"
+                collection="$(echo $at_uri | cut -d "/" -f 4)"
+                key="$(echo $at_uri | cut -d "/" -f 5)"
+                username="$(echo $at_uri | cut -d "/" -f 3)"
+                
+                [[ "$username" != "$_username" ]] && atfile.die "Unable to delete record — not owned by you ($_username)"
+            fi
+            
+            com.atproto.repo.deleteRecord "$_username" "$collection" "$key" | jq
+            ;;
+        "get")
+            collection="$(get_collection "$3")"
+            key="$2"
+            username="$4"
+            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
+            
+            if [[ "$key" == at:* ]]; then
+                at_uri="$key"
+                collection="$(echo $at_uri | cut -d "/" -f 4)"
+                key="$(echo $at_uri | cut -d "/" -f 5)"
+                username="$(echo $at_uri | cut -d "/" -f 3)"
+            fi
+            
+            if [[ -z "$username" ]]; then
+                username="$_username"
+            else
+                if [[ $username != $_username ]]; then
+                    atfile.util.override_actor "$username"
+                    atfile.util.print_override_actor_debug
+                fi
+            fi
+            
+            com.atproto.repo.getRecord "$username" "$collection" "$key" | jq
+            atfile.util.override_actor_reset
+            ;;
+        "put")
+            collection="$(get_collection "$3")"
+            key="$2"
+            record="$3"
+            [[ -z "$key" ]] && atfile.die "<key> not set"
+            [[ -z "$record" ]] && atfile.die "<record> not set"
+            
+            record_json="$(echo "$record" | jq)"
+            [[ $? != 0 ]] && atfile.die "Invalid JSON"
+            
+            if [[ "$key" == at:* ]]; then
+                at_uri="$key"
+                collection="$(echo $at_uri | cut -d "/" -f 4)"
+                key="$(echo $at_uri | cut -d "/" -f 5)"
+                username="$(echo $at_uri | cut -d "/" -f 3)"
+                
+                [[ "$username" != "$_username" ]] && atfile.die "Unable to put record — not owned by you ($_username)"
+            fi
+            
+            com.atproto.repo.putRecord "$_username" "$collection" "$key" "$record" | jq
+            ;;
+    esac
+}
+
 function atfile.invoke.print() {
     key="$1"
     success=1
     
+    atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
@@ -1422,7 +1519,7 @@ function atfile.invoke.print() {
         blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
-        curl -H "$_uas" -s -L "$blob_uri" --output -
+        curl -H "$(atfile.util.get_uas)" -s -L "$blob_uri" --output -
         [[ $? != 0 ]] && success=0
     fi
     
@@ -1435,12 +1532,11 @@ function atfile.invoke.profile() {
     nick="$1"
     
     profile_record="$(blue.zio.meta.profile "$1")"
+    atfile.say.debug "Updating record...\n↳ NSID: $_nsid_profile\n↳ Repo: $_username\n↳ Key: self"
     record="$(com.atproto.repo.putRecord "$_username" "$_nsid_profile" "self" "$profile_record")"
     
-    # HACK: Renamed record to "blue.zio.meta.profile". Remove this in the future.
-    dummy="$(com.atproto.repo.deleteRecord "$_username" "$_nsid_profile" "self")"
-    
     if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
+        atfile.say.debug "Getting record...\n↳ NSID: $_nsid_profile\n↳ Repo: $_username\n↳ Key: self"
         record="$(com.atproto.repo.getRecord "$_username" "$_nsid_profile" "self")"
     
         if [[ $_output_json == 1 ]]; then
@@ -1519,9 +1615,11 @@ function atfile.invoke.upload() {
         file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
         
         if [[ -n "$key" ]]; then
+            atfile.say.debug "Updating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
             record="$(com.atproto.repo.putRecord "$_username" "$_nsid_upload" "$key" "$file_record")"
             success=$(atfile.util.is_xrpc_success $? "$record")
         else
+            atfile.say.debug "Creating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username"
             record="$(com.atproto.repo.createRecord "$_username" "$_nsid_upload" "$file_record")"
             success=$(atfile.util.is_xrpc_success $? "$record")
         fi
@@ -1566,6 +1664,7 @@ function atfile.invoke.upload() {
 
 function atfile.invoke.upload_blob() {
     file="$(atfile.util.get_file_path "$1")"
+    atfile.say.debug "Uploading blob...\n↳ File: $file"
     com.atproto.sync.uploadBlob "$file" | jq
 }
 
@@ -1657,21 +1756,23 @@ Arguments
                 See 'gpg --help' for more information
 
 Environment Variables
-    ${_envvar_prefix}_USERNAME <string>
+    ${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
-    ${_envvar_prefix}_PASSWORD <string>
+    ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
-    ${_envvar_prefix}_PDS <url> (default: $_server_default)
-        Endpoint of the PDS
-        
-    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default $_enable_hidden_commands_default)
+
+    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
+        Print debug outputs
+        ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
+    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
         Enable hidden commands
         ⚠️  When sourcing, sets to 1
-    ${_envvar_prefix}_OUTPUT_JSON <bool> (default $_output_json_default)
-        Print all commands (and errors) as JSON
-        ⚠️  When sourcing, sets to 1
-    ${_envvar_prefix}_FINGERPRINT <int> (default $_fmt_blob_url_default)
+    ${_envvar_prefix}_ENDPOINT_PDS <url>
+        Endpoint of the PDS
+        ℹ️  Your PDS is resolved from your username. Set to override it (or if
+           resolving fails)
+    ${_envvar_prefix}_FINGERPRINT <int> (default: $_fingerprint_default)
         Apply machine fingerprint to uploaded files
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
         Maximum amount of items in any lists
@@ -1680,6 +1781,9 @@ Environment Variables
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
+    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
+        Print all commands (and errors) as JSON
+        ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
@@ -1713,59 +1817,64 @@ Files
 
 _prog="$(basename "$(realpath -s "$0")")"
 _prog_dir="$(dirname "$(realpath -s "$0")")"
-_work_dir="$(realpath -s "$(pwd)")"
 _version="0.2.1"
 _c_year="2024"
 _command="$1"
-_is_git=0
+_command_full="$@"
+_envvar_prefix="ATFILE"
+_envfile="$HOME/.config/atfile.env"
 _is_sourced=0
 _now="$(atfile.util.get_date)"
 
-if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
-    git describe --exact-match --tags > /dev/null 2>&1
-    [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
-    _is_git=1
-fi
-
-_envvar_prefix="ATFILE"
-_envfile="$HOME/.config/atfile.env"
-
+_debug_default=0
 _enable_hidden_commands_default=0
 _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
 _max_list_default=$(( $(atfile.util.get_term_rows) - $_max_list_buffer ))
 _output_json_default=0
-_server_default="https://bsky.social"
 _skip_auth_check_default=0
 _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
+_debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
 _fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
-_server="$(atfile.util.get_envvar "${_envvar_prefix}_PDS" "$_server_default")"
+_resolve_handle_endpoint="https://zio.blue"
+_server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
 _skip_auth_check="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
 _skip_ni_exiftool="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
 _skip_ni_mediainfo="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
 _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
 _test_desktop_uas="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
-_uas="ATFile/$_version"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 
 _nsid_prefix="blue.zio"
+_nsid_lock="${_nsid_prefix}.atfile.lock"
 _nsid_meta="${_nsid_prefix}.atfile.meta"
 _nsid_profile="${_nsid_prefix}.meta.profile"
 _nsid_upload="${_nsid_prefix}.atfile.upload"
 
 if [[ "$0" != "$BASH_SOURCE" ]]; then
+    _debug=0
     _enable_hidden_commands=1
     _is_sourced=1
     _output_json=1
+fi
+
+atfile.say.debug "Starting up..."
+atfile.say.debug "Terminal is $(atfile.util.get_term_rows) rows"
+
+if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
+    atfile.say.debug "Getting tag from Git..."
+    git describe --exact-match --tags > /dev/null 2>&1
+    [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
+    _is_git=1
 fi
 
 if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
@@ -1773,7 +1882,6 @@ if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
 fi
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
-[[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.invoke.usage
@@ -1785,28 +1893,83 @@ if [[ $_command == "version" || $_command == "--version" ]]; then
     exit 0
 fi
 
+if [[ $_is_sourced == 0 ]]; then
+	case "$_command" in
+	    "open"|"print"|"c") _command="cat" ;;
+	    "rm") _command="delete" ;;
+	    "download"|"f"|"d") _command="fetch" ;;
+        "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
+        "get"|"i") _command="info" ;;
+        "ls") _command="list" ;;
+        "ul"|"u") _command="upload" ;;
+        "uc") _command="upload-crypt" ;;
+		"get-url"|"b") _command="url" ;;
+	esac
+fi
+
+atfile.say.debug "Checking required programs..."
 atfile.util.check_prog "curl"
 atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
 atfile.util.check_prog "md5sum"
 atfile.util.check_prog "xargs"
 
+atfile.say.debug "Checking required variables..."
 [[ -z "$_username" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
 
-if [[ $_skip_auth_check == 0 ]]; then
-    session="$(com.atproto.server.getSession)"
-    if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
-        atfile.die "Unable to authenticate as \"$_username\" on \"$_server\""
-    else
-        _username="$(echo $session | jq -r ".did")"
+if [[ -z "$_server" ]]; then
+    skip_resolving=0
+    
+    if [[ $_is_sourced == 0 ]]; then
+    # NOTE: Speeds things up a little if the user is overriding actor
+    #       Keep this in-sync with the main command case below!
+        if [[ $_command == "cat" && "$3" ]] ||\
+           [[ $_command == "fetch" && "$4" ]] ||\
+           [[ $_command == "fetch-crypt" && "$4" ]] ||\
+           [[ $_command == "info" && "$2" == *.* ]] ||\
+           [[ $_command == "list" && "$2" == *.* ]] ||\
+           [[ $_command == "list" && -n "$3" ]] ||\
+           [[ $_command == "url" && "$2" == *.* ]]; then
+               atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
+               skip_resolving=1 
+        fi
+    fi
+    
+    if [[ $skip_resolving == 0 ]]; then
+        atfile.say.debug "Resolving identity..."
+
+        resolved_id="$(atfile.util.resolve_identity "$_username")"
+        _username="$(echo $resolved_id | cut -d "@" -f 1)"
+        _server="$(echo $resolved_id | cut -d "@" -f 2)"
+        
+        atfile.say.debug "Resolved identity\n↳ DID: $_username\n↳ PDS: $_server"
     fi
 else
-    if [[ "$_username" != "did:"* ]]; then
-        atfile.die "Cannot skip authentication validation without a DID\n       ↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
+    atfile.say.debug "Skipping identity resolving\n↳ ${_envvar_prefix}_ENDPOINT_PDS is set ($_server)"
+    [[ $_server != "http://"* ]] && [[ $_server != "https://"* ]] && _server="https://$_server"
+fi
+
+if [[ -n $_server ]]; then
+    if [[ $_skip_auth_check == 0 ]]; then
+        atfile.say.debug "Checking authentication is valid..."
+        
+        session="$(com.atproto.server.getSession)"
+        if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
+            atfile.die "Unable to authenticate as \"$_username\" on \"$_server\""
+        else
+            _username="$(echo $session | jq -r ".did")"
+        fi
+    else
+        atfile.say.debug "Skipping checking authentication validity\n↳ ${_envvar_prefix}_SKIP_AUTH_CHECK is set ($_skip_auth_check)"
+        if [[ "$_username" != "did:"* ]]; then
+            atfile.die "Cannot skip authentication validation without a DID\n↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
+        fi
     fi
 fi
 
 if [[ $_is_sourced == 0 ]]; then
+    atfile.say.debug "Running '$_command_full'...\n↳ Command: $_command\n↳ Arguments: ${@:2}"
+
 	case "$_command" in
 	    "blob")
 		    if [[ "$_enable_hidden_commands" == 1 ]]; then
@@ -1820,41 +1983,62 @@ if [[ $_is_sourced == 0 ]]; then
 		        exit 1
 		    fi	    
 	        ;;
-		"cat"|"open"|"print"|"c")
+		"cat")
 		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
+		    if [[ -n "$3" ]]; then
+		        atfile.util.override_actor "$3"
+		        atfile.util.print_override_actor_debug
+		    fi
+		    
 		    atfile.invoke.print "$2"
 		    ;;
-		"delete"|"rm")
+		"delete")
 		    [[ -z "$2" ]] && atfile.die "<key> not set"
 		    atfile.invoke.delete "$2"
 		    ;;
-		"fetch"|"download"|"f"|"d")
+		"fetch")
 		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
+		    if [[ -n "$4" ]]; then
+		        atfile.util.override_actor "$4"
+		        atfile.util.print_override_actor_debug
+		    fi
+		    
 		    atfile.invoke.download "$2" "$3"
 		    ;;
-		"fetch-crypt"|"download-crypt"|"fc"|"dc")
+		"fetch-crypt")
 		    atfile.util.check_prog_gpg
 		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    [[ -n "$4" ]] && atfile.util.override_actor "$4"
+		    if [[ -n "$4" ]]; then
+		        atfile.util.override_actor "$4"
+		        atfile.util.print_override_actor_debug
+		    fi
+		    
 		    atfile.invoke.download "$2" "$3" 1
 		    ;;
-		"info"|"get"|"i")
+		"info")
 		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
+		    if [[ -n "$3" ]]; then
+		        atfile.util.override_actor "$3"
+		        atfile.util.print_override_actor_debug
+		    fi
+		    
 		    atfile.invoke.get "$2"
 		    ;;
-		"list"|"ls")
+		"list")
 			if [[ "$2" == *.* ]]; then
 			    # NOTE: User has entered <actor> in the wrong place, so we'll fix it
 			    #       for them
 			    # BUG:  Keys with periods in them can't be used as a cursor
 			    
 			    atfile.util.override_actor "$2"
+			    atfile.util.print_override_actor_debug
+
 		        atfile.invoke.list "$3"
 			else
-			    [[ -n "$3" ]] && atfile.util.override_actor "$3"
+			    if [[ -n "$3" ]]; then
+			        atfile.util.override_actor "$3"
+			        atfile.util.print_override_actor_debug
+		        fi
 		        atfile.invoke.list "$2"   
 			fi
 		    ;;
@@ -1879,12 +2063,12 @@ if [[ $_is_sourced == 0 ]]; then
 		        exit 1
 		    fi
 		    ;;
-		"upload"|"ul"|"u")
+		"upload")
 		    atfile.util.check_prog_optional_metadata
 		    [[ -z "$2" ]] && atfile.die "<file> not set"
 		    atfile.invoke.upload "$2" "" "$3"
 		    ;;
-		"upload-crypt"|"uc")
+		"upload-crypt")
 		    atfile.util.check_prog_optional_metadata
 		    atfile.util.check_prog_gpg
 		    [[ -z "$2" ]] && atfile.die "<file> not set"
@@ -1894,9 +2078,13 @@ if [[ $_is_sourced == 0 ]]; then
 		"unlock")
 		    atfile.invoke.lock "$2" 0
 		    ;;
-		"url"|"get-url"|"b")
+		"url")
 		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    [[ -n "$3" ]] && atfile.util.override_actor "$3"
+		    if [[ -n "$3" ]]; then
+		        atfile.util.override_actor "$3"
+		        atfile.util.print_override_actor_debug
+		    fi
+		    
 		    atfile.invoke.get_url "$2"
 		    ;;
 		"temp-get-finger")
@@ -1907,6 +2095,9 @@ if [[ $_is_sourced == 0 ]]; then
 		    ;;
 		"temp-get-meta-jq")
 		    atfile.util.get_meta_record "$2" "$3" | jq
+		    ;;
+		"temp-resolve-id")
+		    atfile.util.resolve_identity "$2"
 		    ;;
 		*)
 		    atfile.die.unknown_command "$_command"
