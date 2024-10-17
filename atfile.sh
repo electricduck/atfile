@@ -1885,7 +1885,7 @@ Files
 
 _prog="$(basename "$(realpath -s "$0")")"
 _prog_dir="$(dirname "$(realpath -s "$0")")"
-_version="0.2.1"
+_version="0.3"
 _c_year="2024"
 _command="$1"
 _command_full="$@"

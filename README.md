@@ -20,10 +20,9 @@
 
 ```sh
 cd ~/.local/bin
-wget https://github.com/electricduck/atfile/releases/download/v%2F0.x%2F0.2.1/atfile.sh -O atfile
+wget https://github.com/electricduck/atfile/releases/download/v%2F0.x%2F0.3/atfile.sh -O atfile
 chmod +x atfile
 echo 'ATFILE_USERNAME="<your-atproto-username>"' > ~/.config/atfile.env  # e.g. jay.bsky.team, did:plc:oky5czdrnfjpqslsw2a5iclo
 echo 'ATFILE_PASSWORD="<your-atproto-password>"' >> ~/.config/atfile.env
-#echo 'ATFILE_PDS="<your-atproto-pds>"' >> ~/.config/atfile.env # not on bsky.social?
 atfile help
 ```
