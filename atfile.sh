@@ -14,7 +14,7 @@ function atfile.die() {
         echo -e "{ \"error\": \"$1\" }" | jq
     fi
     
-    exit 255
+    [[ $_is_sourced == 0 ]] && exit 255
 }
 
 function atfile.die.unknown_command() {
@@ -1091,6 +1091,62 @@ function com.atproto.sync.uploadBlob() {
 
 # Commands
 
+function atfile.invoke.debug() {
+    function atfile.invoke.debug.print_envvar() {
+        variable_name="${_envvar_prefix}_$1"
+        variable_default="$2"
+        
+        unset output
+        
+        output="$variable_name: $(atfile.util.get_envvar "$variable_name" "$variable_default")"
+        [[ -n "$variable_default" ]] && output+=" ($variable_default)"
+        
+        echo -e "↳ $output"
+    }
+
+    if [[ $_output_json == 1 ]]; then
+        atfile.die "Cannot output debug as JSON"
+    fi
+    
+    finger_record="$(atfile.util.get_finger_record)"
+    
+    kernel="$(uname -s -r)"
+    os="$(echo $finger_record | jq -r ".os")"
+    
+    debug_output="ATFile
+↳ Version: $_version
+↳ UAS: $(atfile.util.get_uas)
+Variables
+$(atfile.invoke.debug.print_envvar "DEBUG" $_debug_default)
+$(atfile.invoke.debug.print_envvar "FINGERPRINT" $_fingerprint_default)
+$(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
+$(atfile.invoke.debug.print_envvar "ENABLE_HIDDEN_COMMANDS" $_enable_hidden_commands_default)
+$(atfile.invoke.debug.print_envvar "ENDPOINT_PDS")
+$(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
+$(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
+$(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
+$(atfile.invoke.debug.print_envvar "SKIP_COPYRIGHT_WARN" $_skip_copyright_warn_default)
+$(atfile.invoke.debug.print_envvar "SKIP_NI_EXIFTOOL" $_skip_ni_exiftool_default)
+$(atfile.invoke.debug.print_envvar "SKIP_NI_MEDIAINFO" $_skip_ni_mediainfo_default)
+↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "[Set]")
+$(atfile.invoke.debug.print_envvar "USERNAME")
+Environment
+↳ Bash
+ ↳ Version: $BASH_VERSION
+ ↳ Exec: $SHELL
+↳ OS: $os
+↳ Kernel: $kernel
+Actor
+↳ DID: $_username
+↳ PDS: $_server
+Misc.
+↳ MD5 Output: $(md5sum "$(realpath -s "$0")")
+↳ Now: $_now
+↳ Rows: $(atfile.util.get_term_rows)"
+    
+    atfile.say "$debug_output"
+}
+
 function atfile.invoke.delete() {
     key="$1"
     success=1
@@ -1424,7 +1480,7 @@ function atfile.invoke.lock() {
 }
 
 function atfile.invoke.manage_record() {
-    function get_collection() {
+    function atfile.invoke.manage_record.get_collection() {
         collection="$_nsid_upload"
         parameter_output="$1"
         [[ -n "$1" ]] && collection="$1" # fuck it, manage all the records from atfile!
@@ -1433,7 +1489,7 @@ function atfile.invoke.manage_record() {
     
     case "$1" in
         "create")
-            collection="$(get_collection "$3")"
+            collection="$(atfile.invoke.manage_record.get_collection "$3")"
             record="$2"
             [[ -z "$record" ]] && atfile.die "<record> not set"
             
@@ -1443,7 +1499,7 @@ function atfile.invoke.manage_record() {
             com.atproto.repo.createRecord "$_username" "$collection" "$record_json" | jq
             ;;
         "delete")
-            collection="$(get_collection "$3")"
+            collection="$(atfile.invoke.manage_record.get_collection "$3")"
             key="$2"
             [[ -z "$key" ]] && atfile.die "<key> not set"
             
@@ -1459,7 +1515,7 @@ function atfile.invoke.manage_record() {
             com.atproto.repo.deleteRecord "$_username" "$collection" "$key" | jq
             ;;
         "get")
-            collection="$(get_collection "$3")"
+            collection="$(atfile.invoke.manage_record.get_collection "$3")"
             key="$2"
             username="$4"
             [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
@@ -1484,7 +1540,7 @@ function atfile.invoke.manage_record() {
             atfile.util.override_actor_reset
             ;;
         "put")
-            collection="$(get_collection "$3")"
+            collection="$(atfile.invoke.manage_record.get_collection "$3")"
             key="$2"
             record="$3"
             [[ -z "$key" ]] && atfile.die "<key> not set"
@@ -2062,6 +2118,9 @@ if [[ $_is_sourced == 0 ]]; then
 		        atfile.util.print_hidden_command_warning
 		        exit 1
 		    fi
+		    ;;
+		"something-broke")
+		    atfile.invoke.debug
 		    ;;
 		"upload")
 		    atfile.util.check_prog_optional_metadata
