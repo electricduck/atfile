@@ -569,7 +569,7 @@ function atfile.util.resolve_identity() {
     actor="$1"
     
     if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_resolve_handle_endpoint")"
+        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
         if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
             actor="$(echo "$resolved_handle" | jq -r ".did")"
         fi
@@ -579,7 +579,7 @@ function atfile.util.resolve_identity() {
         unset did_doc
         
         case "$actor" in
-            "did:plc:"*) did_doc="$(curl -s -L -X GET "https://plc.directory/$actor")" ;; # TODO: What if they're not on plc.directory?
+            "did:plc:"*) did_doc="$(curl -s -L -X GET "$_endpoint_plc_directory/$actor")" ;; # TODO: What if they're not on plc.directory?
             "did:web:"*) did_doc="$(curl -s -L -X GET "$(echo "$actor" | sed "s/did:web://")/.well-known/did.json")" ;;
         esac
             
@@ -1105,7 +1105,7 @@ function atfile.invoke.debug() {
     }
 
     if [[ $_output_json == 1 ]]; then
-        atfile.die "Cannot output debug as JSON"
+        atfile.die "Command not available as JSON"
     fi
     
     finger_record="$(atfile.util.get_finger_record)"
@@ -1140,7 +1140,7 @@ Actor
 ↳ DID: $_username
 ↳ PDS: $_server
 Misc.
-↳ MD5 Output: $(md5sum "$(realpath -s "$0")")
+↳ MD5 Output: $(md5sum "$_prog_path")
 ↳ Now: $_now
 ↳ Rows: $(atfile.util.get_term_rows)"
     
@@ -1332,6 +1332,62 @@ function atfile.invoke.get_url() {
         fi
     else
         atfile.die "Unable to get '$key'"
+    fi
+}
+
+function atfile.invoke.update() {
+    function atfile.invoke.update.parse_version() {
+        version="$1"
+        version="$(echo $version | cut -d "+" -f 1)"
+        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
+        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
+        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
+        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+    }
+
+    if [[ $_output_json == 1 ]]; then
+        atfile.die "Command not available as JSON"
+    fi
+    
+    atfile.say.debug "Getting latest release..."
+    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
+    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
+    
+    latest_version="$(echo "$latest_release" | jq -r ".name")"
+    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
+    
+    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
+    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
+    
+    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
+    
+    if [[ $_version == *+git* ]]; then
+        atfile.die "Cannot update Git version ($_version)"
+    fi
+    
+    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
+        temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
+        
+        atfile.say.debug "Touching temporary path ($temp_updated_path)..."
+        touch "$temp_updated_path"
+        [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
+        
+        atfile.say.debug "Downloading latest release..."
+        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
+        if [[ $? == 0 ]]; then
+            mv "$temp_updated_path" "$_prog_path"
+            if [[ $? != 0 ]]; then
+                atfile.die "Unable to update (do you have permission?)"
+            else
+                chmod +x "$_prog_path"
+                atfile.say "😎 Updated to $latest_version!"
+                exit 0
+            fi
+        else
+            atfile.die "Unable to download latest version"
+        fi
+    else
+        atfile.say "No updates found"
     fi
 }
 
@@ -1738,8 +1794,17 @@ function atfile.invoke.upload_blob() {
 
 function atfile.invoke.usage() {
     if [[ $_output_json == 1 ]]; then
-        atfile.die "Cannot output usage as JSON"
+        atfile.die "Command not available as JSON"
     fi
+
+# ------------------------------------------------------------------------------
+    usage_arguments="<actor>     Act upon another ATProto user (either by handle or DID)
+    <cursor>    Key or CID used as a reference to paginate through lists
+    <key>       Key of an uploaded file (unique to that user and collection)
+    <nick>      Nickname
+    <out-dir>   Path to receive downloaded files
+    <recipient> GPG recipient during file encryption
+                See 'gpg --help' for more information"
 
     usage_commands="upload <file> [<key>]
         Upload new file to the PDS
@@ -1783,7 +1848,10 @@ function atfile.invoke.usage() {
         
     nick <nick>
         Set nickname
-        ℹ️  Intended for future use"
+        ℹ️  Intended for future use
+    
+    update
+        Check for updates and update if outdated"
 
     if [[ $_enable_hidden_commands == 1 ]]; then
         usage_commands+="\n\nCommands (Hidden)
@@ -1803,45 +1871,17 @@ function atfile.invoke.usage() {
         ℹ️  <collection> defaults to '$_nsid_upload'"
     fi
 
-# ------------------------------------------------------------------------------
-    echo -e "ATFile | 📦 ➔ 🦋
-    Store and retrieve files on a PDS
-    
-    Version $_version
-    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
-    Licensed under MIT License ✨
-    
-Commands
-    $usage_commands
-
-Arguments
-    <actor>     Act upon another ATProto user (either by handle or DID)
-    <cursor>    Key or CID used as a reference to paginate through lists
-    <key>       Key of an uploaded file (unique to that user and collection)
-    <nick>      Nickname
-    <out-dir>   Path to receive downloaded files
-    <recipient> GPG recipient during file encryption
-                See 'gpg --help' for more information
-
-Environment Variables
-    ${_envvar_prefix}_USERNAME <string> (required)
+usage_envvars="    ${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
     ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
-
-    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
-        Print debug outputs
-        ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
-    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
-        Enable hidden commands
-        ⚠️  When sourcing, sets to 1
-    ${_envvar_prefix}_ENDPOINT_PDS <url>
-        Endpoint of the PDS
-        ℹ️  Your PDS is resolved from your username. Set to override it (or if
-           resolving fails)
+        
     ${_envvar_prefix}_FINGERPRINT <int> (default: $_fingerprint_default)
         Apply machine fingerprint to uploaded files
+    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
+        Print all commands (and errors) as JSON
+        ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
         Maximum amount of items in any lists
         ℹ️  Default value is calculated from your terminal's height
@@ -1849,9 +1889,16 @@ Environment Variables
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
-    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
-        Print all commands (and errors) as JSON
-        ⚠️  When sourcing, sets to 1
+        
+    ${_envvar_prefix}_ENDPOINT_PDS <url>
+        Endpoint of the PDS
+        ℹ️  Your PDS is resolved from your username. Set to override it (or if
+           resolving fails)
+    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: $_endpoint_plc_directory_default)
+        Endpoint of PLC directory
+    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
+        Endpoint used for handle resolving
+
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
@@ -1871,12 +1918,40 @@ Environment Variables
            * audio/*: $_nsid_meta#audio
            * video/*: $_nsid_meta#video
            
-    * A bool in Bash is 1 (true) or 0 (false)
+    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
+        Print debug outputs
+        ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
+    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
+        Enable hidden commands
+        ⚠️  When sourcing, sets to 1
+           
+    * A bool in Bash is 1 (true) or 0 (false)"
+    
+atfile.say.debug "Printing help..."
+usage_files="$_envfile
+        List of key/values of the above environment variables. Exporting these
+        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values"
+
+    echo -e "ATFile | 📦 ➔ 🦋
+    Store and retrieve files on a PDS
+    
+    Version $_version
+    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
+    Licensed under MIT License ✨
+    
+    😎 Stay updated with \`$_prog update\`
+    
+Commands
+    $usage_commands
+
+Arguments
+    $usage_arguments
+
+Environment Variables
+    $usage_envvars
 
 Files
-    $_envfile
-        List of key/values of the above environment variables. Exporting these
-        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
+    $usage_files
 " | less
 # ------------------------------------------------------------------------------
 }
@@ -1885,8 +1960,11 @@ Files
 
 _prog="$(basename "$(realpath -s "$0")")"
 _prog_dir="$(dirname "$(realpath -s "$0")")"
-_version="0.3"
+_prog_path="$(realpath -s "$0")"
+_version="0.4"
 _c_year="2024"
+_gh_user="electricduck"
+_gh_repo="atfile"
 _command="$1"
 _command_full="$@"
 _envvar_prefix="ATFILE"
@@ -1896,6 +1974,8 @@ _now="$(atfile.util.get_date)"
 
 _debug_default=0
 _enable_hidden_commands_default=0
+_endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
+_endpoint_plc_directory_default="https://plc.directory"
 _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
@@ -1910,9 +1990,10 @@ _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
 _fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
+_endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
+_endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
-_resolve_handle_endpoint="https://zio.blue"
 _server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
 _skip_auth_check="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
@@ -1953,6 +2034,11 @@ fi
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.invoke.usage
+    exit 0
+fi
+
+if [[ $_command == "update" ]]; then
+    atfile.invoke.update
     exit 0
 fi
 
