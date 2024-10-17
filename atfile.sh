@@ -1797,6 +1797,15 @@ function atfile.invoke.usage() {
         atfile.die "Command not available as JSON"
     fi
 
+# ------------------------------------------------------------------------------
+    usage_arguments="<actor>     Act upon another ATProto user (either by handle or DID)
+    <cursor>    Key or CID used as a reference to paginate through lists
+    <key>       Key of an uploaded file (unique to that user and collection)
+    <nick>      Nickname
+    <out-dir>   Path to receive downloaded files
+    <recipient> GPG recipient during file encryption
+                See 'gpg --help' for more information"
+
     usage_commands="upload <file> [<key>]
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
@@ -1862,30 +1871,7 @@ function atfile.invoke.usage() {
         ℹ️  <collection> defaults to '$_nsid_upload'"
     fi
 
-# ------------------------------------------------------------------------------
-    echo -e "ATFile | 📦 ➔ 🦋
-    Store and retrieve files on a PDS
-    
-    Version $_version
-    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
-    Licensed under MIT License ✨
-    
-    😎 Stay updated with \`$_prog update\`
-    
-Commands
-    $usage_commands
-
-Arguments
-    <actor>     Act upon another ATProto user (either by handle or DID)
-    <cursor>    Key or CID used as a reference to paginate through lists
-    <key>       Key of an uploaded file (unique to that user and collection)
-    <nick>      Nickname
-    <out-dir>   Path to receive downloaded files
-    <recipient> GPG recipient during file encryption
-                See 'gpg --help' for more information
-
-Environment Variables
-    ${_envvar_prefix}_USERNAME <string> (required)
+usage_envvars="    ${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
     ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
@@ -1939,12 +1925,33 @@ Environment Variables
         Enable hidden commands
         ⚠️  When sourcing, sets to 1
            
-    * A bool in Bash is 1 (true) or 0 (false)
+    * A bool in Bash is 1 (true) or 0 (false)"
+    
+atfile.say.debug "Printing help..."
+usage_files="$_envfile
+        List of key/values of the above environment variables. Exporting these
+        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values"
+
+    echo -e "ATFile | 📦 ➔ 🦋
+    Store and retrieve files on a PDS
+    
+    Version $_version
+    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
+    Licensed under MIT License ✨
+    
+    😎 Stay updated with \`$_prog update\`
+    
+Commands
+    $usage_commands
+
+Arguments
+    $usage_arguments
+
+Environment Variables
+    $usage_envvars
 
 Files
-    $_envfile
-        List of key/values of the above environment variables. Exporting these
-        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
+    $usage_files
 " | less
 # ------------------------------------------------------------------------------
 }
