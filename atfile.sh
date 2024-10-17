@@ -1839,7 +1839,10 @@ function atfile.invoke.usage() {
         
     nick <nick>
         Set nickname
-        ℹ️  Intended for future use"
+        ℹ️  Intended for future use
+    
+    update
+        Check for updates and update if outdated"
 
     if [[ $_enable_hidden_commands == 1 ]]; then
         usage_commands+="\n\nCommands (Hidden)
@@ -1866,6 +1869,8 @@ function atfile.invoke.usage() {
     Version $_version
     (c) $_c_year Ducky <https://github.com/electricduck/atfile>
     Licensed under MIT License ✨
+    
+    😎 Stay updated with \`$_prog update\`
     
 Commands
     $usage_commands
