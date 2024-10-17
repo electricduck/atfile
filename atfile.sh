@@ -1345,7 +1345,13 @@ function atfile.invoke.list() {
    
     if [[ $success == 1 ]]; then
         records="$(echo $records | jq -c '.records[]')"
-        [[ -z "$records" ]] && atfile.die "No files for '$_username'"
+        if [[ -z "$records" ]]; then
+            if [[ -n "$cursor" ]]; then
+                atfile.die "No more files for '$_username'"
+            else
+                atfile.die "No files for '$_username'"
+            fi
+        fi
         
         unset last_key
         unset record_count
@@ -1397,7 +1403,13 @@ function atfile.invoke.list_blobs() {
 
     if [[ $success == 1 ]]; then
         records="$(echo $blobs | jq -c '.cids[]')"
-        [[ -z "$records" ]] && atfile.die "No blobs for '$_username'"
+        if [[ -z "$records" ]]; then
+            if [[ -n "$cursor" ]]; then
+                atfile.die "No more blobs for '$_username'"
+            else
+                atfile.die "No blobs for '$_username'"
+            fi
+        fi
     
         unset last_cid
         unset record_count
