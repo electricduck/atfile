@@ -28,7 +28,7 @@ mkdir -p "$install_dir"
 curl -s -o "${install_dir}/$install_file" "$url"
 [[ $? != 0 ]] && die "Unable to download"
 
-chmod +x "${install_dir}/$_install_file"
+chmod +x "${install_dir}/$install_file"
 [[ $? != 0 ]] && die "Unable to set as executable"
 
 mkdir -p "$conf_dir"
