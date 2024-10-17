@@ -2146,18 +2146,6 @@ if [[ $_is_sourced == 0 ]]; then
 		    
 		    atfile.invoke.get_url "$2"
 		    ;;
-		"temp-get-finger")
-		    atfile.util.get_finger_record
-		    ;;
-		"temp-get-meta")
-		    atfile.util.get_meta_record "$2" "$3"
-		    ;;
-		"temp-get-meta-jq")
-		    atfile.util.get_meta_record "$2" "$3" | jq
-		    ;;
-		"temp-resolve-id")
-		    atfile.util.resolve_identity "$2"
-		    ;;
 		*)
 		    atfile.die.unknown_command "$_command"
 		    ;;
