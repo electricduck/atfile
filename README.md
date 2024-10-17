@@ -19,9 +19,7 @@
 ## ✨ Quick Start
 
 ```sh
-cd ~/.local/bin
-wget https://github.com/electricduck/atfile/releases/download/v%2F0.x%2F0.3/atfile.sh -O atfile
-chmod +x atfile
+curl -sSL https://raw.githubusercontent.com/electricduck/atfile/refs/heads/main/atfile-install.sh | bash
 echo 'ATFILE_USERNAME="<your-atproto-username>"' > ~/.config/atfile.env  # e.g. jay.bsky.team, did:plc:oky5czdrnfjpqslsw2a5iclo
 echo 'ATFILE_PASSWORD="<your-atproto-password>"' >> ~/.config/atfile.env
 atfile help
