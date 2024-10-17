@@ -569,7 +569,7 @@ function atfile.util.resolve_identity() {
     actor="$1"
     
     if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_resolve_handle_endpoint")"
+        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
         if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
             actor="$(echo "$resolved_handle" | jq -r ".did")"
         fi
@@ -579,7 +579,7 @@ function atfile.util.resolve_identity() {
         unset did_doc
         
         case "$actor" in
-            "did:plc:"*) did_doc="$(curl -s -L -X GET "https://plc.directory/$actor")" ;; # TODO: What if they're not on plc.directory?
+            "did:plc:"*) did_doc="$(curl -s -L -X GET "$_endpoint_plc_directory/$actor")" ;; # TODO: What if they're not on plc.directory?
             "did:web:"*) did_doc="$(curl -s -L -X GET "$(echo "$actor" | sed "s/did:web://")/.well-known/did.json")" ;;
         esac
             
@@ -1829,19 +1829,12 @@ Environment Variables
     ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
-
-    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
-        Print debug outputs
-        ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
-    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
-        Enable hidden commands
-        ⚠️  When sourcing, sets to 1
-    ${_envvar_prefix}_ENDPOINT_PDS <url>
-        Endpoint of the PDS
-        ℹ️  Your PDS is resolved from your username. Set to override it (or if
-           resolving fails)
+        
     ${_envvar_prefix}_FINGERPRINT <int> (default: $_fingerprint_default)
         Apply machine fingerprint to uploaded files
+    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
+        Print all commands (and errors) as JSON
+        ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
         Maximum amount of items in any lists
         ℹ️  Default value is calculated from your terminal's height
@@ -1849,9 +1842,16 @@ Environment Variables
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
-    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
-        Print all commands (and errors) as JSON
-        ⚠️  When sourcing, sets to 1
+        
+    ${_envvar_prefix}_ENDPOINT_PDS <url>
+        Endpoint of the PDS
+        ℹ️  Your PDS is resolved from your username. Set to override it (or if
+           resolving fails)
+    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: $_endpoint_plc_directory_default)
+        Endpoint of PLC directory
+    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
+        Endpoint used for handle resolving
+
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
@@ -1870,6 +1870,13 @@ Environment Variables
            not be created:
            * audio/*: $_nsid_meta#audio
            * video/*: $_nsid_meta#video
+           
+    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
+        Print debug outputs
+        ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
+    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
+        Enable hidden commands
+        ⚠️  When sourcing, sets to 1
            
     * A bool in Bash is 1 (true) or 0 (false)
 
@@ -1896,6 +1903,8 @@ _now="$(atfile.util.get_date)"
 
 _debug_default=0
 _enable_hidden_commands_default=0
+_endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
+_endpoint_plc_directory_default="https://plc.directory"
 _fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
@@ -1910,9 +1919,10 @@ _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
 _fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
+_endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
+_endpont_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
-_resolve_handle_endpoint="https://zio.blue"
 _server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
 _skip_auth_check="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
