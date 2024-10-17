@@ -1105,7 +1105,7 @@ function atfile.invoke.debug() {
     }
 
     if [[ $_output_json == 1 ]]; then
-        atfile.die "Cannot output debug as JSON"
+        atfile.die "Command not available as JSON"
     fi
     
     finger_record="$(atfile.util.get_finger_record)"
@@ -1140,7 +1140,7 @@ Actor
 ↳ DID: $_username
 ↳ PDS: $_server
 Misc.
-↳ MD5 Output: $(md5sum "$(realpath -s "$0")")
+↳ MD5 Output: $(md5sum "$_prog_path")
 ↳ Now: $_now
 ↳ Rows: $(atfile.util.get_term_rows)"
     
@@ -1332,6 +1332,62 @@ function atfile.invoke.get_url() {
         fi
     else
         atfile.die "Unable to get '$key'"
+    fi
+}
+
+function atfile.invoke.update() {
+    function atfile.invoke.update.parse_version() {
+        version="$1"
+        version="$(echo $version | cut -d "+" -f 1)"
+        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
+        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
+        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
+        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+    }
+
+    if [[ $_output_json == 1 ]]; then
+        atfile.die "Command not available as JSON"
+    fi
+    
+    atfile.say.debug "Getting latest release..."
+    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
+    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
+    
+    latest_version="$(echo "$latest_release" | jq -r ".name")"
+    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
+    
+    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
+    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
+    
+    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
+    
+    if [[ $_version == *+git* ]]; then
+        atfile.die "Cannot update Git version ($_version)"
+    fi
+    
+    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
+        temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
+        
+        atfile.say.debug "Touching temporary path ($temp_updated_path)..."
+        touch "$temp_updated_path"
+        [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
+        
+        atfile.say.debug "Downloading latest release..."
+        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
+        if [[ $? == 0 ]]; then
+            mv "$temp_updated_path" "$_prog_path"
+            if [[ $? != 0 ]]; then
+                atfile.die "Unable to update (do you have permission?)"
+            else
+                chmod +x "$_prog_path"
+                atfile.say "😎 Updated to $latest_version!"
+                exit 0
+            fi
+        else
+            atfile.die "Unable to download latest version"
+        fi
+    else
+        atfile.say "No updates found"
     fi
 }
 
@@ -1738,7 +1794,7 @@ function atfile.invoke.upload_blob() {
 
 function atfile.invoke.usage() {
     if [[ $_output_json == 1 ]]; then
-        atfile.die "Cannot output usage as JSON"
+        atfile.die "Command not available as JSON"
     fi
 
     usage_commands="upload <file> [<key>]
@@ -1892,8 +1948,11 @@ Files
 
 _prog="$(basename "$(realpath -s "$0")")"
 _prog_dir="$(dirname "$(realpath -s "$0")")"
+_prog_path="$(realpath -s "$0")"
 _version="0.3"
 _c_year="2024"
+_gh_user="electricduck"
+_gh_repo="atfile"
 _command="$1"
 _command_full="$@"
 _envvar_prefix="ATFILE"
@@ -1920,7 +1979,7 @@ _fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_finger
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
-_endpont_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
+_endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
 _server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
@@ -1963,6 +2022,11 @@ fi
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.invoke.usage
+    exit 0
+fi
+
+if [[ $_command == "update" ]]; then
+    atfile.invoke.update
     exit 0
 fi
 
