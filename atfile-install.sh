@@ -35,7 +35,7 @@ mkdir -p "$conf_dir"
 [[ $? != 0 ]] && die "Unable to create config directory ($conf_dir)"
 
 if [[ ! -f "$conf_dir/$conf_file" ]]; then
-    echo "ATFILE_USERNAME=<your-username>\nATFILE_PASSWORD=<your-password>" > "$conf_dir/$conf_file"
+    echo -e "ATFILE_USERNAME=<your-username>\nATFILE_PASSWORD=<your-password>" > "$conf_dir/$conf_file"
     [[ $? != 0 ]] && die "Unable to create config file ($conf_dir/$conf_file)"
 fi
 
