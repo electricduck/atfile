@@ -633,7 +633,7 @@ function atfile.util.override_actor() {
 function atfile.util.override_actor_reset() {
     [[ -n "$_server_original" ]] && _server="$_server_original"; unset _server_original
     [[ -n "$_username_original" ]] && _username="$_username_original"; unset _username_original
-	[[ -n "$_fmt_blob_url_original" ]] && _fmt_blob_url="$_fmt_blob_url_original"; unset _fmt_blob_url_original
+    [[ -n "$_fmt_blob_url_original" ]] && _fmt_blob_url="$_fmt_blob_url_original"; unset _fmt_blob_url_original
 }
 
 function atfile.util.print_blob_url_output() {
@@ -2119,18 +2119,18 @@ fi
 ## Command aliases
 
 if [[ $_is_sourced == 0 ]]; then
-	case "$_command" in
-	    "open"|"print"|"c") _command="cat" ;;
-	    "rm") _command="delete" ;;
-	    "download"|"f"|"d") _command="fetch" ;;
+    case "$_command" in
+        "open"|"print"|"c") _command="cat" ;;
+        "rm") _command="delete" ;;
+        "download"|"f"|"d") _command="fetch" ;;
         "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
         "ul"|"u") _command="upload" ;;
         "uc") _command="upload-crypt" ;;
-		"get-url"|"b") _command="url" ;;
-	esac
-	atfile.say.debug "Set command to $_command"
+        "get-url"|"b") _command="url" ;;
+    esac
+    atfile.say.debug "Set command to $_command"
 fi
 
 ## Program detection
@@ -2204,128 +2204,128 @@ fi
 if [[ $_is_sourced == 0 ]]; then
     atfile.say.debug "Running '$_command_full'...\n↳ Command: $_command\n↳ Arguments: ${@:2}"
 
-	case "$_command" in
-	    "blob")
-		    if [[ "$_enable_hidden_commands" == 1 ]]; then
-		        case "$2" in
-		            "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
-		            "upload"|"u") atfile.invoke.upload_blob "$3" ;;
-		            *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
-		        esac
-		    else
-		        atfile.util.print_hidden_command_warning
-		        exit 1
-		    fi	    
-	        ;;
-		"cat")
-		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    if [[ -n "$3" ]]; then
-		        atfile.util.override_actor "$3"
-		        atfile.util.print_override_actor_debug
-		    fi
-		    
-		    atfile.invoke.print "$2"
-		    ;;
-		"delete")
-		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    atfile.invoke.delete "$2"
-		    ;;
-		"fetch")
-		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    if [[ -n "$4" ]]; then
-		        atfile.util.override_actor "$4"
-		        atfile.util.print_override_actor_debug
-		    fi
-		    
-		    atfile.invoke.download "$2" "$3"
-		    ;;
-		"fetch-crypt")
-		    atfile.util.check_prog_gpg
-		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    if [[ -n "$4" ]]; then
-		        atfile.util.override_actor "$4"
-		        atfile.util.print_override_actor_debug
-		    fi
-		    
-		    atfile.invoke.download "$2" "$3" 1
-		    ;;
-		"info")
-		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    if [[ -n "$3" ]]; then
-		        atfile.util.override_actor "$3"
-		        atfile.util.print_override_actor_debug
-		    fi
-		    
-		    atfile.invoke.get "$2"
-		    ;;
-		"list")
-			if [[ "$2" == *.* ]]; then
-			    # NOTE: User has entered <actor> in the wrong place, so we'll fix it
-			    #       for them
-			    # BUG:  Keys with periods in them can't be used as a cursor
-			    
-			    atfile.util.override_actor "$2"
-			    atfile.util.print_override_actor_debug
+    case "$_command" in
+        "blob")
+            if [[ "$_enable_hidden_commands" == 1 ]]; then
+                case "$2" in
+                    "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
+                    "upload"|"u") atfile.invoke.upload_blob "$3" ;;
+                    *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+                esac
+            else
+                atfile.util.print_hidden_command_warning
+                exit 1
+            fi        
+            ;;
+        "cat")
+            [[ -z "$2" ]] && atfile.die "<key> not set"
+            if [[ -n "$3" ]]; then
+                atfile.util.override_actor "$3"
+                atfile.util.print_override_actor_debug
+            fi
+            
+            atfile.invoke.print "$2"
+            ;;
+        "delete")
+            [[ -z "$2" ]] && atfile.die "<key> not set"
+            atfile.invoke.delete "$2"
+            ;;
+        "fetch")
+            [[ -z "$2" ]] && atfile.die "<key> not set"
+            if [[ -n "$4" ]]; then
+                atfile.util.override_actor "$4"
+                atfile.util.print_override_actor_debug
+            fi
+            
+            atfile.invoke.download "$2" "$3"
+            ;;
+        "fetch-crypt")
+            atfile.util.check_prog_gpg
+            [[ -z "$2" ]] && atfile.die "<key> not set"
+            if [[ -n "$4" ]]; then
+                atfile.util.override_actor "$4"
+                atfile.util.print_override_actor_debug
+            fi
+            
+            atfile.invoke.download "$2" "$3" 1
+            ;;
+        "info")
+            [[ -z "$2" ]] && atfile.die "<key> not set"
+            if [[ -n "$3" ]]; then
+                atfile.util.override_actor "$3"
+                atfile.util.print_override_actor_debug
+            fi
+            
+            atfile.invoke.get "$2"
+            ;;
+        "list")
+            if [[ "$2" == *.* ]]; then
+                # NOTE: User has entered <actor> in the wrong place, so we'll fix it
+                #       for them
+                # BUG:  Keys with periods in them can't be used as a cursor
+                
+                atfile.util.override_actor "$2"
+                atfile.util.print_override_actor_debug
 
-		        atfile.invoke.list "$3"
-			else
-			    if [[ -n "$3" ]]; then
-			        atfile.util.override_actor "$3"
-			        atfile.util.print_override_actor_debug
-		        fi
-		        atfile.invoke.list "$2"   
-			fi
-		    ;;
-		"lock")
-		    atfile.invoke.lock "$2" 1
-		    ;;
-		"nick")
-		    atfile.invoke.profile "$2"
-		    ;;
-		"record")
-		    # NOTE: Performs no validation (apart from JSON)! Here be dragons
-		    if [[ "$_enable_hidden_commands" == 1 ]]; then
-		        case "$2" in
-		            "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
-		            "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
-		            "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
-		            "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
-		            *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
-		        esac
-		    else
-		        atfile.util.print_hidden_command_warning
-		        exit 1
-		    fi
-		    ;;
-		"something-broke")
-		    atfile.invoke.debug
-		    ;;
-		"upload")
-		    atfile.util.check_prog_optional_metadata
-		    [[ -z "$2" ]] && atfile.die "<file> not set"
-		    atfile.invoke.upload "$2" "" "$3"
-		    ;;
-		"upload-crypt")
-		    atfile.util.check_prog_optional_metadata
-		    atfile.util.check_prog_gpg
-		    [[ -z "$2" ]] && atfile.die "<file> not set"
-		    [[ -z "$3" ]] && atfile.die "<recipient> not set"
-		    atfile.invoke.upload "$2" "$3" "$4"
-		    ;;
-		"unlock")
-		    atfile.invoke.lock "$2" 0
-		    ;;
-		"url")
-		    [[ -z "$2" ]] && atfile.die "<key> not set"
-		    if [[ -n "$3" ]]; then
-		        atfile.util.override_actor "$3"
-		        atfile.util.print_override_actor_debug
-		    fi
-		    
-		    atfile.invoke.get_url "$2"
-		    ;;
-		*)
-		    atfile.die.unknown_command "$_command"
-		    ;;
-	esac
+                atfile.invoke.list "$3"
+            else
+                if [[ -n "$3" ]]; then
+                    atfile.util.override_actor "$3"
+                    atfile.util.print_override_actor_debug
+                fi
+                atfile.invoke.list "$2"   
+            fi
+            ;;
+        "lock")
+            atfile.invoke.lock "$2" 1
+            ;;
+        "nick")
+            atfile.invoke.profile "$2"
+            ;;
+        "record")
+            # NOTE: Performs no validation (apart from JSON)! Here be dragons
+            if [[ "$_enable_hidden_commands" == 1 ]]; then
+                case "$2" in
+                    "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
+                    "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
+                    "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
+                    "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
+                    *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+                esac
+            else
+                atfile.util.print_hidden_command_warning
+                exit 1
+            fi
+            ;;
+        "something-broke")
+            atfile.invoke.debug
+            ;;
+        "upload")
+            atfile.util.check_prog_optional_metadata
+            [[ -z "$2" ]] && atfile.die "<file> not set"
+            atfile.invoke.upload "$2" "" "$3"
+            ;;
+        "upload-crypt")
+            atfile.util.check_prog_optional_metadata
+            atfile.util.check_prog_gpg
+            [[ -z "$2" ]] && atfile.die "<file> not set"
+            [[ -z "$3" ]] && atfile.die "<recipient> not set"
+            atfile.invoke.upload "$2" "$3" "$4"
+            ;;
+        "unlock")
+            atfile.invoke.lock "$2" 0
+            ;;
+        "url")
+            [[ -z "$2" ]] && atfile.die "<key> not set"
+            if [[ -n "$3" ]]; then
+                atfile.util.override_actor "$3"
+                atfile.util.print_override_actor_debug
+            fi
+            
+            atfile.invoke.get_url "$2"
+            ;;
+        *)
+            atfile.die.unknown_command "$_command"
+            ;;
+    esac
 fi
