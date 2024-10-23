@@ -1941,7 +1941,10 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
 
     usage_files="$_envfile
         List of key/values of the above environment variables. Exporting these
-        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values"
+        on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
+
+    $_cache_dir/
+        Cache and temporary storage"
 
     usage="ATFile | 📦 ➔ 🦋
     Store and retrieve files on the ATmosphere
