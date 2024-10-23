@@ -1467,13 +1467,15 @@ function atfile.invoke.list_blobs() {
             fi
         fi
     
+        unset first_cid
         unset last_cid
+        unset browser_accessible
         unset record_count
         unset json_output
     
         if [[ $_output_json == 0 ]]; then
-            echo -e "URL"
-            echo -e "---"
+            echo -e "Blob"
+            echo -e "----"
         else
             json_output="{\"blobs\":["
         fi
@@ -1484,11 +1486,20 @@ function atfile.invoke.list_blobs() {
             last_cid="$cid"
             ((record_count++))
             
+            if [[ -z $first_cid ]]; then
+                first_cid="$cid"
+                browser_accessible=$(atfile.util.is_url_accessible_in_browser "$blob_uri")
+            fi
+
             if [[ -n $cid ]]; then
                 if [[ $_output_json == 1 ]]; then
                     json_output+="{ \"cid\": \"$cid\", \"url\": \"$blob_uri\" },"
                 else
-                    echo "$blob_uri"
+                    if [[ $browser_accessible == 1 ]]; then
+                        echo "$blob_uri"
+                    else
+                        echo "$cid"
+                    fi
                 fi
             fi
         done <<< "$records"
@@ -1498,6 +1509,7 @@ function atfile.invoke.list_blobs() {
         else
             json_output="${json_output::-1}"
             json_output+="],"
+            json_output+="\"browser_accessible\": $(atfile.util.get_yn $browser_accessible),"
             json_output+="\"cursor\": \"$last_cid\"}"
             echo -e "$json_output" | jq
         fi
