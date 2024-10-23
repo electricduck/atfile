@@ -561,7 +561,7 @@ function atfile.util.is_xrpc_success() {
     exit_code="$1"
     data="$2"
 
-    if [[ $exit_code != 0 || -z "$data" || "$data" == "{}" || "$data" == *"\"error\":"* ]]; then
+    if [[ $exit_code != 0 || -z "$data" || "$data" == "null" || "$data" == "{}" || "$data" == *"\"error\":"* ]]; then
         echo 0
     else
         echo 1
@@ -1792,17 +1792,19 @@ function atfile.invoke.upload() {
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(atfile.util.is_xrpc_success $? "$blob")
-        
-        file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
-        
-        if [[ -n "$key" ]]; then
-            atfile.say.debug "Updating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
-            record="$(com.atproto.repo.putRecord "$_username" "$_nsid_upload" "$key" "$file_record")"
-            success=$(atfile.util.is_xrpc_success $? "$record")
-        else
-            atfile.say.debug "Creating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username"
-            record="$(com.atproto.repo.createRecord "$_username" "$_nsid_upload" "$file_record")"
-            success=$(atfile.util.is_xrpc_success $? "$record")
+    
+        if [[ $success == 1 ]]; then
+            file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
+            
+            if [[ -n "$key" ]]; then
+                atfile.say.debug "Updating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
+                record="$(com.atproto.repo.putRecord "$_username" "$_nsid_upload" "$key" "$file_record")"
+                success=$(atfile.util.is_xrpc_success $? "$record")
+            else
+                atfile.say.debug "Creating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username"
+                record="$(com.atproto.repo.createRecord "$_username" "$_nsid_upload" "$file_record")"
+                success=$(atfile.util.is_xrpc_success $? "$record")
+            fi
         fi
     fi
     
