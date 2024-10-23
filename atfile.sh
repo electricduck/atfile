@@ -213,7 +213,7 @@ function atfile.util.get_file_name_pretty() {
             "$_nsid_meta#audio")
                 album="$(echo "$file_record" | jq -r ".meta.tags.album")"
                 album_artist="$(echo "$file_record" | jq -r ".meta.tags.album_artist")"
-                date="$(echo "$file_record" | jq -r ".meta.tags.date.parsed")"
+                date="$(echo "$file_record" | jq -r ".meta.tags.date")"
                 disc="$(echo "$file_record" | jq -r ".meta.tags.disc.position")"
                 title="$(echo "$file_record" | jq -r ".meta.tags.title")"
                 track="$(echo "$file_record" | jq -r ".meta.tags.track.position")"
@@ -229,7 +229,7 @@ function atfile.util.get_file_name_pretty() {
                 [[ $disc != 0 || $track != 0 ]] && output+=" [$disc.$track]"
                 ;;
             "$_nsid_meta#photo")
-                date="$(echo "$file_record" | jq -r ".meta.date.create.parsed")"
+                date="$(echo "$file_record" | jq -r ".meta.date.create")"
                 lat="$(echo "$file_record" | jq -r ".meta.gps.lat")"
                 long="$(echo "$file_record" | jq -r ".meta.gps.long")"
                 title="$(echo "$file_record" | jq -r ".meta.title")"
