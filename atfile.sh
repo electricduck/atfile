@@ -1871,7 +1871,7 @@ function atfile.invoke.usage() {
         ℹ️  <collection> defaults to '$_nsid_upload'"
     fi
 
-usage_envvars="    ${_envvar_prefix}_USERNAME <string> (required)
+usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
     ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
