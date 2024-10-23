@@ -105,14 +105,6 @@ function atfile.util.check_prog_optional_metadata() {
     [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
 }
 
-function atfile.util.get_blob_uri() {
-    did="$1"
-    cid="$2"
-    pds="$_server"
-
-    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
-}
-
 function atfile.util.get_cache() {
     file="$_cache_dir/$1"
     
@@ -574,6 +566,21 @@ function atfile.util.is_xrpc_success() {
     else
         echo 1
     fi
+}
+
+function atfile.util.build_blob_uri() {
+    did="$1"
+    cid="$2"
+    pds="$_server"
+
+    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
+}
+
+function atfile.util.build_out_filename() {
+    key="$1"
+    name="$2"
+
+    echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
 }
 
 function atfile.util.resolve_identity() {
@@ -1121,48 +1128,71 @@ function atfile.invoke.debug() {
         unset output
         
         output="$variable_name: $(atfile.util.get_envvar "$variable_name" "$variable_default")"
-        [[ -n "$variable_default" ]] && output+=" ($variable_default)"
+        [[ -n "$variable_default" ]] && output+=" [$variable_default]"
         
         echo -e "↳ $output"
+    }
+
+    function atfile.invoke.debug.print_prog_version() {
+        prog="$1"
+        version_arg="$2"
+
+        [[ -z "$version_arg" ]] && version_arg="--version"
+
+        if [ -x "$(command -v $prog)" ]; then
+            eval "$prog $version_arg"
+        else
+            echo "(Not Installed)"
+        fi
     }
 
     if [[ $_output_json == 1 ]]; then
         atfile.die "Command not available as JSON"
     fi
     
-    finger_record="$(atfile.util.get_finger_record)"
+    md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum" | head -n 1)"
+    os="$(atfile.util.get_finger_record | jq -r ".os")"
     
-    kernel="$(uname -s -r)"
-    os="$(echo $finger_record | jq -r ".os")"
+    if [[ $md5sum_version == *GNU* ]]; then
+        md5sum_version="$(echo $md5sum_version | cut -d " " -f 4) (GNU)"
+    fi
     
     debug_output="ATFile
 ↳ Version: $_version
 ↳ UAS: $(atfile.util.get_uas)
 Variables
 $(atfile.invoke.debug.print_envvar "DEBUG" $_debug_default)
-$(atfile.invoke.debug.print_envvar "FINGERPRINT" $_fingerprint_default)
-$(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
 $(atfile.invoke.debug.print_envvar "ENABLE_HIDDEN_COMMANDS" $_enable_hidden_commands_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PDS")
+$(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_directory_default)
+$(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
+$(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
+$(atfile.invoke.debug.print_envvar "FMT_OUT_FILE" "$_fmt_out_file_default")
+$(atfile.invoke.debug.print_envvar "INCLUDE_FINGERPRINT" $_include_fingerprint_default)
 $(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
 $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
 $(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
 $(atfile.invoke.debug.print_envvar "SKIP_COPYRIGHT_WARN" $_skip_copyright_warn_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_EXIFTOOL" $_skip_ni_exiftool_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_MEDIAINFO" $_skip_ni_mediainfo_default)
-↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "[Set]")
+↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "(Set)")
 $(atfile.invoke.debug.print_envvar "USERNAME")
 Environment
-↳ Bash
- ↳ Version: $BASH_VERSION
- ↳ Exec: $SHELL
 ↳ OS: $os
-↳ Kernel: $kernel
+↳ Shell: $SHELL
+↳ Path: $PATH
+Deps
+↳ Bash: $BASH_VERSION
+↳ curl: $(atfile.invoke.debug.print_prog_version "curl" "--version" | head -n 1 | cut -d " " -f 2)
+↳ ExifTool: $(atfile.invoke.debug.print_prog_version "exiftool" "-ver")
+↳ jq: $(atfile.invoke.debug.print_prog_version "jq" | sed -e "s|jq-||g")
+↳ md5sum: $md5sum_version
+↳ MediaInfo: $(atfile.invoke.debug.print_prog_version "mediainfo" | grep "MediaInfoLib" | cut -d "v" -f 2)
 Actor
 ↳ DID: $_username
 ↳ PDS: $_server
 Misc.
-↳ MD5 Output: $(md5sum "$_prog_path")
+↳ md5sum Output: $(md5sum "$_prog_path")
 ↳ Now: $_now
 ↳ Rows: $(atfile.util.get_term_rows)"
     
@@ -1198,21 +1228,15 @@ function atfile.invoke.download() {
     success=1
     downloaded_file=""
     
-    if [[ -n "$out_dir" ]]; then
-        mkdir -p "$out_dir"
-        [[ $? != 0 ]] && atfile.die "Unable to create '$out_dir'"
-        out_dir="$(realpath "$out_dir")/"
-    fi
-    
     atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
-        blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_uri="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_name="$(echo "$record" | jq -r '.value.file.name')"
         key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
-        downloaded_file="${out_dir}${key}__${file_name}"
+        downloaded_file="$(atfile.util.build_out_filename "$key" "$file_name")"
         
         curl -H "User-Agent: $(atfile.util.get_uas)" --silent "$blob_uri" -o "$downloaded_file"
         [[ $? != 0 ]] && success=0
@@ -1259,7 +1283,7 @@ function atfile.invoke.get() {
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         did="$(echo $record | jq -r ".uri" | cut -d "/" -f 3)"
         key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
-        blob_uri="$(atfile.util.get_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_uri="$(atfile.util.build_blob_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         cdn_uri="$(atfile.util.get_cdn_uri "$did" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")" "$file_type")"
 
         unset locked
@@ -1344,7 +1368,7 @@ function atfile.invoke.get_url() {
     success="$(atfile.util.is_xrpc_success $? "$record")"
     
     if [[ $success == 1 ]]; then
-        blob_url="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_url="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
 
         if [[ $_output_json == 1 ]]; then
             echo -e "{\"url\": \"$blob_url\" }" | jq
@@ -1503,7 +1527,7 @@ function atfile.invoke.list_blobs() {
     
         while IFS=$"\n" read -r c; do
             cid="$(echo $c | jq -r ".")"
-            blob_uri="$(atfile.util.get_blob_uri "$_username" "$cid")"
+            blob_uri="$(atfile.util.build_blob_uri "$_username" "$cid")"
             last_cid="$cid"
             ((record_count++))
             
@@ -1673,7 +1697,7 @@ function atfile.invoke.print() {
     [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
     
     if [[ $success == 1 ]]; then
-        blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_uri="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
         curl -H "$(atfile.util.get_uas)" -s -L "$blob_uri" --output -
@@ -1762,7 +1786,7 @@ function atfile.invoke.upload() {
         unset file_finger_record
         unset file_meta_record
         
-        [[ $_fingerprint == 1 ]] && file_finger_record="$(atfile.util.get_finger_record)"
+        [[ $_include_fingerprint == 1 ]] && file_finger_record="$(atfile.util.get_finger_record)"
         file_meta_record="$(atfile.util.get_meta_record "$file" "$file_type")"
         
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
@@ -1788,7 +1812,7 @@ function atfile.invoke.upload() {
 
     if [[ $success == 1 ]]; then
         unset recipient_key
-        blob_uri="$(atfile.util.get_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
+        blob_uri="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
         key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
         
         if [[ -n "$recipient" ]]; then
@@ -1909,7 +1933,7 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
         
-    ${_envvar_prefix}_FINGERPRINT <int> (default: $_fingerprint_default)
+    ${_envvar_prefix}_INCLUDE_FINGERPRINT <int> (default: $_include_fingerprint_default)
         Apply machine fingerprint to uploaded files
     ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
         Print all commands (and errors) as JSON
@@ -1919,9 +1943,14 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         ℹ️  Default value is calculated from your terminal's height
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 100
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
-        Format for blob URLs. See default (above) for example; includes
-        all possible fragments
-
+        Format for blob URLs. Fragments:
+        * [server]: PDS endpoint
+        * [did]: Actor DID
+        * [cid]: Blob CID
+    ${_envvar_prefix}_FMT_OUT_FILE <string> (default: $_fmt_out_file_default)
+        Format for fetched filenames. Fragments:
+        * [key]: Record key of uploaded file
+        * [name]: Original name of uploaded file
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
@@ -2024,8 +2053,9 @@ _debug_default=0
 _enable_hidden_commands_default=0
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.directory"
-_fingerprint_default=0
 _fmt_blob_url_default="[server]/xrpc/com.atproto.sync.getBlob?did=[did]&cid=[cid]"
+_fmt_out_file_default="[key]__[name]"
+_include_fingerprint_default=0
 _max_list_buffer=6
 _max_list_default=$(( $(atfile.util.get_term_rows) - $_max_list_buffer ))
 _output_json_default=0
@@ -2035,9 +2065,10 @@ _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
 _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
-_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_FINGERPRINT" "$_fingerprint_default")"
-_fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
+_fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
+_fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
+_include_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_include_fingerprint_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
