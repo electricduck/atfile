@@ -2051,6 +2051,7 @@ atfile.say.debug "Terminal is $(atfile.util.get_term_rows) rows"
 if [[ $_is_sourced == 0 ]]; then
     atfile.say.debug "Creating cache directory ($_cache_dir)..."
     mkdir -p "$_cache_dir"
+    [[ $? != 0 ]] && atfile.die "Unable to create cache directory ($_cache_dir)"
 fi
 
 ## Git detection
