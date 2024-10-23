@@ -1910,6 +1910,8 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Endpoint of PLC directory
     ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
         Endpoint used for handle resolving
+        ℹ️  Default value is a PDS ran by @ducky.ws and @astra.blue. You can
+           trust us!
 
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
