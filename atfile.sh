@@ -2002,7 +2002,7 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     
     Version $_version
     (c) $_c_year $_c_author <https://github.com/$_gh_user/$_gh_repo>
-    Licensed under MIT License ✨
+    Licensed as MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
     
@@ -2037,7 +2037,7 @@ _prog="$(basename "$(realpath -s "$0")")"
 _prog_dir="$(dirname "$(realpath -s "$0")")"
 _prog_path="$(realpath -s "$0")"
 _version="0.4.2"
-_c_author="Ducky <@ducky.ws>"
+_c_author="Ducky"
 _c_year="2024"
 _gh_user="electricduck"
 _gh_repo="atfile"
