@@ -2130,7 +2130,6 @@ if [[ $_is_sourced == 0 ]]; then
         "uc") _command="upload-crypt" ;;
         "get-url"|"b") _command="url" ;;
     esac
-    atfile.say.debug "Set command to $_command"
 fi
 
 ## Program detection
