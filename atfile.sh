@@ -1938,17 +1938,16 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         ⚠️  When sourcing, sets to 1
            
     * A bool in Bash is 1 (true) or 0 (false)"
-    
-atfile.say.debug "Printing help..."
-usage_files="$_envfile
+
+    usage_files="$_envfile
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values"
 
-    echo -e "ATFile | 📦 ➔ 🦋
-    Store and retrieve files on a PDS
+    usage="ATFile | 📦 ➔ 🦋
+    Store and retrieve files on the ATmosphere
     
     Version $_version
-    (c) $_c_year Ducky <https://github.com/electricduck/atfile>
+    (c) $_c_year $_c_author <https://github.com/$_gh_user/$_gh_repo>
     Licensed under MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
@@ -1964,19 +1963,31 @@ Environment Variables
 
 Files
     $usage_files
-" | less
+"
+
+if [[ $_debug == 1 ]]; then
+    atfile.say.debug "Printing help..."
+    echo -e "$usage"
+else
+    echo -e "$usage" | less
+fi
+
 # ------------------------------------------------------------------------------
 }
 
 # Main
 
+## Global variables
+
 _prog="$(basename "$(realpath -s "$0")")"
 _prog_dir="$(dirname "$(realpath -s "$0")")"
 _prog_path="$(realpath -s "$0")"
 _version="0.4"
+_c_author="Ducky"
 _c_year="2024"
 _gh_user="electricduck"
 _gh_repo="atfile"
+_cache_dir="$HOME/.local/state/atfile"
 _command="$1"
 _command_full="$@"
 _envvar_prefix="ATFILE"
@@ -2021,6 +2032,8 @@ _nsid_meta="${_nsid_prefix}.atfile.meta"
 _nsid_profile="${_nsid_prefix}.meta.profile"
 _nsid_upload="${_nsid_prefix}.atfile.upload"
 
+## Source detection
+
 if [[ "$0" != "$BASH_SOURCE" ]]; then
     _debug=0
     _enable_hidden_commands=1
@@ -2028,8 +2041,19 @@ if [[ "$0" != "$BASH_SOURCE" ]]; then
     _output_json=1
 fi
 
+## Early debug messages
+
 atfile.say.debug "Starting up..."
 atfile.say.debug "Terminal is $(atfile.util.get_term_rows) rows"
+
+## Cache creation
+
+if [[ $_is_sourced == 0 ]]; then
+    atfile.say.debug "Creating cache directory ($_cache_dir)..."
+    mkdir -p "$_cache_dir"
+fi
+
+## Git detection
 
 if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
     atfile.say.debug "Getting tag from Git..."
@@ -2038,11 +2062,15 @@ if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
     _is_git=1
 fi
 
+## Envvar correction
+
 if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
     _max_list=100
 fi
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
+
+## Lifecycle commands (help/version/update)
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.invoke.usage
@@ -2055,9 +2083,12 @@ if [[ $_command == "update" ]]; then
 fi
 
 if [[ $_command == "version" || $_command == "--version" ]]; then
+    atfile.say.debug "Printing version..."
     echo -e "$_version"
     exit 0
 fi
+
+## Command aliases
 
 if [[ $_is_sourced == 0 ]]; then
 	case "$_command" in
@@ -2071,7 +2102,10 @@ if [[ $_is_sourced == 0 ]]; then
         "uc") _command="upload-crypt" ;;
 		"get-url"|"b") _command="url" ;;
 	esac
+	atfile.say.debug "Set command to $_command"
 fi
+
+## Program detection
 
 atfile.say.debug "Checking required programs..."
 atfile.util.check_prog "curl"
@@ -2079,9 +2113,13 @@ atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
 atfile.util.check_prog "md5sum"
 atfile.util.check_prog "xargs"
 
+## Required variables detection
+
 atfile.say.debug "Checking required variables..."
 [[ -z "$_username" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
 [[ -z "$_password" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
+
+## Identity resolving
 
 if [[ -z "$_server" ]]; then
     skip_resolving=0
@@ -2132,6 +2170,8 @@ if [[ -n $_server ]]; then
         fi
     fi
 fi
+
+## Commands
 
 if [[ $_is_sourced == 0 ]]; then
     atfile.say.debug "Running '$_command_full'...\n↳ Command: $_command\n↳ Arguments: ${@:2}"
