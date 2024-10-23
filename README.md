@@ -4,7 +4,7 @@
 
 <p align="center">
     Store and retrieve files on a <a href="https://atproto.com/guides/glossary#pds-personal-data-server">PDS</a> (like <a href="https://bsky.app">Bluesky</a>)<br />
-    <em>Written entirely in Bash Shell. No Node here.</em>
+    <em>Written entirely in Bash Shell. No <span title="Deno is pretty cool tho">NodeJS</span> here!</em>
 </p>
 
 <p align="center">
