@@ -1901,17 +1901,6 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     ${_envvar_prefix}_FMT_BLOB_URL <string> (default: $_fmt_blob_url_default)
         Format for blob URLs. See default (above) for example; includes
         all possible fragments
-        
-    ${_envvar_prefix}_ENDPOINT_PDS <url>
-        Endpoint of the PDS
-        ℹ️  Your PDS is resolved from your username. Set to override it (or if
-           resolving fails)
-    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: $_endpoint_plc_directory_default)
-        Endpoint of PLC directory
-    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
-        Endpoint used for handle resolving
-        ℹ️  Default value is a PDS ran by @ducky.ws and @astra.blue. You can
-           trust us!
 
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
         Skip session validation on startup
@@ -1931,6 +1920,17 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
            not be created:
            * audio/*: $_nsid_meta#audio
            * video/*: $_nsid_meta#video
+
+    ${_envvar_prefix}_ENDPOINT_PDS <url>
+        Endpoint of the PDS
+        ℹ️  Your PDS is resolved from your username. Set to override it (or if
+           resolving fails)
+    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: $_endpoint_plc_directory_default)
+        Endpoint of PLC directory
+    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
+        Endpoint used for handle resolving
+        ℹ️  Default value is a PDS ran by @ducky.ws and @astra.blue. You can
+           trust us!
            
     ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
         Print debug outputs
