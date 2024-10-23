@@ -1194,8 +1194,7 @@ function atfile.invoke.delete() {
 
 function atfile.invoke.download() {
     key="$1"
-    out_dir="$2"
-    decrypt=$3
+    decrypt=$2
     success=1
     downloaded_file=""
     
@@ -1836,7 +1835,6 @@ function atfile.invoke.usage() {
     <cursor>    Key or CID used as a reference to paginate through lists
     <key>       Key of an uploaded file (unique to that user and collection)
     <nick>      Nickname
-    <out-dir>   Path to receive downloaded files
     <recipient> GPG recipient during file encryption
                 See 'gpg --help' for more information"
 
@@ -1849,7 +1847,7 @@ function atfile.invoke.usage() {
         List all uploaded files. Only $_max_list items can be displayed; to
         paginate, use the last Key for <cursor>
 
-    fetch <key> [<out-dir>] [<actor>]
+    fetch <key> [<actor>]
         Download an uploaded file
         
     cat <key> [<actor>]
@@ -2027,7 +2025,7 @@ _enable_hidden_commands_default=0
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.directory"
 _fingerprint_default=0
-_fmt_blob_url_default="[server]/xrpc/com.sync.atproto.getBlob?did=[did]&cid=[cid]"
+_fmt_blob_url_default="[server]/xrpc/com.atproto.sync.getBlob?did=[did]&cid=[cid]"
 _max_list_buffer=6
 _max_list_default=$(( $(atfile.util.get_term_rows) - $_max_list_buffer ))
 _output_json_default=0
@@ -2154,13 +2152,13 @@ if [[ -z "$_server" ]]; then
     if [[ $_is_sourced == 0 ]]; then
     # NOTE: Speeds things up a little if the user is overriding actor
     #       Keep this in-sync with the main command case below!
-        if [[ $_command == "cat" && "$3" ]] ||\
-           [[ $_command == "fetch" && "$4" ]] ||\
-           [[ $_command == "fetch-crypt" && "$4" ]] ||\
-           [[ $_command == "info" && "$2" == *.* ]] ||\
-           [[ $_command == "list" && "$2" == *.* ]] ||\
+        if [[ $_command == "cat" && -n "$3" ]] ||\
+           [[ $_command == "fetch" && -n "$3" ]] ||\
+           [[ $_command == "fetch-crypt" && -n "$3" ]] ||\
+           [[ $_command == "info" && -n "$2" ]] ||\
+           [[ $_command == "list" ]] && [[ "$2" == *.* || "$2" == did:* ]] ||\
            [[ $_command == "list" && -n "$3" ]] ||\
-           [[ $_command == "url" && "$2" == *.* ]]; then
+           [[ $_command == "url" && -n "$2" ]]; then
                atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
                skip_resolving=1 
         fi
@@ -2231,22 +2229,22 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "fetch")
             [[ -z "$2" ]] && atfile.die "<key> not set"
-            if [[ -n "$4" ]]; then
-                atfile.util.override_actor "$4"
+            if [[ -n "$3" ]]; then
+                atfile.util.override_actor "$3"
                 atfile.util.print_override_actor_debug
             fi
             
-            atfile.invoke.download "$2" "$3"
+            atfile.invoke.download "$2"
             ;;
         "fetch-crypt")
             atfile.util.check_prog_gpg
             [[ -z "$2" ]] && atfile.die "<key> not set"
-            if [[ -n "$4" ]]; then
-                atfile.util.override_actor "$4"
+            if [[ -n "$3" ]]; then
+                atfile.util.override_actor "$3"
                 atfile.util.print_override_actor_debug
             fi
             
-            atfile.invoke.download "$2" "$3" 1
+            atfile.invoke.download "$2" 1
             ;;
         "info")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -2258,7 +2256,7 @@ if [[ $_is_sourced == 0 ]]; then
             atfile.invoke.get "$2"
             ;;
         "list")
-            if [[ "$2" == *.* ]]; then
+            if [[ "$2" == *.* || "$2" == did:* ]]; then
                 # NOTE: User has entered <actor> in the wrong place, so we'll fix it
                 #       for them
                 # BUG:  Keys with periods in them can't be used as a cursor
