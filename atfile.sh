@@ -113,6 +113,17 @@ function atfile.util.get_blob_uri() {
     echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
 }
 
+function atfile.util.get_cache() {
+    file="$_cache_dir/$1"
+    
+    if [[ ! -f "$file" ]]; then
+        touch "$file"
+        [[ $? != 0 ]] && atfile.die "Unable to create cache file ($file)"
+    fi
+    
+    echo -e "$(cat "$file")"
+}
+
 function atfile.util.get_cdn_uri() {
     did="$1"
     blob_cid="$2"
@@ -687,6 +698,17 @@ function atfile.util.repeat_char() {
     amount="$2"
     
     printf "%0.s$char" $(seq 1 $amount)
+}
+
+function atfile.util.write_cache() {
+    file="$1"
+    file_path="$_cache_dir/$1"
+    content="$2"
+    
+    atfile.util.get_cache "$file"
+  
+    echo -e "$content" > "$file_path"
+    [[ $? != 0 ]] && atfile.die "Unable to write to cache file ($file)"
 }
 
 # XRPC
@@ -1992,7 +2014,7 @@ _c_author="Ducky"
 _c_year="2024"
 _gh_user="electricduck"
 _gh_repo="atfile"
-_cache_dir="$HOME/.local/state/atfile"
+_cache_dir="$HOME/.cache/atfile"
 _command="$1"
 _command_full="$@"
 _envvar_prefix="ATFILE"
