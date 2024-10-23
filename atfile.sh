@@ -2128,7 +2128,7 @@ if [[ $_is_sourced == 0 ]]; then
 	    "blob")
 		    if [[ "$_enable_hidden_commands" == 1 ]]; then
 		        case "$2" in
-		            "list"|"l") atfile.invoke.list_blobs "$3" ;;
+		            "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
 		            "upload"|"u") atfile.invoke.upload_blob "$3" ;;
 		            *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
 		        esac
