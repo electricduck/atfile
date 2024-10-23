@@ -146,7 +146,7 @@ function atfile.util.get_date_json() {
 
     if [[ -z "$parsed" ]]; then
         if [[ -n "$date" ]]; then
-            parsed_date="$(atfile.util.get_date "$date")"
+            parsed_date="$(atfile.util.get_date "$date" 2> /dev/null)"
             [[ $? == 0 ]] && parsed="$parsed_date"
         fi
     fi
