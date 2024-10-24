@@ -1132,6 +1132,8 @@ function com.atproto.sync.uploadBlob() {
 # Commands
 
 function atfile.invoke.debug() {
+    prog_not_installed_placeholder="(Not Installed)"
+
     function atfile.invoke.debug.print_envvar() {
         variable_name="${_envvar_prefix}_$1"
         variable_default="$2"
@@ -1153,7 +1155,7 @@ function atfile.invoke.debug() {
         if [ -x "$(command -v $prog)" ]; then
             eval "$prog $version_arg"
         else
-            echo "(Not Installed)"
+            echo "$prog_not_installed_placeholder"
         fi
     }
 
@@ -1161,11 +1163,19 @@ function atfile.invoke.debug() {
         atfile.die "Command not available as JSON"
     fi
     
-    md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum" | head -n 1)"
+    md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum")"
+    mediainfo_version="$(atfile.invoke.debug.print_prog_version "mediainfo")"
     os="$(atfile.util.get_finger_record | jq -r ".os")"
     
-    if [[ $md5sum_version == *GNU* ]]; then
-        md5sum_version="$(echo $md5sum_version | cut -d " " -f 4) (GNU)"
+    if [[ "$md5sum_version" != "$prog_not_installed_placeholder" ]]; then
+        md5sum_version="$(echo "$md5sum_version" | head -n 1)"
+        if [[ "$md5sum_version" == *GNU* ]]; then
+            md5sum_version="$(echo "$md5sum_version" | cut -d " " -f 4) (GNU)"
+        fi
+    fi
+    
+    if [[ "$mediainfo_version" != "$prog_not_installed_placeholder" ]]; then
+        mediainfo_version="$(echo "$mediainfo_version" | grep "MediaInfoLib" | cut -d "v" -f 2)"
     fi
     
     debug_output="ATFile
@@ -1198,7 +1208,7 @@ Deps
 ↳ ExifTool: $(atfile.invoke.debug.print_prog_version "exiftool" "-ver")
 ↳ jq: $(atfile.invoke.debug.print_prog_version "jq" | sed -e "s|jq-||g")
 ↳ md5sum: $md5sum_version
-↳ MediaInfo: $(atfile.invoke.debug.print_prog_version "mediainfo" | grep "MediaInfoLib" | cut -d "v" -f 2)
+↳ MediaInfo: $mediainfo_version
 Actor
 ↳ DID: $_username
 ↳ PDS: $_server
