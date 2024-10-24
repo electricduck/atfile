@@ -84,12 +84,17 @@ function atfile.say.inline() {
 function atfile.util.check_prog() {
     command="$1"
     download_hint="$2"
+    skip_hint="$3"
     
     if ! [ -x "$(command -v $command)" ]; then
         message="'$command' not installed"
         
         if [[ -n "$download_hint" ]]; then
             message="$message (download: $download_hint)"
+        fi
+
+        if [[ -n "$skip_hint" ]]; then
+            message="$message\n↳ This is optional; set ${skip_hint}=1 to ignore"
         fi
     
         atfile.die "$message"
@@ -101,8 +106,8 @@ function atfile.util.check_prog_gpg() {
 }
 
 function atfile.util.check_prog_optional_metadata() {
-    [[ $_skip_ni_exiftool == 0 ]] && atfile.util.check_prog "exiftool" "https://exiftool.org/"
-    [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo"
+    [[ $_skip_ni_exiftool == 0 ]] && atfile.util.check_prog "exiftool" "https://exiftool.org/" "${_envvar_prefix}_SKIP_NI_EXIFTOOL"
+    [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo" "${_envvar_prefix}_SKIP_NI_MEDIAINFO"
 }
 
 function atfile.util.get_cache() {
