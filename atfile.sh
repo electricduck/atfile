@@ -484,6 +484,14 @@ function atfile.util.get_md5() {
     fi
 }
 
+function atfile.util.get_os() {
+    case $OSTYPE in
+        "darwin") echo "macos" ;;
+        "linux-gnu") echo "linux" ;;
+        *) echo "unknown-$OSTYPE" ;;
+    esac
+}
+
 function atfile.util.get_rkey_from_at_uri() {
     at_uri="$1"
     echo $at_uri | cut -d "/" -f 5
@@ -1785,13 +1793,20 @@ function atfile.invoke.upload() {
     fi
 
     if [[ $success == 1 ]]; then
-        file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
+        unset file_date
+
+        if [[ $(atfile.util.get_os) == "macos" ]]; then
+            file_date="$(atfile.util.get_date "$(stat -f '%y' "$file")")"
+        else
+            file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
+        fi
+
         file_hash="$(atfile.util.get_md5 "$file")"
         file_hash_type="md5"
         file_name="$(basename "$file")"
         file_size="$(wc -c "$file" | cut -d " " -f 1)"
         file_type="$(file -b --mime-type "$file")"
-        
+
         if [[ -z "$file_hash" ]]; then
             file_hash_type="none"
         fi
