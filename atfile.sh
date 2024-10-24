@@ -981,21 +981,32 @@ function blue.zio.atfile.finger__machine() {
     machine_id_file="/etc/machine-id"
     os_release_file="/etc/os-release"
     
-    [[ ! -f "$machine_id_file" ]] && atfile.die "Unable to fingerprint — '$machine_id_file' does not exist"
-    [[ ! -f "$os_release_file" ]] && atfile.die "Unable to fingerprint — '$os_release_file' does not exist"
-    
-    id="$(cat "$machine_id_file")"
-    hostname="$(hostname -s)"
-    os_name="$(atfile.util.get_var_from_file "$os_release_file" "NAME")"
-    os_version="$(atfile.util.get_var_from_file "$os_release_file" "VERSION")"
-    os="$os_name $os_version"
-    
-    echo "{
+    if [[ $_include_fingerprint == 1 ]]; then
+        [[ ! -f "$machine_id_file" ]] && atfile.die "Unable to fingerprint — '$machine_id_file' does not exist"
+        [[ ! -f "$os_release_file" ]] && atfile.die "Unable to fingerprint — '$os_release_file' does not exist"
+        
+        id="$(cat "$machine_id_file")"
+        hostname="$(hostname -s)"
+        os_name="$(atfile.util.get_var_from_file "$os_release_file" "NAME")"
+        os_version="$(atfile.util.get_var_from_file "$os_release_file" "VERSION")"
+        os="$os_name $os_version"
+
+        echo "{
     \"\$type\": \"blue.zio.atfile.finger#machine\",
+    \"app\": \"$(atfile.util.get_uas)\",
     \"id\": \"$id\",
     \"host\": \"$hostname\",
     \"os\": \"$os\"
 }"
+    else
+        echo "{
+    \"\$type\": \"blue.zio.atfile.finger#machine\",
+    \"app\": \"$(atfile.util.get_uas)\",
+    \"id\": null,
+    \"host\": null,
+    \"os\": null
+}"
+    fi
 }
 
 function blue.zio.atfile.lock() {
@@ -1786,7 +1797,7 @@ function atfile.invoke.upload() {
         unset file_finger_record
         unset file_meta_record
         
-        [[ $_include_fingerprint == 1 ]] && file_finger_record="$(atfile.util.get_finger_record)"
+        file_finger_record="$(atfile.util.get_finger_record)"
         file_meta_record="$(atfile.util.get_meta_record "$file" "$file_type")"
         
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
