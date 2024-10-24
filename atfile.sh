@@ -1946,7 +1946,7 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
         
-    ${_envvar_prefix}_INCLUDE_FINGERPRINT <int> (default: $_include_fingerprint_default)
+    ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool*> (default: $_include_fingerprint_default)
         Apply machine fingerprint to uploaded files
     ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
         Print all commands (and errors) as JSON
