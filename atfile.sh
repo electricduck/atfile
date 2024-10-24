@@ -1796,7 +1796,7 @@ function atfile.invoke.upload() {
         unset file_date
 
         if [[ $(atfile.util.get_os) == "macos" ]]; then
-            file_date="$(atfile.util.get_date "$(stat -f '%y' "$file")")"
+            file_date="$(atfile.util.get_date "$(stat -f '%Sm' "$file")")"
         else
             file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
         fi
