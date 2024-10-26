@@ -499,6 +499,16 @@ function atfile.util.get_os() {
     esac
 }
 
+function atfile.util.get_realpath() {
+    path="$1"
+
+    if [[ $(atfile.util.get_os) == "macos" ]]; then
+        realpath "$path"
+    else
+        realpath -s "$path"
+    fi
+}
+
 function atfile.util.get_rkey_from_at_uri() {
     at_uri="$1"
     echo $at_uri | cut -d "/" -f 5
@@ -2083,9 +2093,9 @@ fi
 
 ## Global variables
 
-_prog="$(basename "$(realpath -s "$0")")"
-_prog_dir="$(dirname "$(realpath -s "$0")")"
-_prog_path="$(realpath -s "$0")"
+_prog="$(basename "$(atfile.util.get_realpath "$0")")"
+_prog_dir="$(dirname "$atfile.util.get_realpath "$0")")"
+_prog_path="$(atfile.util.get_realpath "$0")"
 _version="0.4.5"
 _c_author="Ducky"
 _c_year="2024"
