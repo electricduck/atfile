@@ -137,11 +137,18 @@ function atfile.util.get_cdn_uri() {
 
 function atfile.util.get_date() {
     date="$1"
+    format="$2"
+
+    [[ -z $format ]] && format="%Y-%m-%dT%H:%M:%SZ"
     
     if [[ -z "$date" ]]; then
-        date -u +%Y-%m-%dT%H:%M:%SZ
+        date -u +$format
     else
-        date --date "$date" -u +%Y-%m-%dT%H:%M:%SZ
+        if [[ $(atfile.util.get_os) == "macos" ]]; then
+            date "$date" -u +"$format"
+        else
+            date --date "$date" -u +"$format"
+        fi
     fi
 }
 
@@ -233,7 +240,7 @@ function atfile.util.get_file_name_pretty() {
                 [[ $(atfile.util.is_null_or_empty "$track") == 1 ]] && track=0
                 
                 output="$title\n   $album_artist — $album"
-                [[ $(atfile.util.is_null_or_empty "$date") == 0 ]] && output+=" ($(date --date="$date" +%Y))"
+                [[ $(atfile.util.is_null_or_empty "$date") == 0 ]] && output+=" ($(atfile.util.get_date "$date" "%Y"))"
                 [[ $disc != 0 || $track != 0 ]] && output+=" [$disc.$track]"
                 ;;
             "$_nsid_meta#photo")
@@ -250,7 +257,7 @@ function atfile.util.get_file_name_pretty() {
                    output+="\n   $long $lat"
                    
                    if [[ $(atfile.util.is_null_or_empty "$date") == 0 ]]; then
-                       output+=" — $(date --date="$date")"
+                       output+=" — $($(atfile.util.get_date "$date"))"
                    fi
                 fi
                 ;;
@@ -1373,7 +1380,7 @@ function atfile.invoke.get() {
             echo -e " ↳ Name: $file_name"
             echo -e " ↳ Type: $file_type"
             echo -e " ↳ Size: $file_size_pretty"
-            echo -e " ↳ Date: $(date --date "$file_date" "+%Y-%m-%d %H:%M:%S %Z")"
+            echo -e " ↳ Date: $(atfile.util.get_date "$file_date" "%Y-%m-%d %H:%M:%S %Z")"
             echo -e " ↳ Hash: $file_hash_pretty"
             echo -e "↳ Locked: $locked"
             echo -e "↳ Encrypted: $encrypted"
