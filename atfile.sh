@@ -486,7 +486,7 @@ function atfile.util.get_md5() {
 
 function atfile.util.get_os() {
     case $OSTYPE in
-        "darwin") echo "macos" ;;
+        "darwin"*) echo "macos" ;;
         "linux-gnu") echo "linux" ;;
         *) echo "unknown-$OSTYPE" ;;
     esac
