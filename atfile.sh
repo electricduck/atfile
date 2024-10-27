@@ -1811,17 +1811,19 @@ function atfile.invoke.upload() {
 
     if [[ $success == 1 ]]; then
         unset file_date
+        unset file_size
 
         if [[ $(atfile.util.get_os) == "macos" ]]; then
             file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
+            file_size="$(stat -f '%z' "$file")"
         else
             file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
+            file_size="$(stat -c %s "$file")"
         fi
 
         file_hash="$(atfile.util.get_md5 "$file")"
         file_hash_type="md5"
         file_name="$(basename "$file")"
-        file_size="$(wc -c "$file" | cut -d " " -f 1)"
         file_type="$(file -b --mime-type "$file")"
 
         if [[ -z "$file_hash" ]]; then
