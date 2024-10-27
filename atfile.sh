@@ -1370,8 +1370,7 @@ function atfile.invoke.get() {
             file_size="$(echo "$record" | jq -r '.value.file.size')"
             file_size_pretty="$(atfile.util.get_file_size_pretty $file_size)"
 
-            finger="(None)"
-            finger_type=""
+            unset finger_type
             header="$file_name_pretty"
         
             if [[ $(atfile.util.is_null_or_empty "$file_hash_type") == 1 ]] || [[ "$file_hash_type" == "md5" && ${#file_hash} != 32 ]] || [[ "$file_hash_type" == "none" ]]; then
@@ -1380,7 +1379,6 @@ function atfile.invoke.get() {
         
             if [[ "$(echo $record | jq -r ".value.finger")" != "null" ]]; then
                 finger_type="$(echo $record | jq -r ".value.finger.\"\$type\"" | cut -d "#" -f 2)"
-                finger="$(echo $record | jq -r ".value.finger.id")"
             fi
 
             echo "$header"
@@ -1394,16 +1392,33 @@ function atfile.invoke.get() {
             echo -e " ↳ Hash: $file_hash_pretty"
             echo -e "↳ Locked: $locked"
             echo -e "↳ Encrypted: $encrypted"
-            echo -e "↳ Finger: $finger"
-            case $finger_type in
-                "browser")
-                    echo -e " ↳ Hostname: $(echo $record | jq -r ".value.finger.userAgent")"
-                    ;;
-                "machine")
-                    echo -e " ↳ Hostname: $(echo $record | jq -r ".value.finger.host")"
-                    echo -e " ↳ OS: $(echo $record | jq -r ".value.finger.os")"
-                    ;;
-            esac
+            if [[ -z "$finger_type" ]]; then
+                echo -e "↳ Source: (Unknown)"
+            else
+                case $finger_type in
+                    "browser")
+                        finger_browser_uas="$(echo $record | jq -r ".value.finger.userAgent")"
+
+                        [[ -z $finger_browser_uas || $finger_browser_uas == "null" ]] && finger_browser_uas="(Unknown)"
+
+                        echo -e "↳ Source: $finger_browser_uas"
+                        ;;
+                    "machine")
+                        finger_machine_app="$(echo $record | jq -r ".value.finger.app")"
+                        finger_machine_host="$(echo $record | jq -r ".value.finger.host")"
+                        finger_machine_os="$(echo $record | jq -r ".value.finger.os")"
+
+                        [[ -z $finger_machine_app || $finger_machine_app == "null" ]] && finger_machine_app="(Unknown)"
+
+                        echo -e "↳ Source: $finger_machine_app"
+                        [[ -n $finger_machine_host && $finger_machine_host != "null" ]] && echo -e " ↳ Host: $finger_machine_host"
+                        [[ -n $finger_machine_os && $finger_machine_os != "null" ]] && echo -e " ↳ OS: $finger_machine_os"
+                        ;;
+                    *)
+                        echo -e "↳ Source: (Unknown)"
+                        ;;
+                esac
+            fi
         fi
     else
         atfile.die "Unable to get '$key'"
