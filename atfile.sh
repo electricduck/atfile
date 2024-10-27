@@ -1840,6 +1840,8 @@ function atfile.invoke.upload() {
         fi
         
         file_type_emoji="$(atfile.util.get_file_type_emoji "$file_type")"
+
+        atfile.say.debug "File: $file\n↳ Date: $file_date\n↳ Emoji: $file_type_emoji\n↳ Hash: $file_hash ($file_hash_type)\n↳ Name: $file_name\n↳ Size: $file_size\n↳ Type: $file_name"
         
         unset file_finger_record
         unset file_meta_record
@@ -1850,6 +1852,8 @@ function atfile.invoke.upload() {
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(atfile.util.is_xrpc_success $? "$blob")
+        
+        atfile.say.debug "Uploading blob...\n↳ Ref: $(echo "$blob" | jq -r ".ref.\"\$link\"")"
     
         if [[ $success == 1 ]]; then
             file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
