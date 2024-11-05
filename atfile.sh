@@ -1701,7 +1701,7 @@ function atfile.invoke.manage_record() {
         "delete")
             collection="$(atfile.invoke.manage_record.get_collection "$3")"
             key="$2"
-            [[ -z "$key" ]] && atfile.die "<key> not set"
+            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
             
             if [[ "$key" == at:* ]]; then
                 at_uri="$key"
@@ -1740,10 +1740,10 @@ function atfile.invoke.manage_record() {
             atfile.util.override_actor_reset
             ;;
         "put")
-            collection="$(atfile.invoke.manage_record.get_collection "$3")"
+            collection="$(atfile.invoke.manage_record.get_collection "$4")"
             key="$2"
             record="$3"
-            [[ -z "$key" ]] && atfile.die "<key> not set"
+            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
             [[ -z "$record" ]] && atfile.die "<record> not set"
             
             record_json="$(echo "$record" | jq)"
