@@ -801,6 +801,15 @@ function atfile.xrpc.post_blob() {
         --data-binary @"$file" | jq
 }
 
+## JetStream
+
+function atfile.js.subscribe() {
+    collection="$1"
+
+    atfile.util.check_prog "websocat"
+    websocat "$_endpoint_jetstream/subscribe?wantedCollections=$collection"
+}
+
 # Lexicons
 
 ## Records
@@ -1797,6 +1806,12 @@ function atfile.invoke.profile() {
     fi
 }
 
+function atfile.invoke.stream() {
+    collection="$1"
+    [[ -z "$collection" ]] && collection="blue.zio.atfile.upload"
+    atfile.js.subscribe "$collection"
+}
+
 function atfile.invoke.upload() {
     file="$(atfile.util.get_file_path "$1")"
     recipient="$2"
@@ -2005,7 +2020,10 @@ function atfile.invoke.usage() {
     record rm <at-uri>
         Manage records on a repository
         ⚠️  Intended for advanced users. Here be dragons
-        ℹ️  <collection> defaults to '$_nsid_upload'"
+        ℹ️  <collection> defaults to '$_nsid_upload'
+        
+    stream <collection>
+        Stream records from JetStream"
     fi
 
 usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
@@ -2132,6 +2150,7 @@ _now="$(atfile.util.get_date)"
 
 _debug_default=0
 _enable_hidden_commands_default=0
+_endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.directory"
 _fmt_blob_url_default="[server]/xrpc/com.atproto.sync.getBlob?did=[did]&cid=[cid]"
@@ -2150,6 +2169,7 @@ _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDD
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
 _include_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_include_fingerprint_default")"
+_endpoint_jetstream="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_JETSTREAM" "$_endpoint_jetstream_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
@@ -2236,6 +2256,7 @@ if [[ $_is_sourced == 0 ]]; then
         "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
+        "js") _command="stream" ;;
         "ul"|"u") _command="upload" ;;
         "uc") _command="upload-crypt" ;;
         "get-url"|"b") _command="url" ;;
@@ -2408,6 +2429,14 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "something-broke")
             atfile.invoke.debug
+            ;;
+        "stream")
+            if [[ "$_enable_hidden_commands" == 1 ]]; then
+                atfile.invoke.stream "$2"
+            else
+                atfile.util.print_hidden_command_warning
+                exit 1
+            fi
             ;;
         "upload")
             atfile.util.check_prog_optional_metadata
