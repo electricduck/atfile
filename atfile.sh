@@ -2133,7 +2133,7 @@ fi
 ## Global variables
 
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
-_prog_dir="$(dirname "$atfile.util.get_realpath "$0")")"
+_prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
 _version="0.4.7"
 _c_author="Ducky"
