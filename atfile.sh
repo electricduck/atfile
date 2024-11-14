@@ -1890,10 +1890,15 @@ function atfile.invoke.resolve() {
     esac
 
     if [[ $_output_json == 1 ]]; then
+        did_doc_data="$(curl -s -l -X GET "$did_doc")"
+    
         echo -e "{
-    \"alias\": \"$alias\",
     \"did\": \"$did\",
-    \"doc\": \"$did_doc\",
+    \"doc\": {
+        \"data\": $did_doc_data,
+        \"url\": \"$did_doc\"
+    },
+    \"handle\": \"$handle\",
     \"pds\": {
         \"endpoint\": \"$pds\",
         \"name\": \"$pds_name\",
@@ -1905,7 +1910,7 @@ function atfile.invoke.resolve() {
         echo "$did"
         echo "↳ Type: $did_type"
         echo " ↳ Doc: $did_doc"
-        echo "↳ Alias: $alias"
+        echo "↳ Handle: @$handle"
         echo "↳ PDS: $pds_name"
         echo " ↳ Endpoint: $pds"
         echo " ↳ Version: $pds_version"
