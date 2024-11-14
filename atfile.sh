@@ -1883,39 +1883,15 @@ function atfile.invoke.resolve() {
     atfile.say.debug "Getting PDS version for '$pds'..."
     pds_version="$(curl -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
 
-    # TODO: Check if the actor has records for these where appropriate?
-    app_bluesky="https://bsky.app/profile/$handle"
-    app_bridgyfed="https://fed.brid.gy/bsky/$handle"
-    app_frontpage="https://frontpage.fyi/profile/$handle"
-    app_internect=""
-    app_pdsls="https://pdsls.dev/at/$did"
-    app_whitewind="https://whtwnd.com/$handle"
-
     case "$did_type" in
-        "did:plc")
-            app_internect="https://internect.info/did/$did"
-            ;;
         "did:web")
             did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
             ;;
     esac
 
-    atfile.say.debug "Resolving actor on Bridgy Fed..."
-    if [[ $(atfile.util.is_url_okay "$app_bridgyfed") == 0 ]]; then
-        unset app_bridgyfed
-    fi
-
     if [[ $_output_json == 1 ]]; then
         echo -e "{
     \"alias\": \"$alias\",
-    \"apps\": {
-        \"Bluesky\": \"$app_bluesky\",
-        \"BridgyFed\": $(if [[ -z $app_bridgyfed ]]; then echo "null"; else echo "\"$app_bridgyfed\""; fi),
-        \"Frontpage\": \"$app_frontpage\",
-        \"Internect\": $(if [[ -z $app_internect ]]; then echo "null"; else echo "\"$app_internect\""; fi),
-        \"PDSls\": \"$app_pdsls\",
-        \"Whitewind\": \"$app_whitewind\"
-    },
     \"did\": \"$did\",
     \"doc\": \"$did_doc\",
     \"pds\": {
@@ -1933,13 +1909,6 @@ function atfile.invoke.resolve() {
         echo "↳ PDS: $pds_name"
         echo " ↳ Endpoint: $pds"
         echo " ↳ Version: $pds_version"
-        echo "↳ Apps"
-        echo " ↳ Bluesky: $app_bluesky"
-        [[ -n $app_bridgyfed ]] && echo " ↳ Bridgy Fed: $app_bridgyfed"
-        echo " ↳ Frontpage: $app_frontpage"
-        [[ -n $app_internect ]] && echo " ↳ Internect: $app_internect"
-        echo " ↳ PDSls: $app_pdsls"
-        echo " ↳ Whitewind: $app_whitewind"
     fi
 }
 
