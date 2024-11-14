@@ -180,13 +180,20 @@ function atfile.util.get_didplc_doc() {
         curl -s -L -X GET "$endpoint/$actor"
     }
 
-    didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$_endpoint_plc_directory" "$actor")"
+    didplc_endpoint="$_endpoint_plc_directory"
+    didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$didplc_endpoint" "$actor")"
 
     if [[ "$didplc_doc" != "{"* ]]; then
-        didplc_doc="$(atfile.util.get_didplc_doc.request_doc "https://plc.directory" "$actor")"
+        didplc_endpoint="https://plc.directory"
+        didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$didplc_endpoint" "$actor")"
     fi
 
-    echo "$didplc_doc"
+    echo "$(echo $didplc_doc | jq ". += {\"directory\": \"$didplc_endpoint\"}")"
+}
+
+function atfile.util.get_didweb_doc_url() {
+    actor="$1"
+    echo "https://$(echo "$actor" | sed "s/did:web://")/.well-known/did.json"
 }
 
 function atfile.util.get_envvar() {
@@ -771,17 +778,20 @@ function atfile.util.resolve_identity() {
         
         case "$actor" in
             "did:plc:"*) did_doc="$(atfile.util.get_didplc_doc "$actor")" ;;
-            "did:web:"*) did_doc="$(curl -s -L -X GET "$(echo "$actor" | sed "s/did:web://")/.well-known/did.json")" ;;
+            "did:web:"*) did_doc="$(curl -s -L -X GET "$(atfile.util.get_didweb_doc_url "$actor")")" ;;
         esac
             
         if [[ $? != 0 || -z "$did_doc" ]]; then
             atfile.die "Unable to fetch DID Doc for '$actor'"
         else
             did="$(echo "$did_doc" | jq -r ".id")"
+            didplc_dir="$(echo "$did_doc" | jq -r ".directory")"
             pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[0]')"
+
+            [[ $didplc_dir == "null" ]] && unset didplc_dir
             
-            echo "$did|$pds|$handle"
+            echo "$did|$pds|$handle|$didplc_dir"
         fi
     else
         atfile.die "Unable to resolve '$actor'"
@@ -1865,6 +1875,7 @@ function atfile.invoke.resolve() {
 
     alias="$(echo $resolved_did | cut -d "|" -f 3)"
     did="$(echo $resolved_did | cut -d "|" -f 1)"
+    did_doc="$(echo $resolved_did | cut -d "|" -f 4)/$did"
     did_type="did:$(echo $did | cut -d ":" -f 2)"
     handle="$(echo $resolved_did | cut -d "|" -f 3 | cut -d "/" -f 3)"
     pds="$(echo $resolved_did | cut -d "|" -f 2)"
@@ -1880,9 +1891,14 @@ function atfile.invoke.resolve() {
     app_pdsls="https://pdsls.dev/at/$did"
     app_whitewind="https://whtwnd.com/$handle"
 
-    if [[ $did_type == "did:plc" ]]; then
-        app_internect="https://internect.info/did/$did"
-    fi
+    case "$did_type" in
+        "did:plc")
+            app_internect="https://internect.info/did/$did"
+            ;;
+        "did:web")
+            did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
+            ;;
+    esac
 
     atfile.say.debug "Resolving actor on Bridgy Fed..."
     if [[ $(atfile.util.is_url_okay "$app_bridgyfed") == 0 ]]; then
@@ -1894,13 +1910,14 @@ function atfile.invoke.resolve() {
     \"alias\": \"$alias\",
     \"apps\": {
         \"Bluesky\": \"$app_bluesky\",
-        \"BridgyFed\": \"$app_bridgyfed\",
+        \"BridgyFed\": $(if [[ -z $app_bridgyfed ]]; then echo "null"; else echo "\"$app_bridgyfed\""; fi),
         \"Frontpage\": \"$app_frontpage\",
         \"Internect\": $(if [[ -z $app_internect ]]; then echo "null"; else echo "\"$app_internect\""; fi),
         \"PDSls\": \"$app_pdsls\",
         \"Whitewind\": \"$app_whitewind\"
     },
     \"did\": \"$did\",
+    \"doc\": \"$did_doc\",
     \"pds\": {
         \"endpoint\": \"$pds\",
         \"name\": \"$pds_name\",
@@ -1911,6 +1928,7 @@ function atfile.invoke.resolve() {
     else
         echo "$did"
         echo "↳ Type: $did_type"
+        echo " ↳ Doc: $did_doc"
         echo "↳ Alias: $alias"
         echo "↳ PDS: $pds_name"
         echo " ↳ Endpoint: $pds"
@@ -2274,7 +2292,7 @@ _debug_default=0
 _enable_hidden_commands_default=0
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
-_endpoint_plc_directory_default="https://plc.directory"
+_endpoint_plc_directory_default="https://plc.zio.blue"
 _fmt_blob_url_default="[server]/xrpc/com.atproto.sync.getBlob?did=[did]&cid=[cid]"
 _fmt_out_file_default="[key]__[name]"
 _include_fingerprint_default=0
@@ -2446,7 +2464,7 @@ if [[ -n $_server ]]; then
         
         session="$(com.atproto.server.getSession)"
         if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
-            atfile.die "Unable to authenticate as \"$_username\" on \"$_server\""
+            atfile.die "Unable to authenticate"
         else
             _username="$(echo $session | jq -r ".did")"
         fi
@@ -2598,6 +2616,9 @@ if [[ $_is_sourced == 0 ]]; then
             fi
             
             atfile.invoke.get_url "$2"
+            ;;
+        "temp-diddoc")
+            atfile.util.resolve_identity "$2"
             ;;
         *)
             atfile.die.unknown_command "$_command"
