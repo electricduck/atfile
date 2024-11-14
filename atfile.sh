@@ -183,7 +183,7 @@ function atfile.util.get_didplc_doc() {
     didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$_endpoint_plc_directory" "$actor")"
 
     if [[ "$didplc_doc" != "{"* ]]; then
-        didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$_endpoint_plc_directory_fallback" "$actor")"
+        didplc_doc="$(atfile.util.get_didplc_doc.request_doc "https://plc.directory" "$actor")"
     fi
 
     echo "$didplc_doc"
