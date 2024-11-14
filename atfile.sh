@@ -184,7 +184,7 @@ function atfile.util.get_didplc_doc() {
     didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$didplc_endpoint" "$actor")"
 
     if [[ "$didplc_doc" != "{"* ]]; then
-        didplc_endpoint="https://plc.directory"
+        didplc_endpoint="$_endpoint_plc_directory_fallback"
         didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$didplc_endpoint" "$actor")"
     fi
 
@@ -2163,7 +2163,7 @@ function atfile.invoke.usage() {
         Get details for <actor>
 
     stream <collection>
-        Stream records from JetStream"
+        Stream records from Jetstream"
     fi
 
 usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
@@ -2172,9 +2172,9 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
         
-    ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool*> (default: $_include_fingerprint_default)
+    ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool¹> (default: $_include_fingerprint_default)
         Apply machine fingerprint to uploaded files
-    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
+    ${_envvar_prefix}_OUTPUT_JSON <bool¹> (default: $_output_json_default)
         Print all commands (and errors) as JSON
         ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
@@ -2190,44 +2190,45 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Format for fetched filenames. Fragments:
         * [key]: Record key of uploaded file
         * [name]: Original name of uploaded file
-    ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
+    ${_envvar_prefix}_SKIP_AUTH_CHECK <bool¹> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
         is a DID (*not* a handle), this will drastically improve performance!
-    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <bool*> (default: $_skip_copyright_warn_default)
+    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <bool¹> (default: $_skip_copyright_warn_default)
         Do not print copyright warning when uploading files to
         https://bsky.social
-    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <bool*> (default: $_skip_ni_exiftool_default)
+    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <bool¹> (default: $_skip_ni_exiftool_default)
         Do not check if ExifTool is installed
         ⚠️  If Exiftool is not installed, the relevant metadata records will
            not be created:
            * image/*: $_nsid_meta#photo
-    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool*> (default: $_skip_ni_mediainfo_default)
+    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool¹> (default: $_skip_ni_mediainfo_default)
         Do not check if MediaInfo is installed
         ⚠️  If MediaInfo is not installed, the relevant metadata records will
            not be created:
            * audio/*: $_nsid_meta#audio
            * video/*: $_nsid_meta#video
 
+    ${_envvar_prefix}_ENDPOINT_JETSTREAM <url> (default: $_endpoint_jetstream_default)
+        Endpoint of the Jetstream relay
     ${_envvar_prefix}_ENDPOINT_PDS <url>
         Endpoint of the PDS
         ℹ️  Your PDS is resolved from your username. Set to override it (or if
            resolving fails)
-    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: $_endpoint_plc_directory_default)
-        Endpoint of PLC directory
-    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
-        Endpoint used for handle resolving
-        ℹ️  Default value is a PDS ran by @ducky.ws and @astra.blue. You can
-           trust us!
+    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: ${_endpoint_plc_directory_default}$([[ $_endpoint_plc_directory_default == *"zio.blue" ]] && echo "²"))
+        Endpoint of the PLC directory
+    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: ${_endpoint_resolve_handle_default}$([[ $_endpoint_plc_directory_default == *"zio.blue" ]] && echo "²"))
+        Endpoint of the PDS/AppView used for handle resolving
            
-    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
+    ${_envvar_prefix}_DEBUG <bool¹> (default: $_debug_default)
         Print debug outputs
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
-    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
+    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool¹> (default: $_enable_hidden_commands_default)
         Enable hidden commands
         ⚠️  When sourcing, sets to 1
            
-    * A bool in Bash is 1 (true) or 0 (false)"
+    ¹ A bool in Bash is 1 (true) or 0 (false)
+    ² These servers are ran by @ducky.ws (and @astra.blue). You can trust us!"
 
     usage_files="$_envfile
         List of key/values of the above environment variables. Exporting these
@@ -2272,6 +2273,8 @@ fi
 
 ## Global variables
 
+### General
+
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
@@ -2288,6 +2291,10 @@ _envfile="$HOME/.config/atfile.env"
 _is_sourced=0
 _now="$(atfile.util.get_date)"
 
+### Envvars
+
+#### Defaults
+
 _debug_default=0
 _enable_hidden_commands_default=0
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
@@ -2303,6 +2310,12 @@ _skip_auth_check_default=0
 _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
+
+#### Fallbacks
+
+_endpoint_plc_directory_fallback="https://plc.directory"
+
+#### Set
 
 _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
 _enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
@@ -2322,6 +2335,8 @@ _skip_ni_mediainfo="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINF
 _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
 _test_desktop_uas="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
+
+### NSIDs
 
 _nsid_prefix="blue.zio"
 _nsid_lock="${_nsid_prefix}.atfile.lock"
