@@ -2291,7 +2291,7 @@ if [[ -z "$_server" ]]; then
            [[ $_command == "info" && -n "$2" ]] ||\
            [[ $_command == "list" ]] && [[ "$2" == *.* || "$2" == did:* ]] ||\
            [[ $_command == "list" && -n "$3" ]] ||\
-           [[ $_command == "url" && -n "$2" ]]; then
+           [[ $_command == "url" && -n "$3" ]]; then
                atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
                skip_resolving=1 
         fi
