@@ -535,7 +535,12 @@ function atfile.util.get_pds_pretty() {
         pds_region="$(echo $pds | cut -d "." -f 2)"
         echo "🍄 ${pds_host^} ($(atfile.util.get_region_pretty "$pds_region"))"
     else
-        echo "$pds"
+        case $pds in
+            "atproto.brid.gy") echo "🔀 Bridgy Fed" ;;
+            "extwitter.link") echo "🐦 Twitter Mirrors" ;;
+            "zio.blue") echo "🟧 @Zio" ;;
+            *) echo "$pds" ;;
+        esac
     fi
 }
 
@@ -1913,7 +1918,7 @@ function atfile.invoke.resolve() {
         echo "↳ Handle: @$handle"
         echo "↳ PDS: $pds_name"
         echo " ↳ Endpoint: $pds"
-        echo " ↳ Version: $pds_version"
+        [[ $pds_version != "null" ]] && echo " ↳ Version: $pds_version"
     fi
 }
 
