@@ -170,6 +170,25 @@ function atfile.util.get_date_json() {
     fi
 }
 
+function atfile.util.get_didplc_doc() {
+    actor="$1"
+
+    function atfile.util.get_didplc_doc.request_doc() {
+        endpoint="$1"
+        actor="$2"
+
+        curl -s -L -X GET "$endpoint/$actor"
+    }
+
+    didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$_endpoint_plc_directory" "$actor")"
+
+    if [[ "$didplc_doc" != "{"* ]]; then
+        didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$_endpoint_plc_directory_fallback" "$actor")"
+    fi
+
+    echo "$didplc_doc"
+}
+
 function atfile.util.get_envvar() {
     envvar="$1"
     default="$2"
@@ -499,6 +518,20 @@ function atfile.util.get_os() {
     esac
 }
 
+function atfile.util.get_pds_pretty() {
+    pds="$1"
+
+    pds="$(echo $pds | cut -d "/" -f 3)"
+
+    if [[ $pds == *".host.bsky.network" ]]; then
+        pds_host="$(echo $pds | cut -d "." -f 1)"
+        pds_region="$(echo $pds | cut -d "." -f 2)"
+        echo "🍄 ${pds_host^} ($(atfile.util.get_region_pretty "$pds_region"))"
+    else
+        echo "$pds"
+    fi
+}
+
 function atfile.util.get_realpath() {
     path="$1"
 
@@ -507,6 +540,15 @@ function atfile.util.get_realpath() {
     else
         realpath -s "$path"
     fi
+}
+
+function atfile.util.get_region_pretty() {
+    region="$1"
+
+    region_sub="$(echo $1 | cut -d "-" -f 2)"
+    region="$(echo $1 | cut -d "-" -f 1)"
+
+    echo "${region^^} ${region_sub^}"
 }
 
 function atfile.util.get_rkey_from_at_uri() {
@@ -577,9 +619,17 @@ function atfile.util.is_null_or_empty() {
 
 function atfile.util.is_url_accessible_in_browser() {
     url="$1"
+    atfile.util.is_url_okay "$url" "$_test_desktop_uas"
+}
 
-    code="$(curl -H "User-Agent: $_test_desktop_uas" -s -o /dev/null -w "%{http_code}" "$url")"
-    
+function atfile.util.is_url_okay() {
+    url="$1"
+    uas="$2"
+
+    [[ -z "$uas" ]] && uas="$(atfile.util.get_uas)"
+
+    code="$(curl -H "User-Agent: $uas" -s -o /dev/null -w "%{http_code}" "$url")"
+
     if [[ "$code" == 2* || "$code" == 3* ]]; then
         echo 1
     else
@@ -613,37 +663,6 @@ function atfile.util.build_out_filename() {
     echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
 }
 
-function atfile.util.resolve_identity() {
-    actor="$1"
-    
-    if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
-        if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
-            actor="$(echo "$resolved_handle" | jq -r ".did")"
-        fi
-    fi
-    
-    if [[ "$actor" == "did:"* ]]; then
-        unset did_doc
-        
-        case "$actor" in
-            "did:plc:"*) did_doc="$(curl -s -L -X GET "$_endpoint_plc_directory/$actor")" ;; # TODO: What if they're not on plc.directory?
-            "did:web:"*) did_doc="$(curl -s -L -X GET "$(echo "$actor" | sed "s/did:web://")/.well-known/did.json")" ;;
-        esac
-            
-        if [[ $? != 0 || -z "$did_doc" ]]; then
-            atfile.die "Unable to fetch DID Doc for '$actor'"
-        else
-            did="$(echo "$did_doc" | jq -r ".id")"
-            pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
-            
-            echo "$did@$pds"
-        fi
-    else
-        atfile.die "Unable to resolve '$actor'"
-    fi
-}
-
 # HACK: This essentially breaks the entire session (it overrides $_username and
 #       $_server). If sourcing, use atfile.util.override_actor_reset() to
 #       reset
@@ -656,8 +675,8 @@ function atfile.util.override_actor() {
     
     if ! [[ $actor == $_username ]]; then
         resolved_id="$(atfile.util.resolve_identity "$actor")"
-        _username="$(echo $resolved_id | cut -d "@" -f 1)"
-        _server="$(echo $resolved_id | cut -d "@" -f 2)"
+        _username="$(echo $resolved_id | cut -d "|" -f 1)"
+        _server="$(echo $resolved_id | cut -d "|" -f 2)"
     
         if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
             export _fmt_blob_url="$_fmt_blob_url_default"
@@ -671,6 +690,16 @@ function atfile.util.override_actor_reset() {
     [[ -n "$_server_original" ]] && _server="$_server_original"; unset _server_original
     [[ -n "$_username_original" ]] && _username="$_username_original"; unset _username_original
     [[ -n "$_fmt_blob_url_original" ]] && _fmt_blob_url="$_fmt_blob_url_original"; unset _fmt_blob_url_original
+}
+
+function atfile.util.parse_exiftool_date() {
+    in_date="$1"
+    tz="$2"
+        
+    date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
+    time="$(echo "$in_date" | cut -d " " -f 2)"
+      
+    echo "$date $time $tz"
 }
 
 function atfile.util.print_blob_url_output() {
@@ -720,21 +749,43 @@ function atfile.util.print_table_paginate_hint() {
     fi
 }
 
-function atfile.util.parse_exiftool_date() {
-    in_date="$1"
-    tz="$2"
-        
-    date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
-    time="$(echo "$in_date" | cut -d " " -f 2)"
-      
-    echo "$date $time $tz"
-}
-
 function atfile.util.repeat_char() {
     char="$1"
     amount="$2"
     
     printf "%0.s$char" $(seq 1 $amount)
+}
+
+function atfile.util.resolve_identity() {
+    actor="$1"
+    
+    if [[ "$actor" != "did:"* ]]; then
+        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
+        if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
+            actor="$(echo "$resolved_handle" | jq -r ".did")"
+        fi
+    fi
+    
+    if [[ "$actor" == "did:"* ]]; then
+        unset did_doc
+        
+        case "$actor" in
+            "did:plc:"*) did_doc="$(atfile.util.get_didplc_doc "$actor")" ;;
+            "did:web:"*) did_doc="$(curl -s -L -X GET "$(echo "$actor" | sed "s/did:web://")/.well-known/did.json")" ;;
+        esac
+            
+        if [[ $? != 0 || -z "$did_doc" ]]; then
+            atfile.die "Unable to fetch DID Doc for '$actor'"
+        else
+            did="$(echo "$did_doc" | jq -r ".id")"
+            pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
+            handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[0]')"
+            
+            echo "$did|$pds|$handle"
+        fi
+    else
+        atfile.die "Unable to resolve '$actor'"
+    fi
 }
 
 function atfile.util.write_cache() {
@@ -1806,6 +1857,71 @@ function atfile.invoke.profile() {
     fi
 }
 
+function atfile.invoke.resolve() {
+    actor="$1"
+
+    atfile.say.debug "Resolving actor '$actor'..."
+    resolved_did="$(atfile.util.resolve_identity "$actor")"
+
+    alias="$(echo $resolved_did | cut -d "|" -f 3)"
+    did="$(echo $resolved_did | cut -d "|" -f 1)"
+    did_type="did:$(echo $did | cut -d ":" -f 2)"
+    handle="$(echo $resolved_did | cut -d "|" -f 3 | cut -d "/" -f 3)"
+    pds="$(echo $resolved_did | cut -d "|" -f 2)"
+    pds_name="$(atfile.util.get_pds_pretty "$pds")"
+    atfile.say.debug "Getting PDS version for '$pds'..."
+    pds_version="$(curl -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
+
+    # TODO: Check if the actor has records for these where appropriate?
+    app_bluesky="https://bsky.app/profile/$handle"
+    app_bridgyfed="https://fed.brid.gy/bsky/$handle"
+    app_frontpage="https://frontpage.fyi/profile/$handle"
+    app_internect=""
+    app_whitewind="https://whtwnd.com/$handle"
+
+    if [[ $did_type == "did:plc" ]]; then
+        app_internect="https://internect.info/did/$did"
+    fi
+
+    atfile.say.debug "Resolving actor on Bridgy Fed..."
+    if [[ $(atfile.util.is_url_okay "$app_bridgyfed") == 0 ]]; then
+        unset app_bridgyfed
+    fi
+
+    if [[ $_output_json == 1 ]]; then
+        echo -e "{
+    \"alias\": \"$alias\",
+    \"apps\": {
+        \"Bluesky\": \"$app_bluesky\",
+        \"BridgyFed\": \"$app_bridgyfed\",
+        \"Frontpage\": \"$app_frontpage\",
+        \"Internect\": $(if [[ -z $app_internect ]]; then echo "null"; else echo "\"$app_internect\""; fi),
+        \"Whitewind\": \"$app_whitewind\"
+    },
+    \"did\": \"$did\",
+    \"pds\": {
+        \"endpoint\": \"$pds\",
+        \"name\": \"$pds_name\",
+        \"version\": \"$pds_version\"
+    },
+    \"type\": \"$did_type\"
+}" | jq
+    else
+        echo "$did"
+        echo "↳ Type: $did_type"
+        echo "↳ Alias: $alias"
+        echo "↳ PDS: $pds_name"
+        echo " ↳ Endpoint: $pds"
+        echo " ↳ Version: $pds_version"
+        echo "↳ Apps"
+        echo " ↳ Bluesky: $app_bluesky"
+        [[ -n $app_bridgyfed ]] && echo " ↳ Bridgy Fed: $app_bridgyfed"
+        echo " ↳ Frontpage: $app_frontpage"
+        [[ -n $app_internect ]] && echo " ↳ Internect: $app_internect"
+        echo " ↳ Whitewind: $app_whitewind"
+    fi
+}
+
 function atfile.invoke.stream() {
     collection="$1"
     [[ -z "$collection" ]] && collection="blue.zio.atfile.upload"
@@ -2022,6 +2138,9 @@ function atfile.invoke.usage() {
         ⚠️  Intended for advanced users. Here be dragons
         ℹ️  <collection> defaults to '$_nsid_upload'
         
+    resolve <actor>
+        Get details for <actor>
+
     stream <collection>
         Stream records from JetStream"
     fi
@@ -2256,6 +2375,7 @@ if [[ $_is_sourced == 0 ]]; then
         "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
+        "did") _command="resolve" ;;
         "js") _command="stream" ;;
         "ul"|"u") _command="upload" ;;
         "uc") _command="upload-crypt" ;;
@@ -2301,8 +2421,8 @@ if [[ -z "$_server" ]]; then
         atfile.say.debug "Resolving identity..."
 
         resolved_id="$(atfile.util.resolve_identity "$_username")"
-        _username="$(echo $resolved_id | cut -d "@" -f 1)"
-        _server="$(echo $resolved_id | cut -d "@" -f 2)"
+        _username="$(echo $resolved_id | cut -d "|" -f 1)"
+        _server="$(echo $resolved_id | cut -d "|" -f 2)"
         
         atfile.say.debug "Resolved identity\n↳ DID: $_username\n↳ PDS: $_server"
     fi
@@ -2422,6 +2542,14 @@ if [[ $_is_sourced == 0 ]]; then
                     "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
                     *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
                 esac
+            else
+                atfile.util.print_hidden_command_warning
+                exit 1
+            fi
+            ;;
+        "resolve")
+            if [[ "$_enable_hidden_commands" == 1 ]]; then
+                atfile.invoke.resolve "$2"
             else
                 atfile.util.print_hidden_command_warning
                 exit 1
