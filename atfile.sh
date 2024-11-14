@@ -1877,6 +1877,7 @@ function atfile.invoke.resolve() {
     app_bridgyfed="https://fed.brid.gy/bsky/$handle"
     app_frontpage="https://frontpage.fyi/profile/$handle"
     app_internect=""
+    app_pdsls="https://pdsls.dev/at/$did"
     app_whitewind="https://whtwnd.com/$handle"
 
     if [[ $did_type == "did:plc" ]]; then
@@ -1896,6 +1897,7 @@ function atfile.invoke.resolve() {
         \"BridgyFed\": \"$app_bridgyfed\",
         \"Frontpage\": \"$app_frontpage\",
         \"Internect\": $(if [[ -z $app_internect ]]; then echo "null"; else echo "\"$app_internect\""; fi),
+        \"PDSls\": \"$app_pdsls\",
         \"Whitewind\": \"$app_whitewind\"
     },
     \"did\": \"$did\",
@@ -1918,6 +1920,7 @@ function atfile.invoke.resolve() {
         [[ -n $app_bridgyfed ]] && echo " ↳ Bridgy Fed: $app_bridgyfed"
         echo " ↳ Frontpage: $app_frontpage"
         [[ -n $app_internect ]] && echo " ↳ Internect: $app_internect"
+        echo " ↳ PDSls: $app_pdsls"
         echo " ↳ Whitewind: $app_whitewind"
     fi
 }
@@ -2403,8 +2406,8 @@ if [[ -z "$_server" ]]; then
     skip_resolving=0
     
     if [[ $_is_sourced == 0 ]]; then
-    # NOTE: Speeds things up a little if the user is overriding actor
-    #       Keep this in-sync with the main command case below!
+        # NOTE: Speeds things up a little if the user is overriding actor
+        #       Keep this in-sync with the main command case below!
         if [[ $_command == "cat" && -n "$3" ]] ||\
            [[ $_command == "fetch" && -n "$3" ]] ||\
            [[ $_command == "fetch-crypt" && -n "$3" ]] ||\
@@ -2412,8 +2415,14 @@ if [[ -z "$_server" ]]; then
            [[ $_command == "list" ]] && [[ "$2" == *.* || "$2" == did:* ]] ||\
            [[ $_command == "list" && -n "$3" ]] ||\
            [[ $_command == "url" && -n "$3" ]]; then
-               atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
-               skip_resolving=1 
+            atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
+            skip_resolving=1 
+        fi
+
+        # NOTE: Speeds things up a little if the command doesn't need actor resolving
+        if [[ $_command == "resolve" ]]; then
+            atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
+            skip_resolving=1
         fi
     fi
     
