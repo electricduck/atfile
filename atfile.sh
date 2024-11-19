@@ -2611,9 +2611,6 @@ if [[ $_is_sourced == 0 ]]; then
             
             atfile.invoke.get_url "$2"
             ;;
-        "temp-diddoc")
-            atfile.util.resolve_identity "$2"
-            ;;
         *)
             atfile.die.unknown_command "$_command"
             ;;
