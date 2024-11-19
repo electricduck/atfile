@@ -1521,59 +1521,121 @@ function atfile.invoke.get_url() {
     fi
 }
 
-function atfile.invoke.update() {
-    function atfile.invoke.update.parse_version() {
-        version="$1"
-        version="$(echo $version | cut -d "+" -f 1)"
-        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
-        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
-        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
-        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
-    }
+function atfile.util.get_app_url_for_at_uri() {
+    uri="$1"
 
-    if [[ $_output_json == 1 ]]; then
-        atfile.die "Command not available as JSON"
-    fi
+    actor="$(echo $uri | cut -d / -f 3)"
+    collection="$(echo $uri | cut -d / -f 4)"
+    rkey="$(echo $uri | cut -d / -f 5)"
+
+    ignore_url_validation=0
+    resolved_actor="$(atfile.util.resolve_identity "$actor")"
+    unset actor_handle
+    unset actor_pds
+    unset resolved_url
     
-    atfile.say.debug "Getting latest release..."
-    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
-    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
-    
-    latest_version="$(echo "$latest_release" | jq -r ".name")"
-    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
-    
-    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
-    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
-    
-    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
-    
-    if [[ $_version == *+git* ]]; then
-        atfile.die "Cannot update Git version ($_version)"
-    fi
-    
-    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
-        temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
-        
-        atfile.say.debug "Touching temporary path ($temp_updated_path)..."
-        touch "$temp_updated_path"
-        [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
-        
-        atfile.say.debug "Downloading latest release..."
-        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
-        if [[ $? == 0 ]]; then
-            mv "$temp_updated_path" "$_prog_path"
-            if [[ $? != 0 ]]; then
-                atfile.die "Unable to update (do you have permission?)"
-            else
-                chmod +x "$_prog_path"
-                atfile.say "😎 Updated to $latest_version!"
-                exit 0
-            fi
-        else
-            atfile.die "Unable to download latest version"
-        fi
+    if [[ $? == 0 ]]; then
+        actor="$(echo "$resolved_actor" | cut -d "|" -f 1)"
+        actor_handle="$(echo "$resolved_actor" | cut -d "|" -f 3 | cut -d "/" -f 3)"
+        actor_pds="$(echo "$resolved_actor" | cut -d "|" -f 2)"
     else
-        atfile.say "No updates found"
+        unset actor
+    fi
+
+    [[ -z "$rkey" ]] && rkey="self"
+
+    if [[ -n "$actor" && -n "$collection" && -n "$rkey" ]]; then
+        case "$collection" in
+            "app.bsky.actor.profile") resolved_url="https://bsky.app/profile/$actor" ;;
+            "app.bsky.feed.generator") resolved_url="https://bsky.app/profile/$actor/feed/$rkey" ;;
+            "app.bsky.graph.list") resolved_url="https://bsky.app/profile/$actor/lists/$rkey" ;;
+            "app.bsky.graph.starterpack") resolved_url="https://bsky.app/starter-pack/$actor/$rkey" ;;
+            "app.bsky.feed.post") resolved_url="https://bsky.app/profile/$actor/post/$rkey" ;;
+            "blue.linkat.board") ignore_url_validation=1 && resolved_url="https://linkat.blue/$actor_handle" ;;
+            "blue.zio.atfile.lock") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "chat.bsky.actor.declaration") resolved_url="https://bsky.app/messages/settings" ;;
+            "com.shinolabs.pinksea.oekaki") resolved_url="https://pinksea.art/$actor/oekaki/$rkey" ;;
+            "com.whtwnd.blog.entry") resolved_url="https://whtwnd.com/$actor/$rkey" ;;
+            "events.smokesignal.app.profile") resolved_url="https://smokesignal.events/$actor" ;;
+            "events.smokesignal.calendar.event") resolved_url="https://smokesignal.events/$actor/$rkey" ;;
+            "fyi.unravel.frontpage.post") resolved_url="https://frontpage.fyi/post/$actor/$rkey" ;;
+            "app.bsky.feed.like"| \
+            "app.bsky.feed.postgate"| \
+            "app.bsky.feed.repost"| \
+            "app.bsky.feed.threadgate"| \
+            "app.bsky.graph.follow"| \
+            "app.bsky.graph.listblock"| \
+            "app.bsky.graph.listitem"| \
+            "events.smokesignal.calendar.rsvp"| \
+            "fyi.unravel.frontpage.comment"| \
+            "fyi.unravel.frontpage.vote")
+                record="$(atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
+
+                if [[ "$(atfile.util.is_xrpc_success $? "$record")" == 1 ]]; then
+                    case "$collection" in
+                        "app.bsky.feed.like")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "app.bsky.feed.postgate")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
+                        "app.bsky.feed.repost")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "app.bsky.feed.threadgate")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
+                        "app.bsky.graph.follow")
+                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
+                        "app.bsky.graph.listblock")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject')")" ;;
+                        "app.bsky.graph.listitem")
+                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
+                        "events.smokesignal.calendar.rsvp")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "fyi.unravel.frontpage.comment")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post.uri')")/$actor/$rkey" ;;
+                        "fyi.unravel.frontpage.vote")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                    esac
+                fi
+                ;;
+        esac
+    elif [[ -n "$actor" ]]; then
+        resolved_url="https://pdsls.dev/at/$actor"
+    fi
+
+    if [[ -n "$resolved_url" && $ignore_url_validation == 0 ]]; then
+        if [[ $(atfile.util.is_url_okay "$resolved_url") == 0 ]]; then
+            unset resolved_url
+        fi
+    fi
+
+    echo "$resolved_url"
+}
+
+function atfile.invoke.handle() {
+    uri="$1"
+
+    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
+    [[ "$uri" != "at://"* ]] && atfile.die "Invalid AT URI\n↳ Must be 'at://<actor>[/<collection>/<rkey>]'"
+
+    app_uri="$(atfile.util.get_app_url_for_at_uri "$uri")"
+    [[ -z "$app_uri" ]] && atfile.die "Unable to resolve AT URI to App"
+
+    app_proto="$(echo $app_uri | cut -d ":" -f 1)"
+
+    if [[ $app_proto == "atfile" ]]; then
+        atfile.util.override_actor "$(echo "$app_uri" | cut -d "/" -f 3)"
+
+        case "$(echo "$app_uri" | cut -d "/" -f 4)" in
+            "upload")
+                if [[ -n $TERM ]]; then
+                    atfile.invoke.get "$(echo "$app_uri" | cut -d "/" -f 5)"
+                else
+                    xdg-open "$(atfile.invoke.get_url "$(echo "$app_uri" | cut -d "/" -f 5)")"
+                fi
+                ;;
+        esac
+    else
+        xdg-open "$app_uri"
     fi
 }
 
@@ -1928,6 +1990,62 @@ function atfile.invoke.stream() {
     atfile.js.subscribe "$collection"
 }
 
+function atfile.invoke.update() {
+    function atfile.invoke.update.parse_version() {
+        version="$1"
+        version="$(echo $version | cut -d "+" -f 1)"
+        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
+        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
+        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
+        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+    }
+
+    if [[ $_output_json == 1 ]]; then
+        atfile.die "Command not available as JSON"
+    fi
+    
+    atfile.say.debug "Getting latest release..."
+    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
+    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
+    
+    latest_version="$(echo "$latest_release" | jq -r ".name")"
+    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
+    
+    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
+    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
+    
+    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
+    
+    if [[ $_version == *+git* ]]; then
+        atfile.die "Cannot update Git version ($_version)"
+    fi
+    
+    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
+        temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
+        
+        atfile.say.debug "Touching temporary path ($temp_updated_path)..."
+        touch "$temp_updated_path"
+        [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
+        
+        atfile.say.debug "Downloading latest release..."
+        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
+        if [[ $? == 0 ]]; then
+            mv "$temp_updated_path" "$_prog_path"
+            if [[ $? != 0 ]]; then
+                atfile.die "Unable to update (do you have permission?)"
+            else
+                chmod +x "$_prog_path"
+                atfile.say "😎 Updated to $latest_version!"
+                exit 0
+            fi
+        else
+            atfile.die "Unable to download latest version"
+        fi
+    else
+        atfile.say "No updates found"
+    fi
+}
+
 function atfile.invoke.upload() {
     file="$(atfile.util.get_file_path "$1")"
     recipient="$2"
@@ -2067,13 +2185,6 @@ function atfile.invoke.usage() {
     fi
 
 # ------------------------------------------------------------------------------
-    usage_arguments="<actor>     Act upon another ATProto user (either by handle or DID)
-    <cursor>    Key or CID used as a reference to paginate through lists
-    <key>       Key of an uploaded file (unique to that user and collection)
-    <nick>      Nickname
-    <recipient> GPG recipient during file encryption
-                See 'gpg --help' for more information"
-
     usage_commands="upload <file> [<key>]
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
@@ -2121,11 +2232,12 @@ function atfile.invoke.usage() {
     update
         Check for updates and update if outdated"
 
-    if [[ $_enable_hidden_commands == 1 ]]; then
-        usage_commands+="\n\nCommands (Hidden)
-    blob list
+    usage_commands_tools="blob list
     blob upload <path>
-        Manage blobs on a repository
+        Manage blobs on authenticated repository
+
+    handle <at-uri>
+        Open at:// URL with relevant App
 
     record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
@@ -2135,7 +2247,7 @@ function atfile.invoke.usage() {
     record rm <key> [<collection>]
     record rm <at-uri>
         Manage records on a repository
-        ⚠️  Intended for advanced users. Here be dragons
+        ⚠️  No validation is performed. Here be dragons!
         ℹ️  <collection> defaults to '$_nsid_upload'
         
     resolve <actor>
@@ -2143,7 +2255,6 @@ function atfile.invoke.usage() {
 
     stream <collection>
         Stream records from Jetstream"
-    fi
 
 usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
@@ -2202,9 +2313,6 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     ${_envvar_prefix}_DEBUG <bool¹> (default: $_debug_default)
         Print debug outputs
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
-    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool¹> (default: $_enable_hidden_commands_default)
-        Enable hidden commands
-        ⚠️  When sourcing, sets to 1
            
     ¹ A bool in Bash is 1 (true) or 0 (false)
     ² These servers are ran by @ducky.ws (and @astra.blue). You can trust us!"
@@ -2214,7 +2322,8 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 
     $_cache_dir/
-        Cache and temporary storage"
+        Cache and temporary storage
+        ℹ️  Intended for future use"
 
     usage="ATFile | 📦 ➔ 🦋
     Store and retrieve files on the ATmosphere
@@ -2225,11 +2334,11 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     
     😎 Stay updated with \`$_prog update\`
     
-Commands
+Commands (General)
     $usage_commands
 
-Arguments
-    $usage_arguments
+Commands (Tools)
+    $usage_commands_tools
 
 Environment Variables
     $usage_envvars
@@ -2388,6 +2497,7 @@ if [[ $_is_sourced == 0 ]]; then
         "rm") _command="delete" ;;
         "download"|"f"|"d") _command="fetch" ;;
         "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
+        "at") _command="handle" ;;
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
         "did") _command="resolve" ;;
@@ -2432,7 +2542,8 @@ if [[ -z "$_server" ]]; then
         fi
 
         # NOTE: Speeds things up a little if the command doesn't need actor resolving
-        if [[ $_command == "resolve" ]]; then
+        if [[ $_command == "handle" ]] ||\
+            [[ $_command == "resolve" ]]; then
             atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
             skip_resolving=1
         fi
@@ -2519,6 +2630,14 @@ if [[ $_is_sourced == 0 ]]; then
             fi
             
             atfile.invoke.download "$2" 1
+            ;;
+        "handle")
+            if [[ "$_enable_hidden_commands" == 1 ]]; then
+                atfile.invoke.handle "$2"
+            else
+                atfile.util.print_hidden_command_warning
+                exit 1
+            fi
             ;;
         "info")
             [[ -z "$2" ]] && atfile.die "<key> not set"
