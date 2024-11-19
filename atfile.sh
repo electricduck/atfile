@@ -110,6 +110,96 @@ function atfile.util.check_prog_optional_metadata() {
     [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo" "${_envvar_prefix}_SKIP_NI_MEDIAINFO"
 }
 
+function atfile.util.get_app_url_for_at_uri() {
+    uri="$1"
+
+    actor="$(echo $uri | cut -d / -f 3)"
+    collection="$(echo $uri | cut -d / -f 4)"
+    rkey="$(echo $uri | cut -d / -f 5)"
+
+    ignore_url_validation=0
+    resolved_actor="$(atfile.util.resolve_identity "$actor")"
+    unset actor_handle
+    unset actor_pds
+    unset resolved_url
+    
+    if [[ $? == 0 ]]; then
+        actor="$(echo "$resolved_actor" | cut -d "|" -f 1)"
+        actor_handle="$(echo "$resolved_actor" | cut -d "|" -f 3 | cut -d "/" -f 3)"
+        actor_pds="$(echo "$resolved_actor" | cut -d "|" -f 2)"
+    else
+        unset actor
+    fi
+
+    [[ -z "$rkey" ]] && rkey="self"
+
+    if [[ -n "$actor" && -n "$collection" && -n "$rkey" ]]; then
+        case "$collection" in
+            "app.bsky.actor.profile") resolved_url="https://bsky.app/profile/$actor" ;;
+            "app.bsky.feed.generator") resolved_url="https://bsky.app/profile/$actor/feed/$rkey" ;;
+            "app.bsky.graph.list") resolved_url="https://bsky.app/profile/$actor/lists/$rkey" ;;
+            "app.bsky.graph.starterpack") resolved_url="https://bsky.app/starter-pack/$actor/$rkey" ;;
+            "app.bsky.feed.post") resolved_url="https://bsky.app/profile/$actor/post/$rkey" ;;
+            "blue.linkat.board") ignore_url_validation=1 && resolved_url="https://linkat.blue/$actor_handle" ;;
+            "blue.zio.atfile.lock") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "chat.bsky.actor.declaration") resolved_url="https://bsky.app/messages/settings" ;;
+            "com.shinolabs.pinksea.oekaki") resolved_url="https://pinksea.art/$actor/oekaki/$rkey" ;;
+            "com.whtwnd.blog.entry") resolved_url="https://whtwnd.com/$actor/$rkey" ;;
+            "events.smokesignal.app.profile") resolved_url="https://smokesignal.events/$actor" ;;
+            "events.smokesignal.calendar.event") resolved_url="https://smokesignal.events/$actor/$rkey" ;;
+            "fyi.unravel.frontpage.post") resolved_url="https://frontpage.fyi/post/$actor/$rkey" ;;
+            "app.bsky.feed.like"| \
+            "app.bsky.feed.postgate"| \
+            "app.bsky.feed.repost"| \
+            "app.bsky.feed.threadgate"| \
+            "app.bsky.graph.follow"| \
+            "app.bsky.graph.listblock"| \
+            "app.bsky.graph.listitem"| \
+            "events.smokesignal.calendar.rsvp"| \
+            "fyi.unravel.frontpage.comment"| \
+            "fyi.unravel.frontpage.vote")
+                record="$(atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
+
+                if [[ "$(atfile.util.is_xrpc_success $? "$record")" == 1 ]]; then
+                    case "$collection" in
+                        "app.bsky.feed.like")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "app.bsky.feed.postgate")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
+                        "app.bsky.feed.repost")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "app.bsky.feed.threadgate")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
+                        "app.bsky.graph.follow")
+                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
+                        "app.bsky.graph.listblock")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject')")" ;;
+                        "app.bsky.graph.listitem")
+                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
+                        "events.smokesignal.calendar.rsvp")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "fyi.unravel.frontpage.comment")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post.uri')")/$actor/$rkey" ;;
+                        "fyi.unravel.frontpage.vote")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                    esac
+                fi
+                ;;
+        esac
+    elif [[ -n "$actor" ]]; then
+        resolved_url="https://pdsls.dev/at/$actor"
+    fi
+
+    if [[ -n "$resolved_url" && $ignore_url_validation == 0 ]]; then
+        if [[ $(atfile.util.is_url_okay "$resolved_url") == 0 ]]; then
+            unset resolved_url
+        fi
+    fi
+
+    echo "$resolved_url"
+}
+
 function atfile.util.get_cache() {
     file="$_cache_dir/$1"
     
@@ -528,19 +618,24 @@ function atfile.util.get_os() {
 function atfile.util.get_pds_pretty() {
     pds="$1"
 
-    pds="$(echo $pds | cut -d "/" -f 3)"
+    pds_host="$(echo $pds | cut -d "/" -f 3)"
 
-    if [[ $pds == *".host.bsky.network" ]]; then
-        pds_host="$(echo $pds | cut -d "." -f 1)"
-        pds_region="$(echo $pds | cut -d "." -f 2)"
-        echo "🍄 ${pds_host^} ($(atfile.util.get_region_pretty "$pds_region"))"
+    if [[ $pds_host == *".host.bsky.network" ]]; then
+        bsky_host="$(echo $pds_host | cut -d "." -f 1)"
+        bsky_region="$(echo $pds_host | cut -d "." -f 2)"
+        echo "🍄 ${bsky_host^} ($(atfile.util.get_region_pretty "$bsky_region"))"
+    elif [[ $pds_host == "atproto.brid.gy" ]]; then
+        echo "🔀 Bridy Fed"
     else
-        case $pds in
-            "atproto.brid.gy") echo "🔀 Bridgy Fed" ;;
-            "extwitter.link") echo "🐦 Twitter Mirrors" ;;
-            "zio.blue") echo "🟧 @Zio" ;;
-            *) echo "$pds" ;;
-        esac
+        pds_oauth_url="$pds/oauth/authorize"
+        pds_oauth_page="$(curl -s -L -X GET "$pds_oauth_url")"
+        pds_customization_data="$(echo $pds_oauth_page | sed -s s/.*_customizationData\"]=//g | sed -s s/\;document\.currentScript\.remove.*//g)"
+
+        if [[ $pds_customization_data == "{"* ]]; then
+            echo "🟦 $(echo $pds_customization_data | jq -r '.name')"
+        else
+            echo "$pds"
+        fi
     fi
 }
 
@@ -1521,121 +1616,62 @@ function atfile.invoke.get_url() {
     fi
 }
 
-function atfile.util.get_app_url_for_at_uri() {
-    uri="$1"
-
-    actor="$(echo $uri | cut -d / -f 3)"
-    collection="$(echo $uri | cut -d / -f 4)"
-    rkey="$(echo $uri | cut -d / -f 5)"
-
-    ignore_url_validation=0
-    resolved_actor="$(atfile.util.resolve_identity "$actor")"
-    unset actor_handle
-    unset actor_pds
-    unset resolved_url
-    
-    if [[ $? == 0 ]]; then
-        actor="$(echo "$resolved_actor" | cut -d "|" -f 1)"
-        actor_handle="$(echo "$resolved_actor" | cut -d "|" -f 3 | cut -d "/" -f 3)"
-        actor_pds="$(echo "$resolved_actor" | cut -d "|" -f 2)"
-    else
-        unset actor
-    fi
-
-    [[ -z "$rkey" ]] && rkey="self"
-
-    if [[ -n "$actor" && -n "$collection" && -n "$rkey" ]]; then
-        case "$collection" in
-            "app.bsky.actor.profile") resolved_url="https://bsky.app/profile/$actor" ;;
-            "app.bsky.feed.generator") resolved_url="https://bsky.app/profile/$actor/feed/$rkey" ;;
-            "app.bsky.graph.list") resolved_url="https://bsky.app/profile/$actor/lists/$rkey" ;;
-            "app.bsky.graph.starterpack") resolved_url="https://bsky.app/starter-pack/$actor/$rkey" ;;
-            "app.bsky.feed.post") resolved_url="https://bsky.app/profile/$actor/post/$rkey" ;;
-            "blue.linkat.board") ignore_url_validation=1 && resolved_url="https://linkat.blue/$actor_handle" ;;
-            "blue.zio.atfile.lock") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
-            "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
-            "chat.bsky.actor.declaration") resolved_url="https://bsky.app/messages/settings" ;;
-            "com.shinolabs.pinksea.oekaki") resolved_url="https://pinksea.art/$actor/oekaki/$rkey" ;;
-            "com.whtwnd.blog.entry") resolved_url="https://whtwnd.com/$actor/$rkey" ;;
-            "events.smokesignal.app.profile") resolved_url="https://smokesignal.events/$actor" ;;
-            "events.smokesignal.calendar.event") resolved_url="https://smokesignal.events/$actor/$rkey" ;;
-            "fyi.unravel.frontpage.post") resolved_url="https://frontpage.fyi/post/$actor/$rkey" ;;
-            "app.bsky.feed.like"| \
-            "app.bsky.feed.postgate"| \
-            "app.bsky.feed.repost"| \
-            "app.bsky.feed.threadgate"| \
-            "app.bsky.graph.follow"| \
-            "app.bsky.graph.listblock"| \
-            "app.bsky.graph.listitem"| \
-            "events.smokesignal.calendar.rsvp"| \
-            "fyi.unravel.frontpage.comment"| \
-            "fyi.unravel.frontpage.vote")
-                record="$(atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
-
-                if [[ "$(atfile.util.is_xrpc_success $? "$record")" == 1 ]]; then
-                    case "$collection" in
-                        "app.bsky.feed.like")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
-                        "app.bsky.feed.postgate")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
-                        "app.bsky.feed.repost")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
-                        "app.bsky.feed.threadgate")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
-                        "app.bsky.graph.follow")
-                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
-                        "app.bsky.graph.listblock")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject')")" ;;
-                        "app.bsky.graph.listitem")
-                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
-                        "events.smokesignal.calendar.rsvp")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
-                        "fyi.unravel.frontpage.comment")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post.uri')")/$actor/$rkey" ;;
-                        "fyi.unravel.frontpage.vote")
-                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
-                    esac
-                fi
-                ;;
-        esac
-    elif [[ -n "$actor" ]]; then
-        resolved_url="https://pdsls.dev/at/$actor"
-    fi
-
-    if [[ -n "$resolved_url" && $ignore_url_validation == 0 ]]; then
-        if [[ $(atfile.util.is_url_okay "$resolved_url") == 0 ]]; then
-            unset resolved_url
-        fi
-    fi
-
-    echo "$resolved_url"
-}
-
 function atfile.invoke.handle() {
     uri="$1"
 
-    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
-    [[ "$uri" != "at://"* ]] && atfile.die "Invalid AT URI\n↳ Must be 'at://<actor>[/<collection>/<rkey>]'"
+    function atfile.invoke.handle.handle_error() {
+        cli_error="$1"
+        gui_error="$2"
 
+        [[ -z $gui_error ]] && gui_error="$cli_error"
+
+        if [ -x "$(command -v zenity)" ]; then
+            zenity --error --text "$gui_error"
+        fi
+
+        atfile.die "$cli_error"
+    }
+
+    function atfile.invoke.handle.launch_xdg() {
+        if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
+            if [[ $(atfile.util.get_os) == "macos" ]]; then
+                open "$app_uri"
+            else
+                xdg-open "$app_uri"
+            fi
+        else
+            echo "$app_uri"
+        fi
+    }
+
+    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
+    [[ "$uri" != "at://"* ]] && atfile.invoke.handle.handle_error \
+        "Invalid AT URI\n↳ Must be 'at://<actor>[/<collection>/<rkey>]'" \
+        "Invalid AT URI"
+
+    atfile.say.debug "Resolving '$uri'..."
     app_uri="$(atfile.util.get_app_url_for_at_uri "$uri")"
-    [[ -z "$app_uri" ]] && atfile.die "Unable to resolve AT URI to App"
+    [[ -z "$app_uri" ]] && atfile.invoke.handle.handle_error \
+        "Unable to resolve AT URI to App"
 
     app_proto="$(echo $app_uri | cut -d ":" -f 1)"
+
+    atfile.say.debug "Opening '$app_uri' ($app_proto)..."
 
     if [[ $app_proto == "atfile" ]]; then
         atfile.util.override_actor "$(echo "$app_uri" | cut -d "/" -f 3)"
 
         case "$(echo "$app_uri" | cut -d "/" -f 4)" in
-            "upload")
+            "lock"|"upload")
                 if [[ -n $TERM ]]; then
                     atfile.invoke.get "$(echo "$app_uri" | cut -d "/" -f 5)"
                 else
-                    xdg-open "$(atfile.invoke.get_url "$(echo "$app_uri" | cut -d "/" -f 5)")"
+                    atfile.invoke.handle.launch_xdg "$(atfile.invoke.get_url "$(echo "$app_uri" | cut -d "/" -f 5)")"
                 fi
                 ;;
         esac
     else
-        xdg-open "$app_uri"
+        atfile.invoke.handle.launch_xdg "$app_uri"
     fi
 }
 
@@ -1949,6 +1985,8 @@ function atfile.invoke.resolve() {
     pds_name="$(atfile.util.get_pds_pretty "$pds")"
     atfile.say.debug "Getting PDS version for '$pds'..."
     pds_version="$(curl -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
+
+    [[ "$did" == "null" ]] && atfile.die "Unable to resolve '$actor'"
 
     case "$did_type" in
         "did:web")
@@ -2456,7 +2494,7 @@ fi
 
 ## Git detection
 
-if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
+if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]] && [[ "$(realpath $(pwd))" == "$_prog_dir" ]]; then
     atfile.say.debug "Getting tag from Git..."
     git describe --exact-match --tags > /dev/null 2>&1
     [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
@@ -2735,3 +2773,5 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
     esac
 fi
+
+# lord help me
