@@ -81,6 +81,21 @@ function atfile.say.inline() {
 
 # Utilities
 
+function atfile.util.build_blob_uri() {
+    did="$1"
+    cid="$2"
+    pds="$_server"
+
+    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
+}
+
+function atfile.util.build_out_filename() {
+    key="$1"
+    name="$2"
+
+    echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
+}
+
 function atfile.util.check_prog() {
     command="$1"
     download_hint="$2"
@@ -755,19 +770,18 @@ function atfile.util.is_xrpc_success() {
     fi
 }
 
-function atfile.util.build_blob_uri() {
-    did="$1"
-    cid="$2"
-    pds="$_server"
+function atfile.until.launch_uri() {
+    uri="$1"
 
-    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
-}
-
-function atfile.util.build_out_filename() {
-    key="$1"
-    name="$2"
-
-    echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
+    if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
+        if [[ $(atfile.util.get_os) == "macos" ]]; then
+            open "$uri"
+        else
+            xdg-open "$uri"
+        fi
+    else
+        echo "$uri"
+    fi
 }
 
 # HACK: This essentially breaks the entire session (it overrides $_username and
@@ -1626,18 +1640,6 @@ function atfile.invoke.handle() {
         atfile.die "$cli_error"
     }
 
-    function atfile.invoke.handle.launch_xdg() {
-        if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
-            if [[ $(atfile.util.get_os) == "macos" ]]; then
-                open "$app_uri"
-            else
-                xdg-open "$app_uri"
-            fi
-        else
-            echo "$app_uri"
-        fi
-    }
-
     [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
     [[ "$uri" != "at://"* ]] && atfile.invoke.handle.handle_error \
         "Invalid AT URI\n↳ Must be 'at://<actor>[/<collection>/<rkey>]'" \
@@ -1653,19 +1655,9 @@ function atfile.invoke.handle() {
     atfile.say.debug "Opening '$app_uri' ($app_proto)..."
 
     if [[ $app_proto == "atfile" ]]; then
-        atfile.util.override_actor "$(echo "$app_uri" | cut -d "/" -f 3)"
-
-        case "$(echo "$app_uri" | cut -d "/" -f 4)" in
-            "lock"|"upload")
-                if [[ -n $TERM ]]; then
-                    atfile.invoke.get "$(echo "$app_uri" | cut -d "/" -f 5)"
-                else
-                    atfile.invoke.handle.launch_xdg "$(atfile.invoke.get_url "$(echo "$app_uri" | cut -d "/" -f 5)")"
-                fi
-                ;;
-        esac
+        atfile.util.handle_protocol "$app_uri"
     else
-        atfile.invoke.handle.launch_xdg "$app_uri"
+        atfile.until.launch_uri "$app_uri"
     fi
 }
 
@@ -2608,6 +2600,38 @@ if [[ -n $_server ]]; then
             atfile.die "Cannot skip authentication validation without a DID\n↳ \$${_envvar_prefix}_USERNAME currently set to '$_username' (need \"did:<type>:<key>\")"
         fi
     fi
+fi
+
+function atfile.util.handle_protocol() {
+    uri="$1"
+
+    actor="$(echo $uri | cut -d "/" -f 3)"
+    path="$(echo $uri | cut -d "/" -f 4)"
+    key="$(echo $uri | cut -d "/" -f 5)"
+
+    if [[ -n "$actor" && -n "$path" && -n "$key" ]]; then
+        case "$path" in
+            "upload")
+                atfile.util.override_actor "$actor"
+
+                if [[ -n $TERM ]]; then
+                    atfile.invoke.get "$key"
+                else
+                    atfile.until.launch_uri "$key"
+                fi
+                ;;
+            *)
+                atfile.die "Unable to handle '$path'"
+        esac
+    fi
+}
+
+## Protocol Handler
+
+if [[ "$_command" == "atfile:"* ]]; then
+    atfile.say.debug "Handling '$_command'..."
+    atfile.util.handle_protocol "$_command"
+    exit 0
 fi
 
 ## Commands
