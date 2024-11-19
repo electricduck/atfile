@@ -833,11 +833,6 @@ function atfile.util.print_copyright_warning() {
     fi
 }
 
-function atfile.util.print_hidden_command_warning() {
-    envvar="$1"
-    echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS=1"
-}
-
 # HACK: We don't normally atfile.say() in the atfile.util.* namespace, but
 #       atfile.until.override_actor() is in this namespace and it would be nice
 #       to have a debug output for it when called in the main command case
@@ -1383,7 +1378,6 @@ function atfile.invoke.debug() {
 ↳ UAS: $(atfile.util.get_uas)
 Variables
 $(atfile.invoke.debug.print_envvar "DEBUG" $_debug_default)
-$(atfile.invoke.debug.print_envvar "ENABLE_HIDDEN_COMMANDS" $_enable_hidden_commands_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PDS")
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_directory_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
@@ -2372,7 +2366,7 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     
     😎 Stay updated with \`$_prog update\`
     
-Commands (General)
+Commands
     $usage_commands
 
 Commands (Tools)
@@ -2422,7 +2416,6 @@ _now="$(atfile.util.get_date)"
 #### Defaults
 
 _debug_default=0
-_enable_hidden_commands_default=0
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.zio.blue"
@@ -2444,7 +2437,6 @@ _endpoint_plc_directory_fallback="https://plc.directory"
 #### Set
 
 _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
-_enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
 _include_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_include_fingerprint_default")"
@@ -2474,7 +2466,6 @@ _nsid_upload="${_nsid_prefix}.atfile.upload"
 
 if [[ "$0" != "$BASH_SOURCE" ]]; then
     _debug=0
-    _enable_hidden_commands=1
     _is_sourced=1
     _output_json=1
 fi
@@ -2626,16 +2617,11 @@ if [[ $_is_sourced == 0 ]]; then
 
     case "$_command" in
         "blob")
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                case "$2" in
-                    "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
-                    "upload"|"u") atfile.invoke.upload_blob "$3" ;;
-                    *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
-                esac
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi        
+            case "$2" in
+                "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
+                "upload"|"u") atfile.invoke.upload_blob "$3" ;;
+                *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+            esac  
             ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -2670,12 +2656,7 @@ if [[ $_is_sourced == 0 ]]; then
             atfile.invoke.download "$2" 1
             ;;
         "handle")
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                atfile.invoke.handle "$2"
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi
+            atfile.invoke.handle "$2"
             ;;
         "info")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -2712,37 +2693,22 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "record")
             # NOTE: Performs no validation (apart from JSON)! Here be dragons
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                case "$2" in
-                    "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
-                    "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
-                    "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
-                    "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
-                    *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
-                esac
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi
+            case "$2" in
+                "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
+                "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
+                "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
+                "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
+                *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+            esac
             ;;
         "resolve")
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                atfile.invoke.resolve "$2"
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi
+            atfile.invoke.resolve "$2"
             ;;
         "something-broke")
             atfile.invoke.debug
             ;;
         "stream")
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                atfile.invoke.stream "$2"
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi
+            atfile.invoke.stream "$2"
             ;;
         "upload")
             atfile.util.check_prog_optional_metadata
