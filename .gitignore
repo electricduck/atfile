@@ -1,2 +1,4 @@
 .test_files/*
 *~
+atfile-*.*.sh
+atfile-*.*.*.sh

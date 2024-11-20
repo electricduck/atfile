@@ -2560,7 +2560,7 @@ fi
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.6.2"
+_version="0.6.3"
 _at_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _c_author="Ducky"
 _c_year="2024"
