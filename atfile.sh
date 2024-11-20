@@ -1354,6 +1354,13 @@ function com.atproto.server.getSession() {
     atfile.xrpc.get "com.atproto.server.getSession"
 }
 
+function com.atproto.sync.getBlob() {
+    did="$1"
+    cid="$2"
+
+    atfile.xrpc.get "com.atproto.sync.getBlob" "did=$did&cid=$cid" "*/*"
+}
+
 function com.atproto.sync.listBlobs() {
     did="$1"
     cursor="$2"
@@ -2232,7 +2239,18 @@ function atfile.invoke.upload() {
 }
 
 function atfile.invoke.upload_blob() {
-    atfile.die "Not implemented"
+    cid="$1"
+
+    blob_uri="$_server/xrpc/com.atproto.sync.getBlob?cid=$cid&did=$_username"
+
+    [[ $(atfile.util.is_url_okay "$blob_uri") == 0 ]] && atfile.die "Unable to find blob '$cid'"
+
+    atfile.say "Fetching '$cid' from '$_username'..."
+
+    echo "---"
+    echo "Uploaded: 🔵 $cid"
+    atfile.util.print_blob_url_output "$(atfile.util.build_blob_uri "$_username" "$cid")"
+    echo -e "↳ Key: $key"
 }
 
 function atfile.invoke.usage() {
@@ -2281,8 +2299,8 @@ function atfile.invoke.usage() {
         Download an uploaded encrypted file and attempt to decrypt it (with GPG)
         ℹ️  Make sure the necessary GPG key has been imported first
         
-    upload-blob <blob-key> [<key>]
-        Create an uploaded file record for an already-existing blob
+    upload-blob <blob-cid> [<key>]
+        Create an uploaded file for an already-existing blob
 
     nick <nick>
         Set nickname
