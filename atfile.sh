@@ -2049,7 +2049,7 @@ function atfile.invoke.update() {
         atfile.die "Cannot update Git version ($_version)"
     fi
     
-    if [[ $(( $parsed_latest_version == $parsed_running_version )) == 1 ]]; then
+    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
         temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
         
         atfile.say.debug "Touching temporary path ($temp_updated_path)..."
@@ -2400,7 +2400,7 @@ fi
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.5"
+_version="0.6"
 _at_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _c_author="Ducky"
 _c_year="2024"

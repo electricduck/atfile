@@ -6,8 +6,8 @@ function die() {
 }
 
 uid="$(id -u)"
-tag="v/0.x/0.5"
-url="https://raw.githubusercontent.com/electricduck/atfile/refs/tags/$tag/atfile.sh"
+blob="bafkreibuq2x5uehivockbkiha7hn6onamfbnynn2ou67wqmobieaeugqta"
+url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$blob"
 
 install_file="atfile"
 conf_file="atfile.env"
@@ -39,7 +39,7 @@ if [[ ! -f "$conf_dir/$conf_file" ]]; then
     [[ $? != 0 ]] && die "Unable to create config file ($conf_dir/$conf_file)"
 fi
 
-echo -e "😎 Installed ATFile $(echo $tag | cut -d "/" -f 3)"
+echo -e "😎 Installed ATFile"
 echo -e "   ↳ Path:   $install_dir/$install_file"
 echo -e "   ↳ Config: $conf_dir/$conf_file"
 echo -e "   ---"
