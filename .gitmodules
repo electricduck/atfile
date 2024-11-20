@@ -1,0 +1,3 @@
+[submodule "lexicons"]
+	path = lexicons
+	url = https://github.com/ziodotsh/lexicons
