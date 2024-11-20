@@ -731,6 +731,25 @@ function atfile.util.get_yn() {
     fi
 }
 
+function atfile.util.handle_protocol() {
+    uri="$1"
+
+    actor="$(echo $uri | cut -d "/" -f 3)"
+    path="$(echo $uri | cut -d "/" -f 4)"
+    key="$(echo $uri | cut -d "/" -f 5)"
+
+    if [[ -n "$actor" && -n "$path" && -n "$key" ]]; then
+        case "$path" in
+            "upload")
+                atfile.util.override_actor "$actor"
+                atfile.until.launch_uri "$key"
+                ;;
+            *)
+                atfile.die "Unable to handle '$path'"
+        esac
+    fi
+}
+
 function atfile.util.is_null_or_empty() {
     if [[ -z "$1" ]] || [[ "$1" == null ]]; then
         echo 1
@@ -1349,6 +1368,81 @@ function com.atproto.sync.uploadBlob() {
 
 # Commands
 
+function atfile.invoke.blob_list() {
+    cursor="$1"
+    success=1
+    
+    atfile.say.debug "Getting blobs...\n↳ Repo: $_username"
+    blobs="$(com.atproto.sync.listBlobs "$_username" "$cursor")"
+    success="$(atfile.util.is_xrpc_success $? "$blobs")"
+
+    if [[ $success == 1 ]]; then
+        records="$(echo $blobs | jq -c '.cids[]')"
+        if [[ -z "$records" ]]; then
+            if [[ -n "$cursor" ]]; then
+                atfile.die "No more blobs for '$_username'"
+            else
+                atfile.die "No blobs for '$_username'"
+            fi
+        fi
+    
+        unset first_cid
+        unset last_cid
+        unset browser_accessible
+        unset record_count
+        unset json_output
+    
+        if [[ $_output_json == 0 ]]; then
+            echo -e "Blob"
+            echo -e "----"
+        else
+            json_output="{\"blobs\":["
+        fi
+    
+        while IFS=$"\n" read -r c; do
+            cid="$(echo $c | jq -r ".")"
+            blob_uri="$(atfile.util.build_blob_uri "$_username" "$cid")"
+            last_cid="$cid"
+            ((record_count++))
+            
+            if [[ -z $first_cid ]]; then
+                first_cid="$cid"
+                browser_accessible=$(atfile.util.is_url_accessible_in_browser "$blob_uri")
+            fi
+
+            if [[ -n $cid ]]; then
+                if [[ $_output_json == 1 ]]; then
+                    json_output+="{ \"cid\": \"$cid\", \"url\": \"$blob_uri\" },"
+                else
+                    if [[ $browser_accessible == 1 ]]; then
+                        echo "$blob_uri"
+                    else
+                        echo "$cid"
+                    fi
+                fi
+            fi
+        done <<< "$records"
+        
+        if [[ $_output_json == 0 ]]; then
+            atfile.util.print_table_paginate_hint "$last_cid" $record_count
+        else
+            json_output="${json_output::-1}"
+            json_output+="],"
+            json_output+="\"browser_accessible\": $(atfile.util.get_yn $browser_accessible),"
+            json_output+="\"cursor\": \"$last_cid\"}"
+            echo -e "$json_output" | jq
+        fi
+    else
+        atfile.die "Unable to list blobs"
+    fi
+}
+
+function atfile.invoke.blob_upload() {
+    file="$(atfile.util.get_file_path "$1")"
+    atfile.say.debug "Uploading blob...\n↳ File: $file"
+    com.atproto.sync.uploadBlob "$file" | jq
+}
+
 function atfile.invoke.debug() {
     prog_not_installed_placeholder="(Not Installed)"
 
@@ -1726,75 +1820,6 @@ function atfile.invoke.list() {
         fi
     else
         atfile.die "Unable to list files"
-    fi
-}
-
-function atfile.invoke.list_blobs() {
-    cursor="$1"
-    success=1
-    
-    atfile.say.debug "Getting blobs...\n↳ Repo: $_username"
-    blobs="$(com.atproto.sync.listBlobs "$_username" "$cursor")"
-    success="$(atfile.util.is_xrpc_success $? "$blobs")"
-
-    if [[ $success == 1 ]]; then
-        records="$(echo $blobs | jq -c '.cids[]')"
-        if [[ -z "$records" ]]; then
-            if [[ -n "$cursor" ]]; then
-                atfile.die "No more blobs for '$_username'"
-            else
-                atfile.die "No blobs for '$_username'"
-            fi
-        fi
-    
-        unset first_cid
-        unset last_cid
-        unset browser_accessible
-        unset record_count
-        unset json_output
-    
-        if [[ $_output_json == 0 ]]; then
-            echo -e "Blob"
-            echo -e "----"
-        else
-            json_output="{\"blobs\":["
-        fi
-    
-        while IFS=$"\n" read -r c; do
-            cid="$(echo $c | jq -r ".")"
-            blob_uri="$(atfile.util.build_blob_uri "$_username" "$cid")"
-            last_cid="$cid"
-            ((record_count++))
-            
-            if [[ -z $first_cid ]]; then
-                first_cid="$cid"
-                browser_accessible=$(atfile.util.is_url_accessible_in_browser "$blob_uri")
-            fi
-
-            if [[ -n $cid ]]; then
-                if [[ $_output_json == 1 ]]; then
-                    json_output+="{ \"cid\": \"$cid\", \"url\": \"$blob_uri\" },"
-                else
-                    if [[ $browser_accessible == 1 ]]; then
-                        echo "$blob_uri"
-                    else
-                        echo "$cid"
-                    fi
-                fi
-            fi
-        done <<< "$records"
-        
-        if [[ $_output_json == 0 ]]; then
-            atfile.util.print_table_paginate_hint "$last_cid" $record_count
-        else
-            json_output="${json_output::-1}"
-            json_output+="],"
-            json_output+="\"browser_accessible\": $(atfile.util.get_yn $browser_accessible),"
-            json_output+="\"cursor\": \"$last_cid\"}"
-            echo -e "$json_output" | jq
-        fi
-    else
-        atfile.die "Unable to list blobs"
     fi
 }
 
@@ -2207,9 +2232,7 @@ function atfile.invoke.upload() {
 }
 
 function atfile.invoke.upload_blob() {
-    file="$(atfile.util.get_file_path "$1")"
-    atfile.say.debug "Uploading blob...\n↳ File: $file"
-    com.atproto.sync.uploadBlob "$file" | jq
+    atfile.die "Not implemented"
 }
 
 function atfile.invoke.usage() {
@@ -2248,7 +2271,7 @@ function atfile.invoke.usage() {
         Lock (or unlock) an uploaded file to prevent it from unintended
         deletions
         ⚠️  Other clients may be able to delete the file. This is intended as a
-           safety-net in the case of inadvertently deleting the wrong file
+           safety-net to avoid inadvertently deleting the wrong file
 
     upload-crypt <file> <recipient> [<key>]
         Encrypt file (with GPG) for <recipient> and upload to the PDS
@@ -2258,6 +2281,9 @@ function atfile.invoke.usage() {
         Download an uploaded encrypted file and attempt to decrypt it (with GPG)
         ℹ️  Make sure the necessary GPG key has been imported first
         
+    upload-blob <blob-key> [<key>]
+        Create an uploaded file record for an already-existing blob
+
     nick <nick>
         Set nickname
         ℹ️  Intended for future use
@@ -2533,6 +2559,7 @@ if [[ $_is_sourced == 0 ]]; then
         "did") _command="resolve" ;;
         "js") _command="stream" ;;
         "ul"|"u") _command="upload" ;;
+        "ub") _command="upload-blob" ;;
         "uc") _command="upload-crypt" ;;
         "get-url"|"b") _command="url" ;;
     esac
@@ -2611,25 +2638,6 @@ if [[ -n $_server ]]; then
     fi
 fi
 
-function atfile.util.handle_protocol() {
-    uri="$1"
-
-    actor="$(echo $uri | cut -d "/" -f 3)"
-    path="$(echo $uri | cut -d "/" -f 4)"
-    key="$(echo $uri | cut -d "/" -f 5)"
-
-    if [[ -n "$actor" && -n "$path" && -n "$key" ]]; then
-        case "$path" in
-            "upload")
-                atfile.util.override_actor "$actor"
-                atfile.until.launch_uri "$key"
-                ;;
-            *)
-                atfile.die "Unable to handle '$path'"
-        esac
-    fi
-}
-
 ## Protocol Handler
 
 if [[ "$_command" == "atfile:"* ]]; then
@@ -2646,8 +2654,8 @@ if [[ $_is_sourced == 0 ]]; then
     case "$_command" in
         "blob")
             case "$2" in
-                "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
-                "upload"|"u") atfile.invoke.upload_blob "$3" ;;
+                "list"|"ls"|"l") atfile.invoke.blob_list "$3" ;;
+                "upload"|"u") atfile.invoke.blob_upload "$3" ;;
                 *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
             esac  
             ;;
@@ -2742,6 +2750,10 @@ if [[ $_is_sourced == 0 ]]; then
             atfile.util.check_prog_optional_metadata
             [[ -z "$2" ]] && atfile.die "<file> not set"
             atfile.invoke.upload "$2" "" "$3"
+            ;;
+        "upload-blob")
+            [[ -z "$2" ]] && atfile.die "<blob-key> not set"
+            atfile.invoke.upload_blob "$2" "$3"
             ;;
         "upload-crypt")
             atfile.util.check_prog_optional_metadata
