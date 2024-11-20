@@ -806,14 +806,12 @@ function atfile.util.override_actor() {
     [[ -z "$_username_original" ]] && _username_original="$_username"
     [[ -z "$_fmt_blob_url_original" ]] && _fmt_blob_url_original="$fmt_blob_url"
     
-    if ! [[ $actor == $_username ]]; then
-        resolved_id="$(atfile.util.resolve_identity "$actor")"
-        _username="$(echo $resolved_id | cut -d "|" -f 1)"
-        _server="$(echo $resolved_id | cut -d "|" -f 2)"
-    
-        if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
-            export _fmt_blob_url="$_fmt_blob_url_default"
-        fi
+    resolved_id="$(atfile.util.resolve_identity "$actor")"
+    _username="$(echo $resolved_id | cut -d "|" -f 1)"
+    _server="$(echo $resolved_id | cut -d "|" -f 2)"
+
+    if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
+        export _fmt_blob_url="$_fmt_blob_url_default"
     fi
 }
 
@@ -1771,7 +1769,7 @@ function atfile.invoke.handle_atfile() {
             fi
 
             if [[ -n $handler ]] || [[ $? != 0 ]]; then
-                atfile.say "Opening '$key' ($file_type) with '$(echo $handler | sed s/.desktop$//g)'..."
+                atfile.say.debug "Opening '$key' ($file_type) with '$(echo $handler | sed s/.desktop$//g)'..."
 
                 # HACK: Some apps don't like http(s)://; we'll need to handle these
                 if [[ $handler == "app.drey.EarTag.desktop" ]] ||\
@@ -2124,6 +2122,48 @@ function atfile.invoke.stream() {
     atfile.js.subscribe "$collection"
 }
 
+function atfile.invoke.toggle_desktop() {
+    unset desktop_dir
+    unset mime_dir
+
+    if [[ $uid == 0 ]]; then
+        desktop_dir="/usr/local/share/applications"
+        mime_dir="/usr/local/share/mime"
+    else
+        desktop_dir="$HOME/.local/share/applications"
+        mime_dir="$HOME/.local/share/mime"
+    fi
+
+    desktop_path="$desktop_dir/atfile-handler.desktop"
+    mkdir -p "$desktop_dir"
+    mkdir -p "$mime_dir"
+
+    if [[ -f "$desktop_path" ]]; then
+        atfile.say "Removing '$desktop_path'..."
+        rm "$desktop_path"
+    else
+        atfile.say "Installing '$desktop_path'..."
+
+        echo "[Desktop Entry]
+Name=ATFile (Handler)
+Description=Handle atfile:/at: URIs with ATFile
+Exec=$_prog_path handle %U
+Terminal=false
+Type=Application
+MimeType=x-scheme-handler/at;x-scheme-handler/atfile;
+NoDisplay=true" > "$desktop_path"
+    fi
+
+    if [ -x "$(command -v xdg-mime)" ] &&\
+        [ -x "$(command -v update-mime-database)" ]; then
+        atfile.say "Updating mime database..."
+
+        update-mime-database "$mime_dir"
+        xdg-mime default atfile-handler.desktop x-scheme-handler/at
+        xdg-mime default atfile-handler.desktop x-scheme-handler/atfile
+    fi
+}
+
 # TODO: Validate checksum
 function atfile.invoke.update() {
     if [[ $_output_json == 1 ]]; then
@@ -2369,10 +2409,13 @@ function atfile.invoke.usage() {
 
     nick <nick>
         Set nickname
-        ℹ️  Intended for future use
-    
-    update
-        Check for updates and update if outdated"
+        ℹ️  Intended for future use"
+
+    usage_commands_lifecycle="update
+        Check for updates and update if outdated
+
+    toggle-mime
+        Install/uninstall desktop file to handle atfile:/at: protocol"
 
     usage_commands_tools="blob list
     blob upload <path>
@@ -2478,6 +2521,9 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     
 Commands
     $usage_commands
+
+Commands (Lifecycle)
+    $usage_commands_lifecycle
 
 Commands (Tools)
     $usage_commands_tools
@@ -2679,8 +2725,10 @@ if [[ -z "$_server" ]]; then
         fi
 
         # NOTE: Speeds things up a little if the command doesn't need actor resolving
-        if [[ $_command == "handle" ]] ||\
-            [[ $_command == "resolve" ]]; then
+        if [[ $_command == "at:"* ]] ||\
+           [[ $_command == "atfile:"* ]] ||\
+           [[ $_command == "handle" ]] ||\
+           [[ $_command == "resolve" ]]; then
             atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
             skip_resolving=1
         fi
@@ -2720,10 +2768,9 @@ fi
 
 ## Protocol Handler
 
-if [[ "$_command" == "atfile:"* ]]; then
-    atfile.say.debug "Handling '$_command'..."
-    atfile.invoke.handle_atfile "$_command"
-    exit 0
+if [[ "$_command" == "atfile:"* || "$_command" == "at:"* ]]; then
+    set -- "handle" "$_command"
+    _command="handle"
 fi
 
 ## Commands
@@ -2772,7 +2819,15 @@ if [[ $_is_sourced == 0 ]]; then
             atfile.invoke.download "$2" 1
             ;;
         "handle")
-            atfile.invoke.handle_aturi "$2"
+            protocol="$(echo $2 | cut -d ":" -f 1)"
+            uri="$2"
+
+            atfile.say.debug "Handling protocol '$protocol://'..."
+
+            case $protocol in
+                "at") atfile.invoke.handle_aturi "$uri" ;;
+                "atfile") atfile.invoke.handle_atfile "$uri" ;;
+            esac
             ;;
         "info")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -2825,6 +2880,9 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "stream")
             atfile.invoke.stream "$2"
+            ;;
+        "toggle-mime")
+            atfile.invoke.toggle_desktop
             ;;
         "upload")
             atfile.util.check_prog_optional_metadata
