@@ -6,7 +6,7 @@ function die() {
 }
 
 uid="$(id -u)"
-blob="bafkreibuq2x5uehivockbkiha7hn6onamfbnynn2ou67wqmobieaeugqta"
+blob="bafkreih3hca5preynuc3gemcr7uqalxoyjupzhlepmiwktad6hr6luhrlu"
 url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$blob"
 
 install_file="atfile"
