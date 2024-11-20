@@ -2622,12 +2622,7 @@ function atfile.util.handle_protocol() {
         case "$path" in
             "upload")
                 atfile.util.override_actor "$actor"
-
-                if [[ -n $TERM ]]; then
-                    atfile.invoke.get "$key"
-                else
-                    atfile.until.launch_uri "$key"
-                fi
+                atfile.until.launch_uri "$key"
                 ;;
             *)
                 atfile.die "Unable to handle '$path'"
