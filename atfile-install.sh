@@ -6,7 +6,7 @@ function die() {
 }
 
 uid="$(id -u)"
-tag="v/0.x/0.4.10"
+tag="v/0.x/0.5"
 url="https://raw.githubusercontent.com/electricduck/atfile/refs/tags/$tag/atfile.sh"
 
 install_file="atfile"
