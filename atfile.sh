@@ -2366,6 +2366,8 @@ function atfile.invoke.usage() {
         atfile.die "Command not available as JSON"
     fi
 
+    handle="$(atfile.util.resolve_identity "$_at_did" | cut -d "|" -f 3 | sed -s 's/at:\/\///g')"
+
 # ------------------------------------------------------------------------------
     usage_commands="upload <file> [<key>]
         Upload new file to the PDS
@@ -2517,7 +2519,7 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     Licensed as MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
-       Follow on Bluesky at @atfile.zio.blue
+       Follow on Bluesky on @$handle
     
 Commands
     $usage_commands
