@@ -2126,6 +2126,10 @@ function atfile.invoke.toggle_desktop() {
     unset desktop_dir
     unset mime_dir
 
+    if [[ $(atfile.util.get_os) == "macos" ]]; then
+        atfile.die "Not available on macOS\nThink you could help? See: https://github.com/electricduck/atfile/issues/9"
+    fi
+
     if [[ $uid == 0 ]]; then
         desktop_dir="/usr/local/share/applications"
         mime_dir="/usr/local/share/mime"
