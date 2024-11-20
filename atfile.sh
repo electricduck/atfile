@@ -2306,20 +2306,20 @@ function atfile.invoke.upload() {
     fi
 }
 
-function atfile.invoke.upload_blob() {
-    cid="$1"
-
-    blob_uri="$_server/xrpc/com.atproto.sync.getBlob?cid=$cid&did=$_username"
-
-    [[ $(atfile.util.is_url_okay "$blob_uri") == 0 ]] && atfile.die "Unable to find blob '$cid'"
-
-    atfile.say "Fetching '$cid' from '$_username'..."
-
-    echo "---"
-    echo "Uploaded: 🔵 $cid"
-    atfile.util.print_blob_url_output "$(atfile.util.build_blob_uri "$_username" "$cid")"
-    echo -e "↳ Key: $key"
-}
+#function atfile.invoke.upload_blob() {
+#    cid="$1"
+#
+#    blob_uri="$_server/xrpc/com.atproto.sync.getBlob?cid=$cid&did=$_username"
+#
+#    [[ $(atfile.util.is_url_okay "$blob_uri") == 0 ]] && atfile.die "Unable to find blob '$cid'"
+#
+#    atfile.say "Downloading '$cid' from '$_username'..."
+#
+#    echo "---"
+#    echo "Uploaded: 🔵 $cid"
+#    atfile.util.print_blob_url_output "$(atfile.util.build_blob_uri "$_username" "$cid")"
+#    echo -e "↳ Key: $key"
+#}
 
 function atfile.invoke.usage() {
     if [[ $_output_json == 1 ]]; then
@@ -2366,9 +2366,6 @@ function atfile.invoke.usage() {
     fetch-crypt <file> [<actor>]
         Download an uploaded encrypted file and attempt to decrypt it (with GPG)
         ℹ️  Make sure the necessary GPG key has been imported first
-        
-    upload-blob <blob-cid> [<key>]
-        Create an uploaded file for an already-existing blob
 
     nick <nick>
         Set nickname
@@ -2834,10 +2831,10 @@ if [[ $_is_sourced == 0 ]]; then
             [[ -z "$2" ]] && atfile.die "<file> not set"
             atfile.invoke.upload "$2" "" "$3"
             ;;
-        "upload-blob")
-            [[ -z "$2" ]] && atfile.die "<blob-key> not set"
-            atfile.invoke.upload_blob "$2" "$3"
-            ;;
+        #"upload-blob")
+        #    [[ -z "$2" ]] && atfile.die "<blob-key> not set"
+        #    atfile.invoke.upload_blob "$2" "$3"
+        #    ;;
         "upload-crypt")
             atfile.util.check_prog_optional_metadata
             atfile.util.check_prog_gpg
