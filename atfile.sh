@@ -228,7 +228,7 @@ function atfile.util.get_app_url_for_at_uri() {
 }
 
 function atfile.util.get_cache() {
-    file="$_cache_dir/$1"
+    file="$_dir_cache/$1"
     
     if [[ ! -f "$file" ]]; then
         touch "$file"
@@ -294,7 +294,7 @@ function atfile.util.get_didplc_doc() {
         endpoint="$1"
         actor="$2"
 
-        curl -s -L -X GET "$endpoint/$actor"
+        curl -H "User-Agent: $(atfile.util.get_uas)" -s -L -X GET "$endpoint/$actor"
     }
 
     didplc_endpoint="$_endpoint_plc_directory"
@@ -655,7 +655,7 @@ function atfile.util.get_pds_pretty() {
         echo "🔀 Bridy Fed"
     else
         pds_oauth_url="$pds/oauth/authorize"
-        pds_oauth_page="$(curl -s -L -X GET "$pds_oauth_url")"
+        pds_oauth_page="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -L -X GET "$pds_oauth_url")"
         pds_customization_data="$(echo $pds_oauth_page | sed -s s/.*_customizationData\"]=//g | sed -s s/\;document\.currentScript\.remove.*//g)"
 
         if [[ $pds_customization_data == "{"* ]]; then
@@ -908,7 +908,7 @@ function atfile.util.resolve_identity() {
         
         case "$actor" in
             "did:plc:"*) did_doc="$(atfile.util.get_didplc_doc "$actor")" ;;
-            "did:web:"*) did_doc="$(curl -s -L -X GET "$(atfile.util.get_didweb_doc_url "$actor")")" ;;
+            "did:web:"*) did_doc="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -L -X GET "$(atfile.util.get_didweb_doc_url "$actor")")" ;;
         esac
             
         if [[ $? != 0 || -z "$did_doc" ]]; then
@@ -930,13 +930,24 @@ function atfile.util.resolve_identity() {
 
 function atfile.util.write_cache() {
     file="$1"
-    file_path="$_cache_dir/$1"
+    file_path="$_dir_cache/$1"
     content="$2"
     
     atfile.util.get_cache "$file"
   
     echo -e "$content" > "$file_path"
     [[ $? != 0 ]] && atfile.die "Unable to write to cache file ($file)"
+}
+
+# HTTP
+
+function atfile.http.download() {
+    uri="$1"
+    out_path="$2"
+
+    curl -s -X GET "$uri" \
+        -H "User-Agent: $(atfile.util.get_uas)" \
+        -o "$out_path"
 }
 
 # XRPC
@@ -1730,6 +1741,7 @@ function atfile.invoke.get_url() {
 
 function atfile.invoke.handle_atfile() {
     uri="$1"
+    handler="$2"
 
     [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
 
@@ -1744,7 +1756,8 @@ function atfile.invoke.handle_atfile() {
         record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
         [[ "$(atfile.util.is_xrpc_success $? "$record")" == 0 ]] && atfile.die.gui "Unable to get '$key'"
 
-        blob_uri="$(atfile.util.build_blob_uri "$_username" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        blob_cid="$(echo $record | jq -r ".value.blob.ref.\"\$link\"")"
+        blob_uri="$(atfile.util.build_blob_uri "$_username" "$blob_cid")"
         file_type="$(echo $record | jq -r '.value.file.mimeType')"
 
         if [[ $(atfile.util.get_os) != "macos" ]] && \
@@ -1752,12 +1765,42 @@ function atfile.invoke.handle_atfile() {
             [ -x "$(command -v xdg-open)" ] && \
             [ -x "$(command -v gtk-launch)" ]; then
 
-            atfile.say.debug "Querying '$file_type' handler..."
-            handler="$(xdg-mime query default $file_type)"
-            
+            if [[ -z $handler ]]; then
+                atfile.say.debug "Querying '$file_type' handler..."
+                handler="$(xdg-mime query default $file_type)"
+            fi
+
             if [[ -n $handler ]] || [[ $? != 0 ]]; then
                 atfile.say "Opening '$key' ($file_type) with '$(echo $handler | sed s/.desktop$//g)'..."
-                gtk-launch "$handler" "$blob_uri" </dev/null &>/dev/null &
+
+                # HACK: Some apps don't like http(s)://; we'll need to handle these
+                if [[ $handler == "app.drey.EarTag.desktop" ]] ||\
+                    [[ $handler == "com.github.neithern.g4music.desktop" ]]; then
+                    atfile.say.debug "Handler '$handler' does not support 'http(s)://'"
+
+                    download_success=1
+                    tmp_dir="/tmp/at-blobs"
+                    tmp_path="$tmp_dir/$blob_cid"
+
+                    mkdir -p "$tmp_dir"
+
+                    if ! [[ -f "$tmp_path" ]]; then
+                        atfile.say.debug "Downloading '$blob_cid'..."
+                        atfile.http.download "$blob_uri" "$tmp_path"
+                        [[ $? != 0 ]] && download_success=0
+                    else
+                        atfile.say.debug "Blob '$blob_cid' already exists"
+                    fi
+
+                    if [[ $download_success == 1 ]]; then
+                        gtk-launch "$handler" "$tmp_path" </dev/null &>/dev/null &
+                    else
+                        atfile.die.gui \
+                            "Unable to download '$key'"
+                    fi
+                else
+                    gtk-launch "$handler" "$blob_uri" </dev/null &>/dev/null &
+                fi
             else
                 atfile.say.debug "No handler for '$file_type'. Launching URI..."
                 atfile.util.launch_uri "$blob_uri"
@@ -2037,7 +2080,7 @@ function atfile.invoke.resolve() {
     pds="$(echo $resolved_did | cut -d "|" -f 2)"
     pds_name="$(atfile.util.get_pds_pretty "$pds")"
     atfile.say.debug "Getting PDS version for '$pds'..."
-    pds_version="$(curl -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
+    pds_version="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
 
     [[ "$did" == "null" ]] && atfile.die "Unable to resolve '$actor'"
 
@@ -2048,7 +2091,7 @@ function atfile.invoke.resolve() {
     esac
 
     if [[ $_output_json == 1 ]]; then
-        did_doc_data="$(curl -s -l -X GET "$did_doc")"
+        did_doc_data="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -l -X GET "$did_doc")"
     
         echo -e "{
     \"did\": \"$did\",
@@ -2118,7 +2161,7 @@ function atfile.invoke.update() {
         [[ $? != 0 ]] && atfile.die "Unable to get blob URL"
 
         atfile.say.debug "Downloading latest release..."
-        curl -s -o "$temp_updated_path" "$blob_url"
+        curl -H "User-Agent: $(atfile.util.get_uas)" -s -o "$temp_updated_path" "$blob_url"
         if [[ $? == 0 ]]; then
             mv "$temp_updated_path" "$_prog_path"
             if [[ $? != 0 ]]; then
@@ -2423,9 +2466,8 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 
-    $_cache_dir/
-        Cache and temporary storage
-        ℹ️  Intended for future use"
+    $_dir_cache/
+        Cache and temporary storage"
 
     usage="ATFile | 📦 ➔ 🦋
     Store and retrieve files on the ATmosphere
@@ -2473,9 +2515,9 @@ _version="0.6.1"
 _at_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _c_author="Ducky"
 _c_year="2024"
-_cache_dir="$HOME/.cache/atfile"
 _command="$1"
 _command_full="$@"
+_dir_cache="$HOME/.cache/atfile"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 _is_sourced=0
@@ -2545,13 +2587,11 @@ fi
 atfile.say.debug "Starting up..."
 atfile.say.debug "Terminal is $(atfile.util.get_term_rows) rows"
 
-## Cache creation
+## Cache
 
-if [[ $_is_sourced == 0 ]]; then
-    atfile.say.debug "Creating cache directory ($_cache_dir)..."
-    mkdir -p "$_cache_dir"
-    [[ $? != 0 ]] && atfile.die "Unable to create cache directory ($_cache_dir)"
-fi
+atfile.say.debug "Creating cache directory ($_dir_cache)..."
+mkdir -p "$_dir_cache"
+[[ $? != 0 ]] && atfile.die "Unable to create cache directory ($_dir_cache)"
 
 ## Git detection
 
