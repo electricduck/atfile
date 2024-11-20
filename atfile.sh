@@ -17,6 +17,19 @@ function atfile.die() {
     [[ $_is_sourced == 0 ]] && exit 255
 }
 
+function atfile.die.gui() {
+    cli_error="$1"
+    gui_error="$2"
+
+    [[ -z $gui_error ]] && gui_error="$cli_error"
+
+    if [ -x "$(command -v zenity)" ] && [[ $_is_sourced == 0 ]]; then
+        zenity --error --text "$gui_error"
+    fi
+
+    atfile.die "$cli_error"
+}
+
 function atfile.die.unknown_command() {
     command="$1"
     atfile.die "Unknown command '$1'"
@@ -156,8 +169,7 @@ function atfile.util.get_app_url_for_at_uri() {
             "app.bsky.graph.starterpack") resolved_url="https://bsky.app/starter-pack/$actor/$rkey" ;;
             "app.bsky.feed.post") resolved_url="https://bsky.app/profile/$actor/post/$rkey" ;;
             "blue.linkat.board") ignore_url_validation=1 && resolved_url="https://linkat.blue/$actor_handle" ;;
-            "blue.zio.atfile.lock") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
-            "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/$rkey" ;;
             "chat.bsky.actor.declaration") resolved_url="https://bsky.app/messages/settings" ;;
             "com.shinolabs.pinksea.oekaki") resolved_url="https://pinksea.art/$actor/oekaki/$rkey" ;;
             "com.whtwnd.blog.entry") resolved_url="https://whtwnd.com/$actor/$rkey" ;;
@@ -731,25 +743,6 @@ function atfile.util.get_yn() {
     fi
 }
 
-function atfile.util.handle_protocol() {
-    uri="$1"
-
-    actor="$(echo $uri | cut -d "/" -f 3)"
-    path="$(echo $uri | cut -d "/" -f 4)"
-    key="$(echo $uri | cut -d "/" -f 5)"
-
-    if [[ -n "$actor" && -n "$path" && -n "$key" ]]; then
-        case "$path" in
-            "upload")
-                atfile.util.override_actor "$actor"
-                atfile.until.launch_uri "$key"
-                ;;
-            *)
-                atfile.die "Unable to handle '$path'"
-        esac
-    fi
-}
-
 function atfile.util.is_null_or_empty() {
     if [[ -z "$1" ]] || [[ "$1" == null ]]; then
         echo 1
@@ -789,7 +782,7 @@ function atfile.util.is_xrpc_success() {
     fi
 }
 
-function atfile.until.launch_uri() {
+function atfile.util.launch_uri() {
     uri="$1"
 
     if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
@@ -1735,30 +1728,62 @@ function atfile.invoke.get_url() {
     fi
 }
 
-function atfile.invoke.handle() {
+function atfile.invoke.handle_atfile() {
     uri="$1"
 
-    function atfile.invoke.handle.handle_error() {
-        cli_error="$1"
-        gui_error="$2"
+    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
 
-        [[ -z $gui_error ]] && gui_error="$cli_error"
+    actor="$(echo $uri | cut -d "/" -f 3)"
+    key="$(echo $uri | cut -d "/" -f 4)"
 
-        if [ -x "$(command -v zenity)" ]; then
-            zenity --error --text "$gui_error"
+    if [[ -n "$actor" && -n "$key" ]]; then
+        atfile.util.override_actor "$actor"
+        atfile.util.print_override_actor_debug
+
+        atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
+        record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
+        [[ "$(atfile.util.is_xrpc_success $? "$record")" == 0 ]] && atfile.die.gui "Unable to get '$key'"
+
+        blob_uri="$(atfile.util.build_blob_uri "$_username" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
+        file_type="$(echo $record | jq -r '.value.file.mimeType')"
+
+        if [[ $(atfile.util.get_os) != "macos" ]] && \
+            [ -x "$(command -v xdg-mime)" ] && \
+            [ -x "$(command -v xdg-open)" ] && \
+            [ -x "$(command -v gtk-launch)" ]; then
+
+            atfile.say.debug "Querying '$file_type' handler..."
+            handler="$(xdg-mime query default $file_type)"
+            
+            if [[ -n $handler ]] || [[ $? != 0 ]]; then
+                atfile.say "Opening '$key' ($file_type) with '$(echo $handler | sed s/.desktop$//g)'..."
+                gtk-launch "$handler" "$blob_uri" </dev/null &>/dev/null &
+            else
+                atfile.say.debug "No handler for '$file_type'. Launching URI..."
+                atfile.util.launch_uri "$blob_uri"
+            fi
+        else
+            atfile.say.debug "Relevant tools not installed. Launching URI..."
+            atfile.util.launch_uri "$blob_uri"
         fi
+    else
+        atfile.die.gui \
+            "Invalid ATFile URI\n↳ Must be 'atfile://<actor>/<key>'" \
+            "Invalid ATFile URI"
+    fi
+}
 
-        atfile.die "$cli_error"
-    }
+function atfile.invoke.handle_aturi() {
+    uri="$1"
 
     [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
-    [[ "$uri" != "at://"* ]] && atfile.invoke.handle.handle_error \
+    [[ "$uri" != "at://"* ]] && atfile.die.gui \
         "Invalid AT URI\n↳ Must be 'at://<actor>[/<collection>/<rkey>]'" \
         "Invalid AT URI"
 
     atfile.say.debug "Resolving '$uri'..."
     app_uri="$(atfile.util.get_app_url_for_at_uri "$uri")"
-    [[ -z "$app_uri" ]] && atfile.invoke.handle.handle_error \
+    [[ -z "$app_uri" ]] && atfile.die.gui \
         "Unable to resolve AT URI to App"
 
     app_proto="$(echo $app_uri | cut -d ":" -f 1)"
@@ -1766,9 +1791,9 @@ function atfile.invoke.handle() {
     atfile.say.debug "Opening '$app_uri' ($app_proto)..."
 
     if [[ $app_proto == "atfile" ]]; then
-        atfile.util.handle_protocol "$app_uri"
+        atfile.invoke.handle_atfile "$app_uri"
     else
-        atfile.until.launch_uri "$app_uri"
+        atfile.util.launch_uri "$app_uri"
     fi
 }
 
@@ -2660,7 +2685,7 @@ fi
 
 if [[ "$_command" == "atfile:"* ]]; then
     atfile.say.debug "Handling '$_command'..."
-    atfile.util.handle_protocol "$_command"
+    atfile.invoke.handle_atfile "$_command"
     exit 0
 fi
 
@@ -2710,7 +2735,7 @@ if [[ $_is_sourced == 0 ]]; then
             atfile.invoke.download "$2" 1
             ;;
         "handle")
-            atfile.invoke.handle "$2"
+            atfile.invoke.handle_aturi "$2"
             ;;
         "info")
             [[ -z "$2" ]] && atfile.die "<key> not set"
