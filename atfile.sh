@@ -1203,8 +1203,8 @@ function blue.zio.atfile.finger__machine() {
         echo "{
     \"\$type\": \"blue.zio.atfile.finger#machine\",
     \"app\": \"$(atfile.util.get_uas)\",
-    \"id\": \"$id\",
     \"host\": \"$hostname\",
+    \"id\": \"$id\",
     \"os\": \"$os\"
 }"
     else
@@ -1244,14 +1244,14 @@ function blue.zio.atfile.upload() {
     echo "{
     \"createdAt\": \"$createdAt\",
     \"file\": {
-        \"modifiedAt\": \"$file_modifiedAt\",
         \"mimeType\": \"$file_type\",
+        \"modifiedAt\": \"$file_modifiedAt\",
         \"name\": \"$file_name\",
         \"size\": $file_size
     },
     \"checksum\": {
-        \"hash\": \"$file_hash\",
-        \"type\": \"$file_hash_type\"
+        \"algo\": \"$file_hash_type\",
+        \"hash\": \"$file_hash\"
     },
     \"finger\": $finger_record,
     \"meta\": $meta_record,
@@ -1541,7 +1541,8 @@ function atfile.invoke.get() {
         else
             file_date="$(echo "$record" | jq -r '.value.file.modifiedAt')"
             file_hash="$(echo "$record" | jq -r '.value.checksum.hash')"
-            file_hash_type="$(echo "$record" | jq -r '.value.checksum.type')"
+            file_hash_type="$(echo "$record" | jq -r '.value.checksum.algo')"
+            [[ "$file_hash_type" == "null" ]] && file_hash_type="$(echo "$record" | jq -r '.value.checksum.type')"
             file_hash_pretty="$file_hash ($file_hash_type)"
             file_name="$(echo "$record" | jq -r '.value.file.name')"
             file_name_pretty="$(atfile.util.get_file_name_pretty "$(echo "$record" | jq -r '.value')")"
