@@ -81,6 +81,21 @@ function atfile.say.inline() {
 
 # Utilities
 
+function atfile.util.build_blob_uri() {
+    did="$1"
+    cid="$2"
+    pds="$_server"
+
+    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
+}
+
+function atfile.util.build_out_filename() {
+    key="$1"
+    name="$2"
+
+    echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
+}
+
 function atfile.util.check_prog() {
     command="$1"
     download_hint="$2"
@@ -108,6 +123,96 @@ function atfile.util.check_prog_gpg() {
 function atfile.util.check_prog_optional_metadata() {
     [[ $_skip_ni_exiftool == 0 ]] && atfile.util.check_prog "exiftool" "https://exiftool.org/" "${_envvar_prefix}_SKIP_NI_EXIFTOOL"
     [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo" "${_envvar_prefix}_SKIP_NI_MEDIAINFO"
+}
+
+function atfile.util.get_app_url_for_at_uri() {
+    uri="$1"
+
+    actor="$(echo $uri | cut -d / -f 3)"
+    collection="$(echo $uri | cut -d / -f 4)"
+    rkey="$(echo $uri | cut -d / -f 5)"
+
+    ignore_url_validation=0
+    resolved_actor="$(atfile.util.resolve_identity "$actor")"
+    unset actor_handle
+    unset actor_pds
+    unset resolved_url
+    
+    if [[ $? == 0 ]]; then
+        actor="$(echo "$resolved_actor" | cut -d "|" -f 1)"
+        actor_handle="$(echo "$resolved_actor" | cut -d "|" -f 3 | cut -d "/" -f 3)"
+        actor_pds="$(echo "$resolved_actor" | cut -d "|" -f 2)"
+    else
+        unset actor
+    fi
+
+    [[ -z "$rkey" ]] && rkey="self"
+
+    if [[ -n "$actor" && -n "$collection" && -n "$rkey" ]]; then
+        case "$collection" in
+            "app.bsky.actor.profile") resolved_url="https://bsky.app/profile/$actor" ;;
+            "app.bsky.feed.generator") resolved_url="https://bsky.app/profile/$actor/feed/$rkey" ;;
+            "app.bsky.graph.list") resolved_url="https://bsky.app/profile/$actor/lists/$rkey" ;;
+            "app.bsky.graph.starterpack") resolved_url="https://bsky.app/starter-pack/$actor/$rkey" ;;
+            "app.bsky.feed.post") resolved_url="https://bsky.app/profile/$actor/post/$rkey" ;;
+            "blue.linkat.board") ignore_url_validation=1 && resolved_url="https://linkat.blue/$actor_handle" ;;
+            "blue.zio.atfile.lock") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/upload/$rkey" ;;
+            "chat.bsky.actor.declaration") resolved_url="https://bsky.app/messages/settings" ;;
+            "com.shinolabs.pinksea.oekaki") resolved_url="https://pinksea.art/$actor/oekaki/$rkey" ;;
+            "com.whtwnd.blog.entry") resolved_url="https://whtwnd.com/$actor/$rkey" ;;
+            "events.smokesignal.app.profile") resolved_url="https://smokesignal.events/$actor" ;;
+            "events.smokesignal.calendar.event") resolved_url="https://smokesignal.events/$actor/$rkey" ;;
+            "fyi.unravel.frontpage.post") resolved_url="https://frontpage.fyi/post/$actor/$rkey" ;;
+            "app.bsky.feed.like"| \
+            "app.bsky.feed.postgate"| \
+            "app.bsky.feed.repost"| \
+            "app.bsky.feed.threadgate"| \
+            "app.bsky.graph.follow"| \
+            "app.bsky.graph.listblock"| \
+            "app.bsky.graph.listitem"| \
+            "events.smokesignal.calendar.rsvp"| \
+            "fyi.unravel.frontpage.comment"| \
+            "fyi.unravel.frontpage.vote")
+                record="$(atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
+
+                if [[ "$(atfile.util.is_xrpc_success $? "$record")" == 1 ]]; then
+                    case "$collection" in
+                        "app.bsky.feed.like")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "app.bsky.feed.postgate")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
+                        "app.bsky.feed.repost")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "app.bsky.feed.threadgate")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post')")" ;;
+                        "app.bsky.graph.follow")
+                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
+                        "app.bsky.graph.listblock")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject')")" ;;
+                        "app.bsky.graph.listitem")
+                            resolved_url="https://bsky.app/profile/$(echo "$record" | jq -r '.value.subject')" ;;
+                        "events.smokesignal.calendar.rsvp")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                        "fyi.unravel.frontpage.comment")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.post.uri')")/$actor/$rkey" ;;
+                        "fyi.unravel.frontpage.vote")
+                            resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
+                    esac
+                fi
+                ;;
+        esac
+    elif [[ -n "$actor" ]]; then
+        resolved_url="https://pdsls.dev/at/$actor"
+    fi
+
+    if [[ -n "$resolved_url" && $ignore_url_validation == 0 ]]; then
+        if [[ $(atfile.util.is_url_okay "$resolved_url") == 0 ]]; then
+            unset resolved_url
+        fi
+    fi
+
+    echo "$resolved_url"
 }
 
 function atfile.util.get_cache() {
@@ -168,6 +273,32 @@ function atfile.util.get_date_json() {
     else
         echo "null"
     fi
+}
+
+function atfile.util.get_didplc_doc() {
+    actor="$1"
+
+    function atfile.util.get_didplc_doc.request_doc() {
+        endpoint="$1"
+        actor="$2"
+
+        curl -s -L -X GET "$endpoint/$actor"
+    }
+
+    didplc_endpoint="$_endpoint_plc_directory"
+    didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$didplc_endpoint" "$actor")"
+
+    if [[ "$didplc_doc" != "{"* ]]; then
+        didplc_endpoint="$_endpoint_plc_directory_fallback"
+        didplc_doc="$(atfile.util.get_didplc_doc.request_doc "$didplc_endpoint" "$actor")"
+    fi
+
+    echo "$(echo $didplc_doc | jq ". += {\"directory\": \"$didplc_endpoint\"}")"
+}
+
+function atfile.util.get_didweb_doc_url() {
+    actor="$1"
+    echo "https://$(echo "$actor" | sed "s/did:web://")/.well-known/did.json"
 }
 
 function atfile.util.get_envvar() {
@@ -499,6 +630,30 @@ function atfile.util.get_os() {
     esac
 }
 
+function atfile.util.get_pds_pretty() {
+    pds="$1"
+
+    pds_host="$(echo $pds | cut -d "/" -f 3)"
+
+    if [[ $pds_host == *".host.bsky.network" ]]; then
+        bsky_host="$(echo $pds_host | cut -d "." -f 1)"
+        bsky_region="$(echo $pds_host | cut -d "." -f 2)"
+        echo "🍄 ${bsky_host^} ($(atfile.util.get_region_pretty "$bsky_region"))"
+    elif [[ $pds_host == "atproto.brid.gy" ]]; then
+        echo "🔀 Bridy Fed"
+    else
+        pds_oauth_url="$pds/oauth/authorize"
+        pds_oauth_page="$(curl -s -L -X GET "$pds_oauth_url")"
+        pds_customization_data="$(echo $pds_oauth_page | sed -s s/.*_customizationData\"]=//g | sed -s s/\;document\.currentScript\.remove.*//g)"
+
+        if [[ $pds_customization_data == "{"* ]]; then
+            echo "🟦 $(echo $pds_customization_data | jq -r '.name')"
+        else
+            echo "$pds"
+        fi
+    fi
+}
+
 function atfile.util.get_realpath() {
     path="$1"
 
@@ -507,6 +662,15 @@ function atfile.util.get_realpath() {
     else
         realpath -s "$path"
     fi
+}
+
+function atfile.util.get_region_pretty() {
+    region="$1"
+
+    region_sub="$(echo $1 | cut -d "-" -f 2)"
+    region="$(echo $1 | cut -d "-" -f 1)"
+
+    echo "${region^^} ${region_sub^}"
 }
 
 function atfile.util.get_rkey_from_at_uri() {
@@ -577,9 +741,17 @@ function atfile.util.is_null_or_empty() {
 
 function atfile.util.is_url_accessible_in_browser() {
     url="$1"
+    atfile.util.is_url_okay "$url" "$_test_desktop_uas"
+}
 
-    code="$(curl -H "User-Agent: $_test_desktop_uas" -s -o /dev/null -w "%{http_code}" "$url")"
-    
+function atfile.util.is_url_okay() {
+    url="$1"
+    uas="$2"
+
+    [[ -z "$uas" ]] && uas="$(atfile.util.get_uas)"
+
+    code="$(curl -H "User-Agent: $uas" -s -o /dev/null -w "%{http_code}" "$url")"
+
     if [[ "$code" == 2* || "$code" == 3* ]]; then
         echo 1
     else
@@ -598,49 +770,17 @@ function atfile.util.is_xrpc_success() {
     fi
 }
 
-function atfile.util.build_blob_uri() {
-    did="$1"
-    cid="$2"
-    pds="$_server"
+function atfile.until.launch_uri() {
+    uri="$1"
 
-    echo "$_fmt_blob_url" | sed -e "s|\[pds\]|$pds|g" -e "s|\[server\]|$pds|g"  -e "s|\[cid\]|$cid|g" -e "s|\[did\]|$did|g"
-}
-
-function atfile.util.build_out_filename() {
-    key="$1"
-    name="$2"
-
-    echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
-}
-
-function atfile.util.resolve_identity() {
-    actor="$1"
-    
-    if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
-        if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
-            actor="$(echo "$resolved_handle" | jq -r ".did")"
-        fi
-    fi
-    
-    if [[ "$actor" == "did:"* ]]; then
-        unset did_doc
-        
-        case "$actor" in
-            "did:plc:"*) did_doc="$(curl -s -L -X GET "$_endpoint_plc_directory/$actor")" ;; # TODO: What if they're not on plc.directory?
-            "did:web:"*) did_doc="$(curl -s -L -X GET "$(echo "$actor" | sed "s/did:web://")/.well-known/did.json")" ;;
-        esac
-            
-        if [[ $? != 0 || -z "$did_doc" ]]; then
-            atfile.die "Unable to fetch DID Doc for '$actor'"
+    if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
+        if [[ $(atfile.util.get_os) == "macos" ]]; then
+            open "$uri"
         else
-            did="$(echo "$did_doc" | jq -r ".id")"
-            pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
-            
-            echo "$did@$pds"
+            xdg-open "$uri"
         fi
     else
-        atfile.die "Unable to resolve '$actor'"
+        echo "$uri"
     fi
 }
 
@@ -656,8 +796,8 @@ function atfile.util.override_actor() {
     
     if ! [[ $actor == $_username ]]; then
         resolved_id="$(atfile.util.resolve_identity "$actor")"
-        _username="$(echo $resolved_id | cut -d "@" -f 1)"
-        _server="$(echo $resolved_id | cut -d "@" -f 2)"
+        _username="$(echo $resolved_id | cut -d "|" -f 1)"
+        _server="$(echo $resolved_id | cut -d "|" -f 2)"
     
         if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
             export _fmt_blob_url="$_fmt_blob_url_default"
@@ -671,6 +811,16 @@ function atfile.util.override_actor_reset() {
     [[ -n "$_server_original" ]] && _server="$_server_original"; unset _server_original
     [[ -n "$_username_original" ]] && _username="$_username_original"; unset _username_original
     [[ -n "$_fmt_blob_url_original" ]] && _fmt_blob_url="$_fmt_blob_url_original"; unset _fmt_blob_url_original
+}
+
+function atfile.util.parse_exiftool_date() {
+    in_date="$1"
+    tz="$2"
+        
+    date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
+    time="$(echo "$in_date" | cut -d " " -f 2)"
+      
+    echo "$date $time $tz"
 }
 
 function atfile.util.print_blob_url_output() {
@@ -697,11 +847,6 @@ function atfile.util.print_copyright_warning() {
     fi
 }
 
-function atfile.util.print_hidden_command_warning() {
-    envvar="$1"
-    echo -e "⚠️  Hidden command ($_command)\n   If you know what you're doing, enable with ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS=1"
-}
-
 # HACK: We don't normally atfile.say() in the atfile.util.* namespace, but
 #       atfile.until.override_actor() is in this namespace and it would be nice
 #       to have a debug output for it when called in the main command case
@@ -720,21 +865,46 @@ function atfile.util.print_table_paginate_hint() {
     fi
 }
 
-function atfile.util.parse_exiftool_date() {
-    in_date="$1"
-    tz="$2"
-        
-    date="$(echo "$in_date" | cut -d " " -f 1 | sed -e "s|:|-|g")"
-    time="$(echo "$in_date" | cut -d " " -f 2)"
-      
-    echo "$date $time $tz"
-}
-
 function atfile.util.repeat_char() {
     char="$1"
     amount="$2"
     
     printf "%0.s$char" $(seq 1 $amount)
+}
+
+function atfile.util.resolve_identity() {
+    actor="$1"
+    
+    if [[ "$actor" != "did:"* ]]; then
+        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
+        if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
+            actor="$(echo "$resolved_handle" | jq -r ".did")"
+        fi
+    fi
+    
+    if [[ "$actor" == "did:"* ]]; then
+        unset did_doc
+        
+        case "$actor" in
+            "did:plc:"*) did_doc="$(atfile.util.get_didplc_doc "$actor")" ;;
+            "did:web:"*) did_doc="$(curl -s -L -X GET "$(atfile.util.get_didweb_doc_url "$actor")")" ;;
+        esac
+            
+        if [[ $? != 0 || -z "$did_doc" ]]; then
+            atfile.die "Unable to fetch DID Doc for '$actor'"
+        else
+            did="$(echo "$did_doc" | jq -r ".id")"
+            didplc_dir="$(echo "$did_doc" | jq -r ".directory")"
+            pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
+            handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[0]')"
+
+            [[ $didplc_dir == "null" ]] && unset didplc_dir
+            
+            echo "$did|$pds|$handle|$didplc_dir"
+        fi
+    else
+        atfile.die "Unable to resolve '$actor'"
+    fi
 }
 
 function atfile.util.write_cache() {
@@ -799,6 +969,15 @@ function atfile.xrpc.post_blob() {
         -H "Content-Type: $type" \
         -H "User-Agent: $(atfile.util.get_uas)" \
         --data-binary @"$file" | jq
+}
+
+## JetStream
+
+function atfile.js.subscribe() {
+    collection="$1"
+
+    atfile.util.check_prog "websocat"
+    websocat "$_endpoint_jetstream/subscribe?wantedCollections=$collection"
 }
 
 # Lexicons
@@ -1213,7 +1392,6 @@ function atfile.invoke.debug() {
 ↳ UAS: $(atfile.util.get_uas)
 Variables
 $(atfile.invoke.debug.print_envvar "DEBUG" $_debug_default)
-$(atfile.invoke.debug.print_envvar "ENABLE_HIDDEN_COMMANDS" $_enable_hidden_commands_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PDS")
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_directory_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
@@ -1446,59 +1624,40 @@ function atfile.invoke.get_url() {
     fi
 }
 
-function atfile.invoke.update() {
-    function atfile.invoke.update.parse_version() {
-        version="$1"
-        version="$(echo $version | cut -d "+" -f 1)"
-        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
-        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
-        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
-        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+function atfile.invoke.handle() {
+    uri="$1"
+
+    function atfile.invoke.handle.handle_error() {
+        cli_error="$1"
+        gui_error="$2"
+
+        [[ -z $gui_error ]] && gui_error="$cli_error"
+
+        if [ -x "$(command -v zenity)" ]; then
+            zenity --error --text "$gui_error"
+        fi
+
+        atfile.die "$cli_error"
     }
 
-    if [[ $_output_json == 1 ]]; then
-        atfile.die "Command not available as JSON"
-    fi
-    
-    atfile.say.debug "Getting latest release..."
-    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
-    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
-    
-    latest_version="$(echo "$latest_release" | jq -r ".name")"
-    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
-    
-    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
-    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
-    
-    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
-    
-    if [[ $_version == *+git* ]]; then
-        atfile.die "Cannot update Git version ($_version)"
-    fi
-    
-    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
-        temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
-        
-        atfile.say.debug "Touching temporary path ($temp_updated_path)..."
-        touch "$temp_updated_path"
-        [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
-        
-        atfile.say.debug "Downloading latest release..."
-        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
-        if [[ $? == 0 ]]; then
-            mv "$temp_updated_path" "$_prog_path"
-            if [[ $? != 0 ]]; then
-                atfile.die "Unable to update (do you have permission?)"
-            else
-                chmod +x "$_prog_path"
-                atfile.say "😎 Updated to $latest_version!"
-                exit 0
-            fi
-        else
-            atfile.die "Unable to download latest version"
-        fi
+    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
+    [[ "$uri" != "at://"* ]] && atfile.invoke.handle.handle_error \
+        "Invalid AT URI\n↳ Must be 'at://<actor>[/<collection>/<rkey>]'" \
+        "Invalid AT URI"
+
+    atfile.say.debug "Resolving '$uri'..."
+    app_uri="$(atfile.util.get_app_url_for_at_uri "$uri")"
+    [[ -z "$app_uri" ]] && atfile.invoke.handle.handle_error \
+        "Unable to resolve AT URI to App"
+
+    app_proto="$(echo $app_uri | cut -d ":" -f 1)"
+
+    atfile.say.debug "Opening '$app_uri' ($app_proto)..."
+
+    if [[ $app_proto == "atfile" ]]; then
+        atfile.util.handle_protocol "$app_uri"
     else
-        atfile.say "No updates found"
+        atfile.until.launch_uri "$app_uri"
     fi
 }
 
@@ -1692,7 +1851,7 @@ function atfile.invoke.manage_record() {
         "delete")
             collection="$(atfile.invoke.manage_record.get_collection "$3")"
             key="$2"
-            [[ -z "$key" ]] && atfile.die "<key> not set"
+            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
             
             if [[ "$key" == at:* ]]; then
                 at_uri="$key"
@@ -1731,10 +1890,10 @@ function atfile.invoke.manage_record() {
             atfile.util.override_actor_reset
             ;;
         "put")
-            collection="$(atfile.invoke.manage_record.get_collection "$3")"
+            collection="$(atfile.invoke.manage_record.get_collection "$4")"
             key="$2"
             record="$3"
-            [[ -z "$key" ]] && atfile.die "<key> not set"
+            [[ -z "$key" ]] && atfile.die "<key/at-uri> not set"
             [[ -z "$record" ]] && atfile.die "<record> not set"
             
             record_json="$(echo "$record" | jq)"
@@ -1794,6 +1953,120 @@ function atfile.invoke.profile() {
         fi
     else
         atfile.die "Unable to update profile"
+    fi
+}
+
+function atfile.invoke.resolve() {
+    actor="$1"
+
+    atfile.say.debug "Resolving actor '$actor'..."
+    resolved_did="$(atfile.util.resolve_identity "$actor")"
+
+    alias="$(echo $resolved_did | cut -d "|" -f 3)"
+    did="$(echo $resolved_did | cut -d "|" -f 1)"
+    did_doc="$(echo $resolved_did | cut -d "|" -f 4)/$did"
+    did_type="did:$(echo $did | cut -d ":" -f 2)"
+    handle="$(echo $resolved_did | cut -d "|" -f 3 | cut -d "/" -f 3)"
+    pds="$(echo $resolved_did | cut -d "|" -f 2)"
+    pds_name="$(atfile.util.get_pds_pretty "$pds")"
+    atfile.say.debug "Getting PDS version for '$pds'..."
+    pds_version="$(curl -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
+
+    [[ "$did" == "null" ]] && atfile.die "Unable to resolve '$actor'"
+
+    case "$did_type" in
+        "did:web")
+            did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
+            ;;
+    esac
+
+    if [[ $_output_json == 1 ]]; then
+        did_doc_data="$(curl -s -l -X GET "$did_doc")"
+    
+        echo -e "{
+    \"did\": \"$did\",
+    \"doc\": {
+        \"data\": $did_doc_data,
+        \"url\": \"$did_doc\"
+    },
+    \"handle\": \"$handle\",
+    \"pds\": {
+        \"endpoint\": \"$pds\",
+        \"name\": \"$pds_name\",
+        \"version\": \"$pds_version\"
+    },
+    \"type\": \"$did_type\"
+}" | jq
+    else
+        echo "$did"
+        echo "↳ Type: $did_type"
+        echo " ↳ Doc: $did_doc"
+        echo "↳ Handle: @$handle"
+        echo "↳ PDS: $pds_name"
+        echo " ↳ Endpoint: $pds"
+        [[ $pds_version != "null" ]] && echo " ↳ Version: $pds_version"
+    fi
+}
+
+function atfile.invoke.stream() {
+    collection="$1"
+    [[ -z "$collection" ]] && collection="blue.zio.atfile.upload"
+    atfile.js.subscribe "$collection"
+}
+
+function atfile.invoke.update() {
+    function atfile.invoke.update.parse_version() {
+        version="$1"
+        version="$(echo $version | cut -d "+" -f 1)"
+        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
+        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
+        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
+        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+    }
+
+    if [[ $_output_json == 1 ]]; then
+        atfile.die "Command not available as JSON"
+    fi
+    
+    atfile.say.debug "Getting latest release..."
+    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
+    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
+    
+    latest_version="$(echo "$latest_release" | jq -r ".name")"
+    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
+    
+    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
+    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
+    
+    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
+    
+    if [[ $_version == *+git* ]]; then
+        atfile.die "Cannot update Git version ($_version)"
+    fi
+    
+    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
+        temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
+        
+        atfile.say.debug "Touching temporary path ($temp_updated_path)..."
+        touch "$temp_updated_path"
+        [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
+        
+        atfile.say.debug "Downloading latest release..."
+        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
+        if [[ $? == 0 ]]; then
+            mv "$temp_updated_path" "$_prog_path"
+            if [[ $? != 0 ]]; then
+                atfile.die "Unable to update (do you have permission?)"
+            else
+                chmod +x "$_prog_path"
+                atfile.say "😎 Updated to $latest_version!"
+                exit 0
+            fi
+        else
+            atfile.die "Unable to download latest version"
+        fi
+    else
+        atfile.say "No updates found"
     fi
 }
 
@@ -1936,13 +2209,6 @@ function atfile.invoke.usage() {
     fi
 
 # ------------------------------------------------------------------------------
-    usage_arguments="<actor>     Act upon another ATProto user (either by handle or DID)
-    <cursor>    Key or CID used as a reference to paginate through lists
-    <key>       Key of an uploaded file (unique to that user and collection)
-    <nick>      Nickname
-    <recipient> GPG recipient during file encryption
-                See 'gpg --help' for more information"
-
     usage_commands="upload <file> [<key>]
         Upload new file to the PDS
         ⚠️  ATProto records are public: do not upload sensitive files
@@ -1990,11 +2256,12 @@ function atfile.invoke.usage() {
     update
         Check for updates and update if outdated"
 
-    if [[ $_enable_hidden_commands == 1 ]]; then
-        usage_commands+="\n\nCommands (Hidden)
-    blob list
+    usage_commands_tools="blob list
     blob upload <path>
-        Manage blobs on a repository
+        Manage blobs on authenticated repository
+
+    handle <at-uri>
+        Open at:// URL with relevant App
 
     record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
@@ -2004,9 +2271,14 @@ function atfile.invoke.usage() {
     record rm <key> [<collection>]
     record rm <at-uri>
         Manage records on a repository
-        ⚠️  Intended for advanced users. Here be dragons
-        ℹ️  <collection> defaults to '$_nsid_upload'"
-    fi
+        ⚠️  No validation is performed. Here be dragons!
+        ℹ️  <collection> defaults to '$_nsid_upload'
+        
+    resolve <actor>
+        Get details for <actor>
+
+    stream <collection>
+        Stream records from Jetstream"
 
 usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
@@ -2014,9 +2286,9 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Password of the PDS user
         An App Password is recommended (https://bsky.app/settings/app-passwords)
         
-    ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool*> (default: $_include_fingerprint_default)
+    ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool¹> (default: $_include_fingerprint_default)
         Apply machine fingerprint to uploaded files
-    ${_envvar_prefix}_OUTPUT_JSON <bool> (default: $_output_json_default)
+    ${_envvar_prefix}_OUTPUT_JSON <bool¹> (default: $_output_json_default)
         Print all commands (and errors) as JSON
         ⚠️  When sourcing, sets to 1
     ${_envvar_prefix}_MAX_LIST <int> (default: $_max_list_default)
@@ -2032,51 +2304,50 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Format for fetched filenames. Fragments:
         * [key]: Record key of uploaded file
         * [name]: Original name of uploaded file
-    ${_envvar_prefix}_SKIP_AUTH_CHECK <bool*> (default: $_skip_auth_check_default)
+    ${_envvar_prefix}_SKIP_AUTH_CHECK <bool¹> (default: $_skip_auth_check_default)
         Skip session validation on startup
         If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
         is a DID (*not* a handle), this will drastically improve performance!
-    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <bool*> (default: $_skip_copyright_warn_default)
+    ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <bool¹> (default: $_skip_copyright_warn_default)
         Do not print copyright warning when uploading files to
         https://bsky.social
-    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <bool*> (default: $_skip_ni_exiftool_default)
+    ${_envvar_prefix}_SKIP_NI_EXIFTOOL <bool¹> (default: $_skip_ni_exiftool_default)
         Do not check if ExifTool is installed
         ⚠️  If Exiftool is not installed, the relevant metadata records will
            not be created:
            * image/*: $_nsid_meta#photo
-    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool*> (default: $_skip_ni_mediainfo_default)
+    ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool¹> (default: $_skip_ni_mediainfo_default)
         Do not check if MediaInfo is installed
         ⚠️  If MediaInfo is not installed, the relevant metadata records will
            not be created:
            * audio/*: $_nsid_meta#audio
            * video/*: $_nsid_meta#video
 
+    ${_envvar_prefix}_ENDPOINT_JETSTREAM <url> (default: $_endpoint_jetstream_default)
+        Endpoint of the Jetstream relay
     ${_envvar_prefix}_ENDPOINT_PDS <url>
         Endpoint of the PDS
         ℹ️  Your PDS is resolved from your username. Set to override it (or if
            resolving fails)
-    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: $_endpoint_plc_directory_default)
-        Endpoint of PLC directory
-    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: $_endpoint_resolve_handle_default)
-        Endpoint used for handle resolving
-        ℹ️  Default value is a PDS ran by @ducky.ws and @astra.blue. You can
-           trust us!
+    ${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY <url> (default: ${_endpoint_plc_directory_default}$([[ $_endpoint_plc_directory_default == *"zio.blue" ]] && echo "²"))
+        Endpoint of the PLC directory
+    ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: ${_endpoint_resolve_handle_default}$([[ $_endpoint_plc_directory_default == *"zio.blue" ]] && echo "²"))
+        Endpoint of the PDS/AppView used for handle resolving
            
-    ${_envvar_prefix}_DEBUG <bool> (default: $_debug_default)
+    ${_envvar_prefix}_DEBUG <bool¹> (default: $_debug_default)
         Print debug outputs
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
-    ${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS <bool> (default: $_enable_hidden_commands_default)
-        Enable hidden commands
-        ⚠️  When sourcing, sets to 1
            
-    * A bool in Bash is 1 (true) or 0 (false)"
+    ¹ A bool in Bash is 1 (true) or 0 (false)
+    ² These servers are ran by @ducky.ws (and @astra.blue). You can trust us!"
 
     usage_files="$_envfile
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 
     $_cache_dir/
-        Cache and temporary storage"
+        Cache and temporary storage
+        ℹ️  Intended for future use"
 
     usage="ATFile | 📦 ➔ 🦋
     Store and retrieve files on the ATmosphere
@@ -2090,8 +2361,8 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
 Commands
     $usage_commands
 
-Arguments
-    $usage_arguments
+Commands (Tools)
+    $usage_commands_tools
 
 Environment Variables
     $usage_envvars
@@ -2114,10 +2385,12 @@ fi
 
 ## Global variables
 
+### General
+
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
-_prog_dir="$(dirname "$atfile.util.get_realpath "$0")")"
+_prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.4.6"
+_version="0.4.10"
 _c_author="Ducky"
 _c_year="2024"
 _gh_user="electricduck"
@@ -2130,10 +2403,14 @@ _envfile="$HOME/.config/atfile.env"
 _is_sourced=0
 _now="$(atfile.util.get_date)"
 
+### Envvars
+
+#### Defaults
+
 _debug_default=0
-_enable_hidden_commands_default=0
+_endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
-_endpoint_plc_directory_default="https://plc.directory"
+_endpoint_plc_directory_default="https://plc.zio.blue"
 _fmt_blob_url_default="[server]/xrpc/com.atproto.sync.getBlob?did=[did]&cid=[cid]"
 _fmt_out_file_default="[key]__[name]"
 _include_fingerprint_default=0
@@ -2145,11 +2422,17 @@ _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
 
+#### Fallbacks
+
+_endpoint_plc_directory_fallback="https://plc.directory"
+
+#### Set
+
 _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
-_enable_hidden_commands="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_HIDDEN_COMMANDS" "$_enable_hidden_commands_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
 _include_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_include_fingerprint_default")"
+_endpoint_jetstream="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_JETSTREAM" "$_endpoint_jetstream_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
@@ -2163,6 +2446,8 @@ _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
 _test_desktop_uas="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 
+### NSIDs
+
 _nsid_prefix="blue.zio"
 _nsid_lock="${_nsid_prefix}.atfile.lock"
 _nsid_meta="${_nsid_prefix}.atfile.meta"
@@ -2173,7 +2458,6 @@ _nsid_upload="${_nsid_prefix}.atfile.upload"
 
 if [[ "$0" != "$BASH_SOURCE" ]]; then
     _debug=0
-    _enable_hidden_commands=1
     _is_sourced=1
     _output_json=1
 fi
@@ -2193,7 +2477,7 @@ fi
 
 ## Git detection
 
-if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]]; then
+if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]] && [[ "$(realpath $(pwd))" == "$_prog_dir" ]]; then
     atfile.say.debug "Getting tag from Git..."
     git describe --exact-match --tags > /dev/null 2>&1
     [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
@@ -2234,8 +2518,11 @@ if [[ $_is_sourced == 0 ]]; then
         "rm") _command="delete" ;;
         "download"|"f"|"d") _command="fetch" ;;
         "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
+        "at") _command="handle" ;;
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
+        "did") _command="resolve" ;;
+        "js") _command="stream" ;;
         "ul"|"u") _command="upload" ;;
         "uc") _command="upload-crypt" ;;
         "get-url"|"b") _command="url" ;;
@@ -2262,17 +2549,24 @@ if [[ -z "$_server" ]]; then
     skip_resolving=0
     
     if [[ $_is_sourced == 0 ]]; then
-    # NOTE: Speeds things up a little if the user is overriding actor
-    #       Keep this in-sync with the main command case below!
+        # NOTE: Speeds things up a little if the user is overriding actor
+        #       Keep this in-sync with the main command case below!
         if [[ $_command == "cat" && -n "$3" ]] ||\
            [[ $_command == "fetch" && -n "$3" ]] ||\
            [[ $_command == "fetch-crypt" && -n "$3" ]] ||\
            [[ $_command == "info" && -n "$2" ]] ||\
            [[ $_command == "list" ]] && [[ "$2" == *.* || "$2" == did:* ]] ||\
            [[ $_command == "list" && -n "$3" ]] ||\
-           [[ $_command == "url" && -n "$2" ]]; then
-               atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
-               skip_resolving=1 
+           [[ $_command == "url" && -n "$3" ]]; then
+            atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
+            skip_resolving=1 
+        fi
+
+        # NOTE: Speeds things up a little if the command doesn't need actor resolving
+        if [[ $_command == "handle" ]] ||\
+            [[ $_command == "resolve" ]]; then
+            atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
+            skip_resolving=1
         fi
     fi
     
@@ -2280,8 +2574,8 @@ if [[ -z "$_server" ]]; then
         atfile.say.debug "Resolving identity..."
 
         resolved_id="$(atfile.util.resolve_identity "$_username")"
-        _username="$(echo $resolved_id | cut -d "@" -f 1)"
-        _server="$(echo $resolved_id | cut -d "@" -f 2)"
+        _username="$(echo $resolved_id | cut -d "|" -f 1)"
+        _server="$(echo $resolved_id | cut -d "|" -f 2)"
         
         atfile.say.debug "Resolved identity\n↳ DID: $_username\n↳ PDS: $_server"
     fi
@@ -2296,7 +2590,7 @@ if [[ -n $_server ]]; then
         
         session="$(com.atproto.server.getSession)"
         if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
-            atfile.die "Unable to authenticate as \"$_username\" on \"$_server\""
+            atfile.die "Unable to authenticate"
         else
             _username="$(echo $session | jq -r ".did")"
         fi
@@ -2308,6 +2602,38 @@ if [[ -n $_server ]]; then
     fi
 fi
 
+function atfile.util.handle_protocol() {
+    uri="$1"
+
+    actor="$(echo $uri | cut -d "/" -f 3)"
+    path="$(echo $uri | cut -d "/" -f 4)"
+    key="$(echo $uri | cut -d "/" -f 5)"
+
+    if [[ -n "$actor" && -n "$path" && -n "$key" ]]; then
+        case "$path" in
+            "upload")
+                atfile.util.override_actor "$actor"
+
+                if [[ -n $TERM ]]; then
+                    atfile.invoke.get "$key"
+                else
+                    atfile.until.launch_uri "$key"
+                fi
+                ;;
+            *)
+                atfile.die "Unable to handle '$path'"
+        esac
+    fi
+}
+
+## Protocol Handler
+
+if [[ "$_command" == "atfile:"* ]]; then
+    atfile.say.debug "Handling '$_command'..."
+    atfile.util.handle_protocol "$_command"
+    exit 0
+fi
+
 ## Commands
 
 if [[ $_is_sourced == 0 ]]; then
@@ -2315,16 +2641,11 @@ if [[ $_is_sourced == 0 ]]; then
 
     case "$_command" in
         "blob")
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                case "$2" in
-                    "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
-                    "upload"|"u") atfile.invoke.upload_blob "$3" ;;
-                    *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
-                esac
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi        
+            case "$2" in
+                "list"|"ls"|"l") atfile.invoke.list_blobs "$3" ;;
+                "upload"|"u") atfile.invoke.upload_blob "$3" ;;
+                *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+            esac  
             ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -2357,6 +2678,9 @@ if [[ $_is_sourced == 0 ]]; then
             fi
             
             atfile.invoke.download "$2" 1
+            ;;
+        "handle")
+            atfile.invoke.handle "$2"
             ;;
         "info")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -2393,21 +2717,22 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "record")
             # NOTE: Performs no validation (apart from JSON)! Here be dragons
-            if [[ "$_enable_hidden_commands" == 1 ]]; then
-                case "$2" in
-                    "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
-                    "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
-                    "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
-                    "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
-                    *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
-                esac
-            else
-                atfile.util.print_hidden_command_warning
-                exit 1
-            fi
+            case "$2" in
+                "add"|"create"|"c") atfile.invoke.manage_record "create" "$3" "$4" ;;
+                "get"|"g") atfile.invoke.manage_record "get" "$3" "$4" "$5" ;;
+                "put"|"update"|"u") atfile.invoke.manage_record "put" "$3" "$4" ;;
+                "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
+                *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
+            esac
+            ;;
+        "resolve")
+            atfile.invoke.resolve "$2"
             ;;
         "something-broke")
             atfile.invoke.debug
+            ;;
+        "stream")
+            atfile.invoke.stream "$2"
             ;;
         "upload")
             atfile.util.check_prog_optional_metadata
@@ -2438,3 +2763,5 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
     esac
 fi
+
+# lord help me
