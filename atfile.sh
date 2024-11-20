@@ -823,6 +823,15 @@ function atfile.util.parse_exiftool_date() {
     echo "$date $time $tz"
 }
 
+function atfile.util.parse_version() {
+    version="$1"
+    version="$(echo $version | cut -d "+" -f 1)"
+    v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
+    v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
+    v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
+    echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+}
+
 function atfile.util.print_blob_url_output() {
     blob_uri="$1"
     
@@ -1890,7 +1899,7 @@ function atfile.invoke.manage_record() {
             com.atproto.repo.getRecord "$username" "$collection" "$key" | jq
             atfile.util.override_actor_reset
             ;;
-        "put")
+        "put") # BUG: Collection is always blue.zio.atfile.upload when not using at://
             collection="$(atfile.invoke.manage_record.get_collection "$4")"
             key="$2"
             record="$3"
@@ -2015,45 +2024,44 @@ function atfile.invoke.stream() {
     atfile.js.subscribe "$collection"
 }
 
+# TODO: Validate checksum
 function atfile.invoke.update() {
-    function atfile.invoke.update.parse_version() {
-        version="$1"
-        version="$(echo $version | cut -d "+" -f 1)"
-        v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
-        v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
-        v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
-        echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
-    }
-
     if [[ $_output_json == 1 ]]; then
         atfile.die "Command not available as JSON"
     fi
-    
+
+    atfile.util.override_actor "$_at_did"
+    atfile.util.print_override_actor_debug
+
     atfile.say.debug "Getting latest release..."
-    latest_release="$(curl -s -H "User-Agent $_uas" "https://api.github.com/repos/$_gh_user/$_gh_repo/releases/latest")"
-    [[ $? != 0 ]] && atfile.die "Unable to get latest version (is GitHub up?)"
+    latest_release_record="$(com.atproto.repo.getRecord "$_at_did" "self.atfile.latest" "self")"
+    [[ $(atfile.util.is_xrpc_success $? "$latest_release_record") != 1 ]] && atfile.die "Unable to get latest version"
+
+    latest_version="$(echo "$latest_release_record" | jq -r '.value.version')"
+    latest_version_commit="$(echo "$latest_release_record" | jq -r '.value.commit')"
+    latest_version_date="$(echo "$latest_release_record" | jq -r '.value.releasedAt')"
+    parsed_latest_version="$(atfile.util.parse_version $latest_version)"
+    parsed_running_version="$(atfile.util.parse_version $_version)"
     
-    latest_version="$(echo "$latest_release" | jq -r ".name")"
-    latest_tag="$(echo "$latest_release" | jq -r ".tag_name")"
-    
-    parsed_latest_version="$(atfile.invoke.update.parse_version $latest_version)"
-    parsed_running_version="$(atfile.invoke.update.parse_version $_version)"
-    
-    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Tag: $latest_tag\n↳ Running: $_version ($parsed_running_version)"
-    
+    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
+
     if [[ $_version == *+git* ]]; then
         atfile.die "Cannot update Git version ($_version)"
     fi
     
-    if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
+    if [[ $(( $parsed_latest_version == $parsed_running_version )) == 1 ]]; then
         temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
         
         atfile.say.debug "Touching temporary path ($temp_updated_path)..."
         touch "$temp_updated_path"
         [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
         
+        atfile.say.debug "Getting blob URL for $latest_version ($parsed_latest_version)..."
+        blob_url="$(atfile.invoke.get_url $parsed_latest_version | tail -n 1)" # HACK: ATFILE_DEBUG=1 screws up output, so we'll `tail` for safety
+        [[ $? != 0 ]] && atfile.die "Unable to get blob URL"
+
         atfile.say.debug "Downloading latest release..."
-        curl -s -o "$temp_updated_path" "https://raw.githubusercontent.com/$_gh_user/$_gh_repo/refs/tags/$latest_tag/atfile.sh"
+        curl -s -o "$temp_updated_path" "$blob_url"
         if [[ $? == 0 ]]; then
             mv "$temp_updated_path" "$_prog_path"
             if [[ $? != 0 ]]; then
@@ -2354,10 +2362,11 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     Store and retrieve files on the ATmosphere
     
     Version $_version
-    (c) $_c_year $_c_author <https://github.com/$_gh_user/$_gh_repo>
+    (c) $_c_year $_c_author <https://github.com/electricduck/atfile>
     Licensed as MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
+       Follow on Bluesky at @atfile.zio.blue
     
 Commands
     $usage_commands
@@ -2392,10 +2401,9 @@ _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
 _version="0.5"
+_at_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _c_author="Ducky"
 _c_year="2024"
-_gh_user="electricduck"
-_gh_repo="atfile"
 _cache_dir="$HOME/.cache/atfile"
 _command="$1"
 _command_full="$@"
