@@ -426,9 +426,7 @@ function atfile.util.get_file_name_pretty() {
 function atfile.util.get_file_path() {
     file="$1"
     
-    if [ ! -f "$file" ]; then
-        atfile.die "File '$file' does not exist"
-    else
+    if [ -f "$file" ]; then
         echo "$(realpath "$file")"
     fi
 }
@@ -1448,6 +1446,7 @@ function atfile.invoke.blob_list() {
 
 function atfile.invoke.blob_upload() {
     file="$(atfile.util.get_file_path "$1")"
+    [[ ! -f "$file" ]] && atfile.die "File '$file' does not exist"
     atfile.say.debug "Uploading blob...\n↳ File: $file"
     com.atproto.sync.uploadBlob "$file" | jq
 }
@@ -1504,6 +1503,8 @@ function atfile.invoke.debug() {
 ↳ UAS: $(atfile.util.get_uas)
 Variables
 $(atfile.invoke.debug.print_envvar "DEBUG" $_debug_default)
+↳ ${_envvar_prefix}_DIST_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD") ]] && echo "(Set)")
+$(atfile.invoke.debug.print_envvar "DIST_USERNAME" $_dist_username_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PDS")
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_directory_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
@@ -1675,6 +1676,7 @@ function atfile.invoke.get() {
             echo "$header"
             atfile.util.print_blob_url_output "$blob_uri"
             [[ -n "$cdn_uri" ]] && echo -e " ↳ CDN: $cdn_uri"
+            echo -e "↳ URI: atfile://$_username/$key"
             echo -e "↳ File: $key"
             echo -e " ↳ Name: $file_name"
             echo -e " ↳ Type: $file_type"
@@ -2064,6 +2066,33 @@ function atfile.invoke.profile() {
     fi
 }
 
+function atfile.invoke.release() {
+    [[ $_is_git == 0 ]] && atfile.die "Cannot run 'release' outside of Git directory"
+    [[ $_version == *"+"* ]] && atfile.die "Not a stable version ($_version)"
+
+    commit_hash="$(git rev-parse HEAD)"
+    commit_date="$(git show --no-patch --format=%ci $commit_hash)"
+    dist_file="$(echo "$_prog" | cut -d "." -f 1)-${_version}.sh"
+    dist_path="$_prog_dir/$dist_file"
+    parsed_version="$(atfile.util.parse_version "$_version")"
+
+    atfile.say "Copying working version to '$dist_file'..."
+    cp -f "$_prog_path" "$dist_path"
+    [[ $? != 0 ]] && atfile.die "Unable to create '$dist_path'"
+
+    atfile.invoke.upload "$dist_path" "" "$parsed_version"
+    echo "---"
+
+    latest_release_record="{
+    \"version\": \"$_version\",
+    \"releasedAt\": \"$(atfile.util.get_date "$_commit_date")\",
+    \"commit\": \"$commit_hash\" 
+}"
+
+    atfile.say "Updating latest record to $_version..."
+    atfile.invoke.manage_record put "at://$_username/self.atfile.latest/self2" "$latest_release_record" &> /dev/null
+}
+
 function atfile.invoke.resolve() {
     actor="$1"
 
@@ -2174,11 +2203,11 @@ function atfile.invoke.update() {
         atfile.die "Command not available as JSON"
     fi
 
-    atfile.util.override_actor "$_at_did"
+    atfile.util.override_actor "$_meta_did"
     atfile.util.print_override_actor_debug
 
     atfile.say.debug "Getting latest release..."
-    latest_release_record="$(com.atproto.repo.getRecord "$_at_did" "self.atfile.latest" "self")"
+    latest_release_record="$(com.atproto.repo.getRecord "$_meta_did" "self.atfile.latest" "self")"
     [[ $(atfile.util.is_xrpc_success $? "$latest_release_record") != 1 ]] && atfile.die "Unable to get latest version"
 
     latest_version="$(echo "$latest_release_record" | jq -r '.value.version')"
@@ -2201,8 +2230,9 @@ function atfile.invoke.update() {
         [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
         
         atfile.say.debug "Getting blob URL for $latest_version ($parsed_latest_version)..."
-        blob_url="$(atfile.invoke.get_url $parsed_latest_version | tail -n 1)" # HACK: ATFILE_DEBUG=1 screws up output, so we'll `tail` for safety
+        blob_url="$(atfile.invoke.get_url $parsed_latest_version)"
         [[ $? != 0 ]] && atfile.die "Unable to get blob URL"
+        blob_url="$(echo -e "$blob_url" | tail -n 1)" # HACK: ATFILE_DEBUG=1 screws up output, so we'll `tail` for safety
 
         atfile.say.debug "Downloading latest release..."
         curl -H "User-Agent: $(atfile.util.get_uas)" -s -o "$temp_updated_path" "$blob_url"
@@ -2229,6 +2259,8 @@ function atfile.invoke.upload() {
     key="$3"
     success=1
     
+    [[ ! -f "$file" ]] && atfile.die "File '$file' does not exist"
+
     if [[ $_output_json == 0 ]]; then
         if [[ "$_server" == "https://bsky.social" ]] || [[ "$_server" == *".bsky.network" ]]; then
             atfile.util.print_copyright_warning
@@ -2284,7 +2316,7 @@ function atfile.invoke.upload() {
         
         file_type_emoji="$(atfile.util.get_file_type_emoji "$file_type")"
 
-        atfile.say.debug "File: $file\n↳ Date: $file_date\n↳ Emoji: $file_type_emoji\n↳ Hash: $file_hash ($file_hash_type)\n↳ Name: $file_name\n↳ Size: $file_size\n↳ Type: $file_name"
+        atfile.say.debug "File: $file\n↳ Date: $file_date\n↳ Hash: $file_hash ($file_hash_type)\n↳ Name: $file_name\n↳ Size: $file_size\n↳ Type: $file_type_emoji $file_type"
         
         unset file_finger_record
         unset file_meta_record
@@ -2341,6 +2373,7 @@ function atfile.invoke.upload() {
             echo "Uploaded: $file_type_emoji $file_name"
             atfile.util.print_blob_url_output "$blob_uri"
             echo -e "↳ Key: $key"
+            echo -e "↳ URI: atfile://$_username/$key"
             if [[ -n "$recipient" ]]; then
                 echo -e "↳ Recipient: $recipient ($recipient_key)"
             fi
@@ -2370,7 +2403,7 @@ function atfile.invoke.usage() {
         atfile.die "Command not available as JSON"
     fi
 
-    handle="$(atfile.util.resolve_identity "$_at_did" | cut -d "|" -f 3 | sed -s 's/at:\/\///g')"
+    handle="$(atfile.util.resolve_identity "$_meta_did" | cut -d "|" -f 3 | sed -s 's/at:\/\///g')"
 
 # ------------------------------------------------------------------------------
     usage_commands="upload <file> [<key>]
@@ -2560,8 +2593,7 @@ fi
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.6.3"
-_at_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
+_version="0.6.4"
 _c_author="Ducky"
 _c_year="2024"
 _command="$1"
@@ -2570,6 +2602,7 @@ _dir_cache="$HOME/.cache/atfile"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 _is_sourced=0
+_meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _now="$(atfile.util.get_date)"
 
 ### Envvars
@@ -2577,6 +2610,7 @@ _now="$(atfile.util.get_date)"
 #### Defaults
 
 _debug_default=0
+_dist_username_default="$_meta_did"
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.zio.blue"
@@ -2598,6 +2632,8 @@ _endpoint_plc_directory_fallback="https://plc.directory"
 #### Set
 
 _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
+_dist_password="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD" $_dist_password_default)"
+_dist_username="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_USERNAME" $_dist_username_default)"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
 _include_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_include_fingerprint_default")"
@@ -2659,7 +2695,7 @@ fi
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 
-## Lifecycle commands (help/version/update)
+## Lifecycle commands
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.invoke.usage
@@ -2712,6 +2748,14 @@ atfile.say.debug "Checking required variables..."
 [[ -z "$_password" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
 
 ## Identity resolving
+
+if [[ $_is_git == 1 ]] && [[ $_command == "release" ]]; then
+    atfile.say.debug "Using release credentials..."
+
+    _fmt_blob_url="$_fmt_blob_url_default"
+    _password="$_dist_password"
+    _username="$_dist_username"
+fi
 
 if [[ -z "$_server" ]]; then
     skip_resolving=0
@@ -2772,7 +2816,7 @@ if [[ -n $_server ]]; then
     fi
 fi
 
-## Protocol Handler
+## Protocol handling
 
 if [[ "$_command" == "atfile:"* || "$_command" == "at:"* ]]; then
     set -- "handle" "$_command"
@@ -2877,6 +2921,9 @@ if [[ $_is_sourced == 0 ]]; then
                 "rm"|"delete"|"d") atfile.invoke.manage_record "delete" "$3" "$4" ;;
                 *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
             esac
+            ;;
+        "release")
+            atfile.invoke.release
             ;;
         "resolve")
             atfile.invoke.resolve "$2"
