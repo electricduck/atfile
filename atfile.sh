@@ -2678,7 +2678,7 @@ fi
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.6.5"
+_version="0.6.6"
 _command="$1"
 _command_full="$@"
 _dir_cache="$HOME/.cache/atfile"
