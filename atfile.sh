@@ -1793,8 +1793,11 @@ function atfile.invoke.handle_atfile() {
             [ -x "$(command -v gtk-launch)" ]; then
 
             if [[ -z $handler ]]; then
-                atfile.say.debug "Querying '$file_type' handler..."
+                atfile.say.debug "Querying for handler '$file_type'..."
                 handler="$(xdg-mime query default $file_type)"
+            else
+                handler="$handler.desktop"
+                atfile.say.debug "Handler manually set to '$handler'"
             fi
 
             if [[ -n $handler ]] || [[ $? != 0 ]]; then
@@ -1816,12 +1819,14 @@ function atfile.invoke.handle_atfile() {
                     fi
 
                     if [[ $download_success == 1 ]]; then
+                        atfile.say.debug "Launching '$handler'..."
                         gtk-launch "$handler" "$tmp_path" </dev/null &>/dev/null &
                     else
                         atfile.die.gui \
                             "Unable to download '$key'"
                     fi
                 else
+                    atfile.say.debug "Launching '$handler'..."
                     gtk-launch "$handler" "$blob_uri" </dev/null &>/dev/null &
                 fi
             else
@@ -2484,7 +2489,12 @@ function atfile.invoke.usage() {
         Manage blobs on authenticated repository
 
     handle <at-uri>
-        Open at:// URL with relevant App
+        Open at:// URI with relevant App
+
+    handle <atfile-uri> [<handler>]
+        Open atfile:// URI with relevant App
+        ℹ️  Set <handler> to a .desktop entry to force the application
+           <atfile-uri> opens with
 
     record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
@@ -2503,7 +2513,7 @@ function atfile.invoke.usage() {
     stream <collection>
         Stream records from Jetstream"
 
-usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
+    usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
     ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
@@ -2581,13 +2591,18 @@ usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
     😎 Stay updated with \`$_prog update\`
        Follow on Bluesky on @$handle
     
+Usage
+    $_prog <command> [<arguments>]
+    $_prog at://<actor>[/<collection>/<rkey>]
+    $_prog atfile://<actor>/<key>
+
 Commands
     $usage_commands
 
-Commands (Lifecycle)
+Commands ➔ Lifecycle
     $usage_commands_lifecycle
 
-Commands (Tools)
+Commands ➔ Tools
     $usage_commands_tools
 
 Environment Variables
@@ -2893,13 +2908,11 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "handle")
             protocol="$(echo $2 | cut -d ":" -f 1)"
-            uri="$2"
-
             atfile.say.debug "Handling protocol '$protocol://'..."
 
             case $protocol in
-                "at") atfile.invoke.handle_aturi "$uri" ;;
-                "atfile") atfile.invoke.handle_atfile "$uri" ;;
+                "at") atfile.invoke.handle_aturi "$2" ;;
+                "atfile") atfile.invoke.handle_atfile "$2" "$3" ;;
             esac
             ;;
         "info")
