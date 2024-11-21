@@ -5,14 +5,52 @@ function die() {
     exit 255
 }
 
-uid="$(id -u)"
-blob="bafkreic2edgefv62mqdvkrvzwbe632qp2s37mv3pr62rxgnqecemimzqrm"
-url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$blob"
+function check_prog() {
+    prog="$1"
+    ! [ -x "$(command -v $prog)" ] && die "'$prog' not installed"
+}
 
+function parse_version() {
+    version="$1"
+    version="$(echo $version | cut -d "+" -f 1)"
+    v_major="$(printf "%04d\n" "$(echo $version | cut -d "." -f 1)")"
+    v_minor="$(printf "%04d\n" "$(echo $version | cut -d "." -f 2)")"
+    v_rev="$(printf "%04d\n" "$(echo $version | cut -d "." -f 3)")"
+    echo "$(echo ${v_major}${v_minor}${v_rev} | sed 's/^0*//')"
+}
+
+function xrpc_get() {
+    lexi="$1"
+    collection="$2"
+    key="$3"
+
+    curl -s -L -X GET "$endpoint/$lexi?collection=$collection&repo=$did&rkey=$key"
+}
+
+check_prog "curl"
+check_prog "jq"
+
+uid="$(id -u)"
+did="did:plc:wennm3p5pufuib7vo5ex4sqw"
+endpoint="https://zio.blue/xrpc"
 install_file="atfile"
 conf_file="atfile.env"
 unset install_dir
 unset conf_dir
+
+latest_version_record="$(xrpc_get "com.atproto.repo.getRecord" "self.atfile.latest" "self")"
+[[ $? != 0 ]] && die "Unable to get latest version"
+
+latest_version="$(echo "$latest_version_record" | jq -r '.value.version')"
+parsed_latest_version="$(parse_version $latest_version)"
+found_version_record="$(xrpc_get "com.atproto.repo.getRecord" "blue.zio.atfile.upload" "$parsed_latest_version")"
+[[ $? != 0 ]] && die "Unable to fetch record for '$parsed_latest_version'"
+
+found_version_blob="$(echo "$found_version_record" | jq -r ".value.blob.ref.\"\$link\"")"
+url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$found_version_blob"
+
+echo $url
+exit 0
 
 if [[ $uid == 0 ]]; then
     install_dir="/usr/local/bin"
