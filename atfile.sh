@@ -2090,7 +2090,7 @@ function atfile.invoke.release() {
 }"
 
     atfile.say "Updating latest record to $_version..."
-    atfile.invoke.manage_record put "at://$_username/self.atfile.latest/self2" "$latest_release_record" &> /dev/null
+    atfile.invoke.manage_record put "at://$_username/self.atfile.latest/self" "$latest_release_record" &> /dev/null
 }
 
 function atfile.invoke.resolve() {
