@@ -138,6 +138,15 @@ function atfile.util.check_prog_optional_metadata() {
     [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo" "${_envvar_prefix}_SKIP_NI_MEDIAINFO"
 }
 
+function atfile.util.create_dir() {
+    dir="$1"
+
+    if ! [[ -d $dir  ]]; then
+        mkdir -p "$dir"
+        [[ $? != 0 ]] && atfile.die "Unable to create directory '$dir'"
+    fi
+}
+
 function atfile.util.get_app_url_for_at_uri() {
     uri="$1"
 
@@ -1743,6 +1752,24 @@ function atfile.invoke.handle_atfile() {
     uri="$1"
     handler="$2"
 
+    function atfile.invoke.handle_atfile.is_temp_file_needed() {
+        handler="$(echo $1 | sed s/.desktop$//g)"
+        type="$2"
+
+        handlers=(
+            "app.drey.EarTag"
+            "com.github.neithern.g4music"
+        )
+
+        if [[ ${handlers[@]} =~ $handler ]]; then
+            echo 1
+        elif [[ $type == "text/"* ]]; then
+            echo 1
+        else
+            echo 0
+        fi
+    }
+
     [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
 
     actor="$(echo $uri | cut -d "/" -f 3)"
@@ -1774,15 +1801,11 @@ function atfile.invoke.handle_atfile() {
                 atfile.say.debug "Opening '$key' ($file_type) with '$(echo $handler | sed s/.desktop$//g)'..."
 
                 # HACK: Some apps don't like http(s)://; we'll need to handle these
-                if [[ $handler == "app.drey.EarTag.desktop" ]] ||\
-                    [[ $handler == "com.github.neithern.g4music.desktop" ]]; then
-                    atfile.say.debug "Handler '$handler' does not support 'http(s)://'"
+                if [[ $(atfile.invoke.handle_atfile.is_temp_file_needed "$handler" "$file_type") == 1 ]]; then
+                    atfile.say.debug "Unsupported for streaming"
 
                     download_success=1
-                    tmp_dir="/tmp/at-blobs"
-                    tmp_path="$tmp_dir/$blob_cid"
-
-                    mkdir -p "$tmp_dir"
+                    tmp_path="$_dir_blobs_tmp/$blob_cid"
 
                     if ! [[ -f "$tmp_path" ]]; then
                         atfile.say.debug "Downloading '$blob_cid'..."
@@ -2599,6 +2622,7 @@ _c_year="2024"
 _command="$1"
 _command_full="$@"
 _dir_cache="$HOME/.cache/atfile"
+_dir_blobs_tmp="/tmp/at-blobs"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 _is_sourced=0
@@ -2667,16 +2691,15 @@ if [[ "$0" != "$BASH_SOURCE" ]]; then
     _output_json=1
 fi
 
-## Early debug messages
+## "Hello, world!"
 
 atfile.say.debug "Starting up..."
-atfile.say.debug "Terminal is $(atfile.util.get_term_rows) rows"
 
-## Cache
+## Cache/Temp
 
-atfile.say.debug "Creating cache directory ($_dir_cache)..."
-mkdir -p "$_dir_cache"
-[[ $? != 0 ]] && atfile.die "Unable to create cache directory ($_dir_cache)"
+atfile.say.debug "Creating necessary directories..."
+atfile.util.create_dir "$_dir_cache"
+atfile.util.create_dir "$_dir_blobs_tmp"
 
 ## Git detection
 
