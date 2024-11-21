@@ -2629,7 +2629,7 @@ function atfile.invoke.usage() {
     Store and retrieve files on the ATmosphere
     
     Version $_version
-    (c) $_c_year $_c_author <https://github.com/electricduck/atfile>
+    (c) $_meta_year $_meta_author <$_meta_repo>
     Licensed as MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
@@ -2676,8 +2676,6 @@ _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
 _version="0.6.5"
-_c_author="Ducky"
-_c_year="2024"
 _command="$1"
 _command_full="$@"
 _dir_cache="$HOME/.cache/atfile"
@@ -2685,7 +2683,10 @@ _dir_blobs_tmp="/tmp/at-blobs"
 _envvar_prefix="ATFILE"
 _envfile="$HOME/.config/atfile.env"
 _is_sourced=0
+_meta_author="Ducky"
 _meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
+_meta_repo="https://github.com/electricduck/atfile"
+_meta_year="2024"
 _now="$(atfile.util.get_date)"
 
 ### Envvars
