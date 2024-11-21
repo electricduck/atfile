@@ -2153,6 +2153,7 @@ function atfile.invoke.release() {
     [[ $? != 0 ]] && atfile.die "Unable to create '$dist_path'"
 
     atfile.invoke.upload "$dist_path" "" "$parsed_version"
+    [[ $? != 0 ]] && atfile.die "Unable to upload '$dist_path'"
     echo "---"
 
     latest_release_record="{
@@ -2163,6 +2164,8 @@ function atfile.invoke.release() {
 
     atfile.say "Updating latest record to $_version..."
     atfile.invoke.manage_record put "at://$_username/self.atfile.latest/self" "$latest_release_record" &> /dev/null
+    
+    rm -f "$dist_path"
 }
 
 function atfile.invoke.resolve() {
