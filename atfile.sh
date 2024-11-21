@@ -803,6 +803,50 @@ function atfile.util.launch_uri() {
     fi
 }
 
+function atfile.util.get_uri_segment() {
+    uri="$1"
+    segment="$2"
+    unset parsed_uri
+
+    case $segment in
+        "host") echo $uri | cut -d "/" -f 3 ;;
+        "protocol") echo $uri | cut -d ":" -f 1 ;;
+        *) echo $uri | cut -d "/" -f $segment ;;
+    esac
+}
+
+function atfile.util.map_http_to_at() {
+    http_uri="$1"
+    unset at_uri
+    unset actor
+    unset collection
+    unset rkey
+
+    case "$(atfile.util.get_uri_segment $http_uri host)" in
+        "atproto-browser.vercel.app"|\
+        "pdsls.dev"|\
+        "pdsls.pages.dev")
+            actor="$(atfile.util.get_uri_segment $http_uri 5)"
+            collection="$(atfile.util.get_uri_segment $http_uri 6)"
+            rkey="$(atfile.util.get_uri_segment $http_uri 7)"
+            ;;
+    esac
+
+    if [[ -n "$actor" ]]; then
+        at_uri="at://$actor"
+
+        if [[ -n "$collection" ]]; then
+            at_uri="$at_uri/$collection"
+
+            if [[ -n "$rkey" ]]; then
+                at_uri="$at_uri/$rkey"
+            fi
+        fi
+    fi
+
+    echo $at_uri
+}
+
 # HACK: This essentially breaks the entire session (it overrides $_username and
 #       $_server). If sourcing, use atfile.util.override_actor_reset() to
 #       reset
@@ -2856,7 +2900,7 @@ fi
 
 ## Protocol handling
 
-if [[ "$_command" == "atfile:"* || "$_command" == "at:"* ]]; then
+if [[ "$_command" == "atfile:"* || "$_command" == "at:"* || "$_command" == "https:"* ]]; then
     set -- "handle" "$_command"
     _command="handle"
 fi
@@ -2907,12 +2951,27 @@ if [[ $_is_sourced == 0 ]]; then
             atfile.invoke.download "$2" 1
             ;;
         "handle")
-            protocol="$(echo $2 | cut -d ":" -f 1)"
+            uri="$2"
+            protocol="$(atfile.util.get_uri_segment $uri protocol)"
+
+            if [[ $protocol == "https" ]]; then
+                http_uri="$uri"
+                uri="$(atfile.util.map_http_to_at "$http_uri")"
+
+                atfile.say.debug "Mapping '$http_uri'..."
+                
+                if [[ -z "$uri" ]]; then
+                    atfile.die "Unable to map '$http_uri' to at:// URI"
+                else
+                    protocol="$(atfile.util.get_uri_segment $uri protocol)"
+                fi
+            fi
+
             atfile.say.debug "Handling protocol '$protocol://'..."
 
             case $protocol in
-                "at") atfile.invoke.handle_aturi "$2" ;;
-                "atfile") atfile.invoke.handle_atfile "$2" "$3" ;;
+                "at") atfile.invoke.handle_aturi "$uri" ;;
+                "atfile") atfile.invoke.handle_atfile "$uri" "$3" ;;
             esac
             ;;
         "info")
