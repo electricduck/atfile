@@ -2631,7 +2631,7 @@ fi
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.6.4"
+_version="0.6.5"
 _c_author="Ducky"
 _c_year="2024"
 _command="$1"
