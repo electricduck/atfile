@@ -49,9 +49,6 @@ found_version_record="$(xrpc_get "com.atproto.repo.getRecord" "blue.zio.atfile.u
 found_version_blob="$(echo "$found_version_record" | jq -r ".value.blob.ref.\"\$link\"")"
 url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$found_version_blob"
 
-echo $url
-exit 0
-
 if [[ $uid == 0 ]]; then
     install_dir="/usr/local/bin"
     conf_dir="/root/.config"
