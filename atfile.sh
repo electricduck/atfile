@@ -2326,10 +2326,27 @@ function atfile.invoke.update() {
     parsed_latest_version="$(atfile.util.parse_version $latest_version)"
     parsed_running_version="$(atfile.util.parse_version $_version)"
     
-    atfile.say.debug "Version\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
+    atfile.say.debug "Checking version...\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
 
-    if [[ $_version == *+git* ]]; then
-        atfile.die "Cannot update Git version ($_version)"
+    atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
+
+    [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
+    if [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
+       [[ $_os == "linux" && $_prog_dir == "/bin" ]] ||\
+       [[ $_os == "linux" && $_prog_dir == "/opt"* ]] ||\
+       [[ $_os == "linux" && $_prog_dir == "/usr/bin" ]] ||\
+       [[ $_os == "macos" && $_prog_dir == "/opt/local"* ]] ||\
+       [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar"* ]]; then
+        # OS        Path                Prog
+        # ------------------------------------------
+        # Haiku     /boot/system/bin    pkgman
+        # Linux     /bin                (various)
+        # Linux     /opt                (various)
+        # Linux     /usr/bin            (various)
+        # macOS     /opt/local          MacPorts
+        # macOS     /usr/local/Cellar   Homebrew
+
+        atfile.die "Cannot update system-managed version (update from your package manager)"
     fi
     
     if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
@@ -2565,6 +2582,8 @@ function atfile.invoke.usage() {
 
     usage_commands_lifecycle="update
         Check for updates and update if outdated
+        ⚠️  If installed from your system's package manager, self-updating is not
+           possible
 
     toggle-mime
         Install/uninstall desktop file to handle atfile:/at: protocol"
