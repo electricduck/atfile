@@ -118,7 +118,11 @@ function atfile.util.check_prog() {
         message="'$command' not installed"
         
         if [[ -n "$download_hint" ]]; then
-            message="$message (download: $download_hint)"
+            if [[ "$download_hint" == "http"* ]]; then
+                message="$message (download: $download_hint)"
+            else
+                message="$message (install: \`$download_hint\`)"
+            fi
         fi
 
         if [[ -n "$skip_hint" ]]; then
@@ -798,13 +802,13 @@ function atfile.util.launch_uri() {
     uri="$1"
 
     if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
-        if [[ $_os == "macos" ]]; then
-            open "$uri"
-        else
-            xdg-open "$uri"
-        fi
-    else
-        echo "$uri"
+        xdg-open "$uri"
+    elif [[ $_os == "haiku" || $_os == "macos" ]]; then
+        case $_os in
+            "haiku") open "$uri" ;;
+            "macos") open "$uri" ;;
+            *) echo "$uri"
+        esac
     fi
 }
 
@@ -1844,10 +1848,12 @@ function atfile.invoke.handle_atfile() {
         blob_uri="$(atfile.util.build_blob_uri "$_username" "$blob_cid")"
         file_type="$(echo $record | jq -r '.value.file.mimeType')"
 
-        if [[ $_os != "macos" ]] && \
+        if [[ $_os == "linux" ]] && \
             [ -x "$(command -v xdg-mime)" ] && \
             [ -x "$(command -v xdg-open)" ] && \
             [ -x "$(command -v gtk-launch)" ]; then
+
+            [[ -z $file_type ]] && file_type="text/html" # HACK: Open with browser is file_type isn't set
 
             if [[ -z $handler ]]; then
                 atfile.say.debug "Querying for handler '$file_type'..."
@@ -2243,9 +2249,8 @@ function atfile.invoke.toggle_desktop() {
     unset desktop_dir
     unset mime_dir
 
-    if [[ $_os == "macos" ]]; then
-        atfile.die "Not available on macOS\nThink you could help? See: https://github.com/electricduck/atfile/issues/9"
-    fi
+    [[ $_os == "haiku" ]] && atfile.die "Not available on Haiku"
+    [[ $_os == "macos" ]] && atfile.die "Not available on macOS\nThink you could help? See: https://github.com/electricduck/atfile/issues/9"
 
     if [[ $uid == 0 ]]; then
         desktop_dir="/usr/local/share/applications"
@@ -2373,19 +2378,26 @@ function atfile.invoke.upload() {
     if [[ $success == 1 ]]; then
         unset file_date
         unset file_size
+        unset file_type
 
-        if [[ $_os == "macos" ]]; then
-            file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
-            file_size="$(stat -f '%z' "$file")"
-        else
-            file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
-            file_size="$(stat -c %s "$file")"
+        case "$_os" in
+            "macos")
+                file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
+                file_size="$(stat -f '%z' "$file")"
+                ;;
+            *)
+                file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
+                file_size="$(stat -c %s "$file")"
+                ;;
+        esac
+
+        if [ -x "$(command -v file)" ]; then
+            file_type="$(file -b --mime-type "$file")"
         fi
 
         file_hash="$(atfile.util.get_md5 "$file")"
         file_hash_type="md5"
         file_name="$(basename "$file")"
-        file_type="$(file -b --mime-type "$file")"
 
         if [[ -z "$file_hash" ]]; then
             file_hash_type="none"
@@ -2792,9 +2804,15 @@ fi
 
 ## Program detection
 
+_prog_hint_jq="https://jqlang.github.io/jq"
+
+if [[ "$_os" == "linux" ]]; then
+    _prog_hint_jq="pkgman install jq"
+fi
+
 atfile.say.debug "Checking required programs..."
 atfile.util.check_prog "curl"
-atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
+atfile.util.check_prog "jq" "$_prog_hint_jq"
 atfile.util.check_prog "md5sum"
 atfile.util.check_prog "xargs"
 
