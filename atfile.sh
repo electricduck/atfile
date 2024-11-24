@@ -2755,6 +2755,7 @@ _path_envvar="$HOME/.config/atfile.env"
 
 case "$_os" in
     "haiku")
+        _dir_blobs_tmp="/boot/system/cache/tmp/at-blobs"
         _dir_cache="$HOME/config/cache"
         _path_envvar="$HOME/config/settings/atfile.env"
         ;;
