@@ -427,7 +427,7 @@ function atfile.util.get_file_name_pretty() {
         esac
     fi
     
-     # BUG: Haiku Terminal has issues with emojis
+    # BUG: Haiku Terminal has issues with emojis
     if [[ $_os != "haiku" ]]; then
         output="$emoji $output"
     fi
@@ -2484,7 +2484,11 @@ function atfile.invoke.upload() {
             echo -e "{ \"blob\": \"$blob_uri\", \"key\": \"$key\", \"upload\": $record, \"recipient\": $recipient_json }" | jq
         else
             echo "---"
-            echo "Uploaded: $file_type_emoji $file_name"
+            if [[ $_os == "haiku" ]]; then
+                echo "Uploaded: $file_name" # BUG: Haiku Terminal has issues with emojis
+            else
+                echo "Uploaded: $file_type_emoji $file_name"
+            fi
             atfile.util.print_blob_url_output "$blob_uri"
             echo -e "↳ Key: $key"
             echo -e "↳ URI: atfile://$_username/$key"
