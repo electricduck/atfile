@@ -10,6 +10,15 @@ function check_prog() {
     ! [ -x "$(command -v $prog)" ] && die "'$prog' not installed"
 }
 
+function get_os() {
+    case $OSTYPE in
+        "darwin"*) echo "macos" ;;
+        "haiku") echo "haiku" ;;
+        "linux-gnu") echo "linux" ;;
+        *) echo "unknown-$OSTYPE" ;;
+    esac
+}
+
 function parse_version() {
     version="$1"
     version="$(echo $version | cut -d "+" -f 1)"
@@ -49,13 +58,21 @@ found_version_record="$(xrpc_get "com.atproto.repo.getRecord" "blue.zio.atfile.u
 found_version_blob="$(echo "$found_version_record" | jq -r ".value.blob.ref.\"\$link\"")"
 url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$found_version_blob"
 
-if [[ $uid == 0 ]]; then
-    install_dir="/usr/local/bin"
-    conf_dir="/root/.config"
-else
-    install_dir="$(eval echo ~$USER)/.local/bin"
-    conf_dir="$(eval echo ~$USER)/.config"
-fi
+case "$(get_os)" in
+    "haiku")
+        install_dir="/boot/system/non-packaged/bin"
+        conf_dir="$HOME/config/settings"
+        ;;
+    *)
+        if [[ $uid == 0 ]]; then
+            install_dir="/usr/local/bin"
+            conf_dir="/root/.config"
+        else
+            install_dir="$(eval echo ~$USER)/.local/bin"
+            conf_dir="$(eval echo ~$USER)/.config"
+        fi
+        ;;
+esac
 
 mkdir -p "$install_dir"
 [[ $? != 0 ]] && die "Unable to create install directory ($install_dir)"
