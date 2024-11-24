@@ -2783,6 +2783,14 @@ fi
 
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 
+## Program detection
+
+atfile.say.debug "Checking required programs..."
+atfile.util.check_prog "curl"
+atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
+atfile.util.check_prog "md5sum"
+atfile.util.check_prog "xargs"
+
 ## Lifecycle commands
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
@@ -2820,14 +2828,6 @@ if [[ $_is_sourced == 0 ]]; then
         "get-url"|"b") _command="url" ;;
     esac
 fi
-
-## Program detection
-
-atfile.say.debug "Checking required programs..."
-atfile.util.check_prog "curl"
-atfile.util.check_prog "jq" "https://jqlang.github.io/jq"
-atfile.util.check_prog "md5sum"
-atfile.util.check_prog "xargs"
 
 ## Required variables detection
 
