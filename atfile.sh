@@ -3116,9 +3116,6 @@ if [[ $_is_sourced == 0 ]]; then
             
             atfile.invoke.get_url "$2"
             ;;
-        "temp-finger")
-            atfile.util.get_finger_record
-            ;;
         *)
             atfile.die.unknown_command "$_command"
             ;;
