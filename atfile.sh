@@ -2389,9 +2389,9 @@ function atfile.invoke.upload() {
 
         case "$_os" in
             "haiku")
-                haiku_file_attr="$(catattr BEOS:TYPE "$file")"
+                haiku_file_attr="$(catattr BEOS:TYPE "$file" 2> /dev/null)"
                 [[ $? == 0 ]] && file_type="$(echo "$haiku_file_attr" | cut -d ":" -f 3 | xargs)"
-                
+
                 file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
                 file_size="$(stat -c %s "$file")"
                 ;;
