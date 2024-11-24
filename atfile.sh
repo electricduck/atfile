@@ -2389,7 +2389,8 @@ function atfile.invoke.upload() {
 
         case "$_os" in
             "haiku")
-                file_type="$(catattr BEOS:TYPE "$file" | cut -d ":" -f 3 | xargs)"
+                haiku_file_attr="$(catattr BEOS:TYPE "$file")"
+                [[ $? == 0 ]] && file_type="$(echo "$haiku_file_attr" | cut -d ":" -f 3 | xargs)"
                 ;;
             "macos")
                 file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
