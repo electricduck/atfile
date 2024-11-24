@@ -1292,13 +1292,23 @@ function blue.zio.atfile.finger__machine() {
 
         case "$_os" in
             "haiku")
-                os_version="$(uname -v | cut -d " " -f 1)"
+                os_version="$(uname -v | cut -d ' ' -f 1 | cut -d '+' -f 1)"
+                
+                case $os_version in
+                    "hrev57937") os_version="R1/Beta5" ;;
+                esac
 
                 machine_host="$(hostname)"
                 machine_os="Haiku $os_version"
                 ;;
             "macos")
                 os_version="$(sw_vers -productVersion | cut -d '.' -f 1,2)"
+                
+                case $os_version in
+                    "13."*) os_version="$os_version Ventura" ;;
+                    "14."*) os_version="$os_version Sonoma" ;;
+                    "15."*) os_version="$os_version Sequoia" ;;
+                esac
 
                 machine_host="$(hostname)"
                 machine_os="macOS $os_version"
