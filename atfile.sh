@@ -1262,46 +1262,57 @@ function blue.zio.atfile.meta__video() {
 
 # NOTE: Never intended to be used from ATFile. Here for reference
 function blue.zio.atfile.finger__browser() {
-    id="$1"
+    url="$1"
     userAgent="$2"
 
     echo "{
     \"\$type\": \"blue.zio.atfile.finger#browser\",
-    \"id\": \"$id\",
+    \"url\": \"$url\",
     \"userAgent\": \"$userAgent\"
 }"
 }
 
 function blue.zio.atfile.finger__machine() {
-    machine_id_file="/etc/machine-id"
-    os_release_file="/etc/os-release"
-    
-    if [[ $_include_fingerprint == 1 ]]; then
-        [[ ! -f "$machine_id_file" ]] && atfile.die "Unable to fingerprint — '$machine_id_file' does not exist"
-        [[ ! -f "$os_release_file" ]] && atfile.die "Unable to fingerprint — '$os_release_file' does not exist"
-        
-        id="$(cat "$machine_id_file")"
-        hostname="$(hostname -s)"
-        os_name="$(atfile.util.get_var_from_file "$os_release_file" "NAME")"
-        os_version="$(atfile.util.get_var_from_file "$os_release_file" "VERSION")"
-        os="$os_name $os_version"
+    unset machine_host
+    unset machine_id
+    unset machine_os
 
-        echo "{
-    \"\$type\": \"blue.zio.atfile.finger#machine\",
-    \"app\": \"$(atfile.util.get_uas)\",
-    \"host\": \"$hostname\",
-    \"id\": \"$id\",
-    \"os\": \"$os\"
-}"
-    else
-        echo "{
-    \"\$type\": \"blue.zio.atfile.finger#machine\",
-    \"app\": \"$(atfile.util.get_uas)\",
-    \"id\": null,
-    \"host\": null,
-    \"os\": null
-}"
+    if [[ $_include_fingerprint == 1 ]]; then
+        machine_id_file="/etc/machine-id"
+        os_release_file="/etc/os-release"
+
+        [[ -f "$machine_id_file" ]] && machine_id="$(cat "$machine_id_file")"
+
+        case "$_os" in
+            "haiku")
+                os_version="$(uname -v | cut -d " " -f 1)"
+
+                machine_host="$(hostname)"
+                machine_os="Haiku $os_version"
+                ;;
+            "macos")
+                os_version="$(sw_vers -productVersion | cut -d '.' -f 1,2)"
+
+                machine_host="$(hostname)"
+                machine_os="macOS $os_version"
+                ;;
+            *)
+                os_name="$(atfile.util.get_var_from_file "$os_release_file" "NAME")"
+                os_version="$(atfile.util.get_var_from_file "$os_release_file" "VERSION")"
+            
+                machine_host="$(hostname -s)"
+                machine_os="$os_name $os_version"
+                ;;
+        esac
     fi
+
+    echo "{
+    \"\$type\": \"blue.zio.atfile.finger#machine\",
+    \"app\": \"$(atfile.util.get_uas)\",
+    \"id\": $([[ $(atfile.util.is_null_or_empty "$machine_id") == 0 ]] && echo "\"$machine_id\"" || echo "null"),
+    \"host\": $([[ $(atfile.util.is_null_or_empty "$machine_host") == 0 ]] && echo "\"$machine_host\"" || echo "null"),
+    \"os\": $([[ $(atfile.util.is_null_or_empty "$machine_os") == 0 ]] && echo "\"$machine_os\"" || echo "null"),
+}"
 }
 
 function blue.zio.atfile.lock() {
@@ -2460,21 +2471,6 @@ function atfile.invoke.upload() {
     fi
 }
 
-#function atfile.invoke.upload_blob() {
-#    cid="$1"
-#
-#    blob_uri="$_server/xrpc/com.atproto.sync.getBlob?cid=$cid&did=$_username"
-#
-#    [[ $(atfile.util.is_url_okay "$blob_uri") == 0 ]] && atfile.die "Unable to find blob '$cid'"
-#
-#    atfile.say "Downloading '$cid' from '$_username'..."
-#
-#    echo "---"
-#    echo "Uploaded: 🔵 $cid"
-#    atfile.util.print_blob_url_output "$(atfile.util.build_blob_uri "$_username" "$cid")"
-#    echo -e "↳ Key: $key"
-#}
-
 function atfile.invoke.usage() {
     if [[ $_output_json == 1 ]]; then
         atfile.die "Command not available as JSON"
@@ -2696,12 +2692,12 @@ _os="$(atfile.util.get_os)"
 
 _dir_cache="$HOME/.cache/atfile"
 _dir_blobs_tmp="/tmp/at-blobs"
-_file_envvar="$HOME/.config/atfile.env"
+_path_envvar="$HOME/.config/atfile.env"
 
 case "$_os" in
     "haiku")
         _dir_cache="$HOME/config/cache"
-        _file_envvar="$HOME/config/settings/atfile.env"
+        _path_envvar="$HOME/config/settings/atfile.env"
         ;;
 esac
 
@@ -3055,10 +3051,6 @@ if [[ $_is_sourced == 0 ]]; then
             [[ -z "$2" ]] && atfile.die "<file> not set"
             atfile.invoke.upload "$2" "" "$3"
             ;;
-        #"upload-blob")
-        #    [[ -z "$2" ]] && atfile.die "<blob-key> not set"
-        #    atfile.invoke.upload_blob "$2" "$3"
-        #    ;;
         "upload-crypt")
             atfile.util.check_prog_optional_metadata
             atfile.util.check_prog_gpg
@@ -3077,6 +3069,9 @@ if [[ $_is_sourced == 0 ]]; then
             fi
             
             atfile.invoke.get_url "$2"
+            ;;
+        "temp-finger")
+            atfile.util.get_finger_record
             ;;
         *)
             atfile.die.unknown_command "$_command"
