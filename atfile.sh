@@ -1971,7 +1971,11 @@ function atfile.invoke.list() {
                 if [[ $_output_json == 1 ]]; then
                     json_output+="$c,"
                 else
-                    echo -e "$key\t$type_emoji $name"
+                    if [[ $_os == "haiku" ]]; then
+                        echo -e "$key\t$name" # BUG: Haiku Terminal has issues with emojis
+                    else
+                        echo -e "$key\t$type_emoji $name"
+                    fi
                 fi
             fi
         done <<< "$records"
