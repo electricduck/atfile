@@ -427,7 +427,10 @@ function atfile.util.get_file_name_pretty() {
         esac
     fi
     
-    output="$emoji $output"
+     # BUG: Haiku Terminal has issues with emojis
+    if [[ $_os != "haiku" ]]; then
+        output="$emoji $output"
+    fi
     
     output_last_line="$(echo -e "$output" | tail -n1)"
     output_last_line_length="${#output_last_line}"
