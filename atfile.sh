@@ -2834,7 +2834,7 @@ fi
 
 _prog_hint_jq="https://jqlang.github.io/jq"
 
-if [[ "$_os" == "linux" ]]; then
+if [[ "$_os" == "haiku" ]]; then
     _prog_hint_jq="pkgman install jq"
 fi
 
