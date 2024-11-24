@@ -270,7 +270,7 @@ function atfile.util.get_date() {
     if [[ -z "$date" ]]; then
         date -u +$format
     else
-        if [[ $(atfile.util.get_os) == "macos" ]]; then
+        if [[ $_os == "macos" ]]; then
             date -u -j -f "$format" "$date" +"$format"
         else
             date --date "$date" -u +"$format"
@@ -343,7 +343,7 @@ function atfile.util.get_envvar() {
 
 function atfile.util.get_envvar_from_envfile() {
     variable="$1"
-    atfile.util.get_var_from_file "$_envfile" "$variable"
+    atfile.util.get_var_from_file "$_path_envvar" "$variable"
 }
 
 function atfile.util.get_exiftool_field() {
@@ -677,7 +677,7 @@ function atfile.util.get_pds_pretty() {
 function atfile.util.get_realpath() {
     path="$1"
 
-    if [[ $(atfile.util.get_os) == "macos" ]]; then
+    if [[ $_os == "macos" ]]; then
         realpath "$path"
     else
         realpath -s "$path"
@@ -798,7 +798,7 @@ function atfile.util.launch_uri() {
     uri="$1"
 
     if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
-        if [[ $(atfile.util.get_os) == "macos" ]]; then
+        if [[ $_os == "macos" ]]; then
             open "$uri"
         else
             xdg-open "$uri"
@@ -1833,7 +1833,7 @@ function atfile.invoke.handle_atfile() {
         blob_uri="$(atfile.util.build_blob_uri "$_username" "$blob_cid")"
         file_type="$(echo $record | jq -r '.value.file.mimeType')"
 
-        if [[ $(atfile.util.get_os) != "macos" ]] && \
+        if [[ $_os != "macos" ]] && \
             [ -x "$(command -v xdg-mime)" ] && \
             [ -x "$(command -v xdg-open)" ] && \
             [ -x "$(command -v gtk-launch)" ]; then
@@ -2232,7 +2232,7 @@ function atfile.invoke.toggle_desktop() {
     unset desktop_dir
     unset mime_dir
 
-    if [[ $(atfile.util.get_os) == "macos" ]]; then
+    if [[ $_os == "macos" ]]; then
         atfile.die "Not available on macOS\nThink you could help? See: https://github.com/electricduck/atfile/issues/9"
     fi
 
@@ -2363,7 +2363,7 @@ function atfile.invoke.upload() {
         unset file_date
         unset file_size
 
-        if [[ $(atfile.util.get_os) == "macos" ]]; then
+        if [[ $_os == "macos" ]]; then
             file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
             file_size="$(stat -f '%z' "$file")"
         else
@@ -2623,7 +2623,7 @@ function atfile.invoke.usage() {
     ¹ A bool in Bash is 1 (true) or 0 (false)
     ² These servers are ran by @ducky.ws (and @astra.blue). You can trust us!"
 
-    usage_files="$_envfile
+    usage_files="$_path_envvar
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 
@@ -2683,16 +2683,27 @@ _prog_path="$(atfile.util.get_realpath "$0")"
 _version="0.6.7"
 _command="$1"
 _command_full="$@"
-_dir_cache="$HOME/.cache/atfile"
-_dir_blobs_tmp="/tmp/at-blobs"
 _envvar_prefix="ATFILE"
-_envfile="$HOME/.config/atfile.env"
 _is_sourced=0
 _meta_author="Ducky"
 _meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _meta_repo="https://github.com/electricduck/atfile"
 _meta_year="2024"
 _now="$(atfile.util.get_date)"
+_os="$(atfile.util.get_os)"
+
+### Paths
+
+_dir_cache="$HOME/.cache/atfile"
+_dir_blobs_tmp="/tmp/at-blobs"
+_file_envvar="$HOME/.config/atfile.env"
+
+case "$_os" in
+    "haiku")
+        _dir_cache="$HOME/config/cache"
+        _file_envvar="$HOME/config/settings/atfile.env"
+        ;;
+esac
 
 ### Envvars
 
