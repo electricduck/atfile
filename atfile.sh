@@ -803,7 +803,7 @@ function atfile.util.launch_uri() {
 
     if [[ -n $DISPLAY ]] && [ -x "$(command -v xdg-open)" ]; then
         xdg-open "$uri"
-    elif [[ $_os == "haiku" || $_os == "macos" ]]; then
+    else
         case $_os in
             "haiku") open "$uri" ;;
             "macos") open "$uri" ;;
