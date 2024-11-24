@@ -2345,18 +2345,18 @@ function atfile.invoke.update() {
     [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
     if [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
        [[ $_os == "linux" && $_prog_dir == "/bin" ]] ||\
-       [[ $_os == "linux" && $_prog_dir == "/opt"* ]] ||\
+       [[ $_os == "linux" && $_prog_dir == "/opt/"* ]] ||\
        [[ $_os == "linux" && $_prog_dir == "/usr/bin" ]] ||\
-       [[ $_os == "macos" && $_prog_dir == "/opt/local"* ]] ||\
-       [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar"* ]]; then
+       [[ $_os == "macos" && $_prog_dir == "/opt/local/"* ]] ||\
+       [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar/"* ]]; then
         # OS        Path                Prog
         # ------------------------------------------
         # Haiku     /boot/system/bin    pkgman
         # Linux     /bin                (various)
-        # Linux     /opt                (various)
+        # Linux     /opt/*              (various)
         # Linux     /usr/bin            (various)
-        # macOS     /opt/local          MacPorts
-        # macOS     /usr/local/Cellar   Homebrew
+        # macOS     /opt/local/*        MacPorts
+        # macOS     /usr/local/Cellar/* Homebrew
 
         atfile.die "Cannot update system-managed version (update from your package manager)"
     fi
@@ -2697,8 +2697,10 @@ function atfile.invoke.usage() {
     $_dir_cache/
         Cache and temporary storage"
 
-    usage="ATFile | 📦 ➔ 🦋
-    Store and retrieve files on the ATmosphere
+    usage="ATFile"
+    [[ $_os != "haiku" ]] && usage+=" | 📦 ➔ 🦋"
+
+    usage+="\nStore and retrieve files on the ATmosphere
     
     Version $_version
     (c) $_meta_year $_meta_author <$_meta_repo>
