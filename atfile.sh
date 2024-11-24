@@ -722,8 +722,12 @@ function atfile.util.get_var_from_file() {
             output="$(echo $found_line | sed "s|${variable}=||g")"
             output="${output%\"}"
             output="${output#\"}"
-            
-            echo "$output"
+
+            if [[ $output == *"\$("* && $output == *")"* ]]; then
+                eval "echo \"$output\""
+            else
+                echo "$output"
+            fi
         fi
     fi
 }
