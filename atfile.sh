@@ -1583,9 +1583,6 @@ Deps
 ↳ jq: $(atfile.invoke.debug.print_prog_version "jq" | sed -e "s|jq-||g")
 ↳ md5sum: $md5sum_version
 ↳ MediaInfo: $mediainfo_version
-Actor
-↳ DID: $_username
-↳ PDS: $_server
 Misc.
 ↳ md5sum Output: $(md5sum "$_prog_path")
 ↳ Now: $_now
@@ -2864,7 +2861,8 @@ if [[ -z "$_server" ]]; then
         if [[ $_command == "at:"* ]] ||\
            [[ $_command == "atfile:"* ]] ||\
            [[ $_command == "handle" ]] ||\
-           [[ $_command == "resolve" ]]; then
+           [[ $_command == "resolve" ]] ||\
+           [[ $_command == "something-broke" ]]; then
             atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
             skip_resolving=1
         fi
