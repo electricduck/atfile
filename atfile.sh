@@ -1318,7 +1318,7 @@ function blue.zio.atfile.finger__machine() {
     \"app\": \"$(atfile.util.get_uas)\",
     \"id\": $([[ $(atfile.util.is_null_or_empty "$machine_id") == 0 ]] && echo "\"$machine_id\"" || echo "null"),
     \"host\": $([[ $(atfile.util.is_null_or_empty "$machine_host") == 0 ]] && echo "\"$machine_host\"" || echo "null"),
-    \"os\": $([[ $(atfile.util.is_null_or_empty "$machine_os") == 0 ]] && echo "\"$machine_os\"" || echo "null"),
+    \"os\": $([[ $(atfile.util.is_null_or_empty "$machine_os") == 0 ]] && echo "\"$machine_os\"" || echo "null")
 }"
 }
 
