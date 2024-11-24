@@ -2388,6 +2388,9 @@ function atfile.invoke.upload() {
         unset file_type
 
         case "$_os" in
+            "haiku")
+                file_type="$(catattr BEOS:TYPE "$file" | cut -d ":" -f 3 | xargs)"
+                ;;
             "macos")
                 file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
                 file_size="$(stat -f '%z' "$file")"
