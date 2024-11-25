@@ -2388,7 +2388,7 @@ function atfile.invoke.update() {
         # macOS         /opt/local/*        MacPorts
         # macOS         /usr/local/Cellar/* Homebrew
 
-        atfile.die "Cannot update system-managed version (update from your package manager)"
+        atfile.die "Cannot update system-managed version: update from your package manager"
     fi
     
     if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
