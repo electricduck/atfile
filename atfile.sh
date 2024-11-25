@@ -2492,8 +2492,6 @@ function atfile.invoke.upload() {
         file="$(atfile.util.get_realpath "$file")"
     fi
 
-    file="$(atfile.util.get_file_path "$1")"
-
     if [[ $_output_json == 0 ]]; then
         if [[ "$_server" == "https://bsky.social" ]] || [[ "$_server" == *".bsky.network" ]]; then
             atfile.util.print_copyright_warning
