@@ -21,13 +21,36 @@ function atfile.die.gui() {
     cli_error="$1"
     gui_error="$2"
 
-    [[ -z $gui_error ]] && gui_error="$cli_error"
+    [[ -z "$gui_error" ]] && gui_error="$cli_error"
 
     if [ -x "$(command -v zenity)" ] && [[ $_is_sourced == 0 ]]; then
         zenity --error --text "$gui_error"
     fi
 
     atfile.die "$cli_error"
+}
+
+function atfile.die.gui.xrpc_error() {
+    message="$1"
+    xrpc_error="$2"
+    message_cli="$message"
+
+    [[ "$xrpc_error" == "?" ]] && unset xrpc_error
+    [[ -n "$xrpc_error" ]] && message_cli="$message\n↳ $xrpc_error"
+
+    atfile.die.gui \
+        "$message_cli" \
+        "$message"
+}
+
+function atfile.die.xrpc_error() {
+    message="$1"
+    xrpc_error="$2"
+
+    [[ "$xrpc_error" == "?" ]] && unset xrpc_error
+    [[ -n "$xrpc_error" ]] && message="$message\n↳ $xrpc_error"
+
+    atfile.die "$message"
 }
 
 function atfile.die.unknown_command() {
@@ -160,6 +183,9 @@ function atfile.util.get_app_url_for_at_uri() {
 
     ignore_url_validation=0
     resolved_actor="$(atfile.util.resolve_identity "$actor")"
+    error="$(atfile.util.get_xrpc_error $? "$resolved_actor")"
+    [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$actor'" "$resolved_actor"
+
     unset actor_handle
     unset actor_pds
     unset resolved_url
@@ -201,7 +227,7 @@ function atfile.util.get_app_url_for_at_uri() {
             "fyi.unravel.frontpage.vote")
                 record="$(atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
 
-                if [[ "$(atfile.util.is_xrpc_success $? "$record")" == 1 ]]; then
+                if [[ -z "$(atfile.util.get_xrpc_error $? "$record")" ]]; then
                     case "$collection" in
                         "app.bsky.feed.like")
                             resolved_url="$(atfile.util.get_app_url_for_at_uri "$(echo "$record" | jq -r '.value.subject.uri')")" ;;
@@ -763,6 +789,28 @@ function atfile.util.get_uas() {
     echo "ATFile/$_version"
 }
 
+function atfile.util.get_xrpc_error() {
+    exit_code="$1"
+    data="$2"
+
+    if [[ $exit_code != 0 || -z "$data" || "$data" == "null" || "$data" == "{}" || "$data" == *"\"error\":"* ]]; then
+        if [[ "$data" == "{"* && "$data" == *"\"error\":"* ]]; then
+            error="$(echo "$data" | jq -r ".error")"
+            message="$(echo "$data" | jq -r ".message")"
+
+            if [[ -z $message ]]; then
+                echo "$error"
+            else
+                echo "[$error] $message"
+            fi
+        else
+            echo "?"
+        fi
+    else
+        echo ""
+    fi
+}
+
 function atfile.util.get_yn() {
     yn="$1"
     
@@ -806,17 +854,6 @@ function atfile.util.is_url_okay() {
         echo 1
     else
         echo 0
-    fi
-}
-
-function atfile.util.is_xrpc_success() {
-    exit_code="$1"
-    data="$2"
-
-    if [[ $exit_code != 0 || -z "$data" || "$data" == "null" || "$data" == "{}" || "$data" == *"\"error\":"* ]]; then
-        echo 0
-    else
-        echo 1
     fi
 }
 
@@ -888,9 +925,12 @@ function atfile.util.override_actor() {
     [[ -z "$_username_original" ]] && _username_original="$_username"
     [[ -z "$_fmt_blob_url_original" ]] && _fmt_blob_url_original="$fmt_blob_url"
     
-    resolved_id="$(atfile.util.resolve_identity "$actor")"
-    _username="$(echo $resolved_id | cut -d "|" -f 1)"
-    _server="$(echo $resolved_id | cut -d "|" -f 2)"
+    resolved_did="$(atfile.util.resolve_identity "$actor")"
+    error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
+    [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$actor'" "$resolved_did"
+
+    _username="$(echo $resolved_did | cut -d "|" -f 1)"
+    _server="$(echo $resolved_did | cut -d "|" -f 2)"
 
     if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
         export _fmt_blob_url="$_fmt_blob_url_default"
@@ -978,23 +1018,29 @@ function atfile.util.resolve_identity() {
     
     if [[ "$actor" != "did:"* ]]; then
         resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
-        if [[ $(atfile.util.is_xrpc_success $? "$resolved_handle") == 1 ]]; then
+        error="$(atfile.util.get_xrpc_error $? "$resolved_handle")"
+
+        if [[ -z "$error" ]]; then
             actor="$(echo "$resolved_handle" | jq -r ".did")"
         fi
     fi
     
     if [[ "$actor" == "did:"* ]]; then
         unset did_doc
-        
+
         case "$actor" in
             "did:plc:"*) did_doc="$(atfile.util.get_didplc_doc "$actor")" ;;
             "did:web:"*) did_doc="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -L -X GET "$(atfile.util.get_didweb_doc_url "$actor")")" ;;
         esac
-            
-        if [[ $? != 0 || -z "$did_doc" ]]; then
-            atfile.die "Unable to fetch DID Doc for '$actor'"
-        else
+
+        if [[ -n "$did_doc" ]]; then
             did="$(echo "$did_doc" | jq -r ".id")"
+
+            if [[ $(atfile.util.is_null_or_empty "$did") == 1 ]]; then
+                echo "$error"
+                exit 255
+            fi
+
             didplc_dir="$(echo "$did_doc" | jq -r ".directory")"
             pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[0]')"
@@ -1004,7 +1050,8 @@ function atfile.util.resolve_identity() {
             echo "$did|$pds|$handle|$didplc_dir"
         fi
     else
-        atfile.die "Unable to resolve '$actor'"
+        echo "$error"
+        exit 255
     fi
 }
 
@@ -1482,13 +1529,13 @@ function com.atproto.sync.uploadBlob() {
 
 function atfile.invoke.blob_list() {
     cursor="$1"
-    success=1
+    unset error
     
     atfile.say.debug "Getting blobs...\n↳ Repo: $_username"
     blobs="$(com.atproto.sync.listBlobs "$_username" "$cursor")"
-    success="$(atfile.util.is_xrpc_success $? "$blobs")"
+    error="$(atfile.util.get_xrpc_error $? "$blobs")"
 
-    if [[ $success == 1 ]]; then
+    if [[ -z "$error" ]]; then
         records="$(echo $blobs | jq -c '.cids[]')"
         if [[ -z "$records" ]]; then
             if [[ -n "$cursor" ]]; then
@@ -1663,23 +1710,25 @@ Misc.
 function atfile.invoke.delete() {
     key="$1"
     success=1
+    unset error
 
     lock_record="$(com.atproto.repo.getRecord "$_username" "blue.zio.atfile.lock" "$key")"
 
-    if [[ $(atfile.util.is_xrpc_success $? "$lock_record") == 1 ]] && [[ $(echo "$lock_record" | jq -r ".value.lock") == true ]]; then
+    if [[ $(echo "$lock_record" | jq -r ".value.lock") == true ]]; then
         atfile.die "Unable to delete '$key' — file is locked\n       Run \`$_prog unlock $key\` to unlock file"
     fi
 
     record="$(com.atproto.repo.deleteRecord "$_username" "$_nsid_upload" "$key")"
+    error="$(atfile.util.get_xrpc_error $? "$record")"
     
-    if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
+    if [[ -z "$error" ]]; then
         if [[ $_output_json == 1 ]]; then
             echo "{ \"deleted\": true }" | jq
         else
             echo "Deleted: $key"
         fi
     else
-        atfile.die "Unable to delete '$key'"
+        atfile.die.xrpc_error "Unable to delete '$key'" "$error"
     fi
 }
 
@@ -1839,13 +1888,13 @@ function atfile.invoke.get() {
 
 function atfile.invoke.get_url() {
     key="$1"
-    success=1
+    unset error
     
     atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
-    success="$(atfile.util.is_xrpc_success $? "$record")"
+    error="$(atfile.util.get_xrpc_error $? "$record")"
     
-    if [[ $success == 1 ]]; then
+    if [[ -z "$error" ]]; then
         blob_url="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
 
         if [[ $_output_json == 1 ]]; then
@@ -1854,7 +1903,7 @@ function atfile.invoke.get_url() {
             echo "$blob_url"
         fi
     else
-        atfile.die "Unable to get '$key'"
+        atfile.die.xrpc_error "Unable to get '$key'" "$error"
     fi
 }
 
@@ -1891,7 +1940,8 @@ function atfile.invoke.handle_atfile() {
 
         atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
         record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
-        [[ "$(atfile.util.is_xrpc_success $? "$record")" == 0 ]] && atfile.die.gui "Unable to get '$key'"
+        error="$(atfile.util.get_xrpc_error $? "$record")"
+        [[ -n "$error" ]] && atfile.die.gui.xrpc_error "Unable to get '$key'" "$error"
 
         blob_cid="$(echo $record | jq -r ".value.blob.ref.\"\$link\"")"
         blob_uri="$(atfile.util.build_blob_uri "$_username" "$blob_cid")"
@@ -1982,13 +2032,13 @@ function atfile.invoke.handle_aturi() {
 
 function atfile.invoke.list() {
     cursor="$1"
-    success=1
+    unset error
     
     atfile.say.debug "Getting records...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username"
     records="$(com.atproto.repo.listRecords "$_username" "$_nsid_upload" "$cursor")"
-    success="$(atfile.util.is_xrpc_success $? "$records")"
+    error="$(atfile.util.get_xrpc_error $? "$records")"
    
-    if [[ $success == 1 ]]; then
+    if [[ -z "$error" ]]; then
         records="$(echo $records | jq -c '.records[]')"
         if [[ -z "$records" ]]; then
             if [[ -n "$cursor" ]]; then
@@ -2038,19 +2088,20 @@ function atfile.invoke.list() {
             echo -e "$json_output" | jq
         fi
     else
-        atfile.die "Unable to list files"
+        atfile.die.xrpc_error "Unable to list files" "$error"
     fi
 }
 
 function atfile.invoke.lock() {
     key="$1"
     locked=$2
+    unset error
     
     atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     upload_record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
-    success=$(atfile.util.is_xrpc_success $? "$upload_record")
+    error=$(atfile.util.get_xrpc_error $? "$upload_record")
     
-    if [[ $success == 1 ]]; then        
+    if [[ -z "$error" ]]; then        
         if [[ $locked == 1 ]]; then
             locked=true
         else
@@ -2061,10 +2112,10 @@ function atfile.invoke.lock() {
         
         atfile.say.debug "Updating record...\n↳ NSID: $_nsid_lock\n↳ Repo: $_username\n↳ Key: $key"
         record="$(com.atproto.repo.putRecord "$_username" "$_nsid_lock" "$key" "$lock_record")"
-        success=$(atfile.util.is_xrpc_success $? "$record")
+        error=$(atfile.util.get_xrpc_error $? "$record")
     fi
     
-    if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
+    if [[ -z "$error" ]]; then
         if [[ $_output_json == 1 ]]; then
             echo -e "{ \"locked\": $locked }" | jq
         else
@@ -2075,10 +2126,10 @@ function atfile.invoke.lock() {
             fi
         fi
     else
-         if [[ $locked == true ]]; then
-            atfile.die "Unable to lock '$key'"
+        if [[ $locked == true ]]; then
+            atfile.die "Unable to lock '$key'" "$error"
         else
-            atfile.die "Unable to unlock '$key'"
+            atfile.die "Unable to unlock '$key'" "$error"
         fi
     fi
 }
@@ -2190,12 +2241,14 @@ function atfile.invoke.print() {
 
 function atfile.invoke.profile() {
     nick="$1"
+    unset error
     
     profile_record="$(blue.zio.meta.profile "$1")"
     atfile.say.debug "Updating record...\n↳ NSID: $_nsid_profile\n↳ Repo: $_username\n↳ Key: self"
     record="$(com.atproto.repo.putRecord "$_username" "$_nsid_profile" "self" "$profile_record")"
-    
-    if [[ $(atfile.util.is_xrpc_success $? "$record") == 1 ]]; then
+    error="$(atfile.util.get_xrpc_error $? "$record")"
+
+    if [[ -z "$error" ]]; then
         atfile.say.debug "Getting record...\n↳ NSID: $_nsid_profile\n↳ Repo: $_username\n↳ Key: self"
         record="$(com.atproto.repo.getRecord "$_username" "$_nsid_profile" "self")"
     
@@ -2206,7 +2259,7 @@ function atfile.invoke.profile() {
             echo "↳ Nickname: $(echo "$record" | jq -r ".value.nickname")"
         fi
     else
-        atfile.die "Unable to update profile"
+        atfile.die "Unable to update profile" "$error"
     fi
 }
 
@@ -2244,7 +2297,10 @@ function atfile.invoke.resolve() {
     actor="$1"
 
     atfile.say.debug "Resolving actor '$actor'..."
+
     resolved_did="$(atfile.util.resolve_identity "$actor")"
+    error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
+    [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$actor'" "$resolved_did"
 
     alias="$(echo $resolved_did | cut -d "|" -f 3)"
     did="$(echo $resolved_did | cut -d "|" -f 1)"
@@ -2255,8 +2311,6 @@ function atfile.invoke.resolve() {
     pds_name="$(atfile.util.get_pds_pretty "$pds")"
     atfile.say.debug "Getting PDS version for '$pds'..."
     pds_version="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
-
-    [[ "$did" == "null" ]] && atfile.die "Unable to resolve '$actor'"
 
     case "$did_type" in
         "did:web")
@@ -2345,6 +2399,8 @@ NoDisplay=true" > "$desktop_path"
 
 # TODO: Validate checksum
 function atfile.invoke.update() {
+    unset error
+
     if [[ $_output_json == 1 ]]; then
         atfile.die "Command not available as JSON"
     fi
@@ -2354,7 +2410,9 @@ function atfile.invoke.update() {
 
     atfile.say.debug "Getting latest release..."
     latest_release_record="$(com.atproto.repo.getRecord "$_meta_did" "self.atfile.latest" "self")"
-    [[ $(atfile.util.is_xrpc_success $? "$latest_release_record") != 1 ]] && atfile.die "Unable to get latest version"
+    error="$(atfile.util.get_xrpc_error $? "$latest_release_record")"
+
+    [[ -n "$error" ]] && atfile.die "Unable to get latest version" "$error"
 
     latest_version="$(echo "$latest_release_record" | jq -r '.value.version')"
     latest_version_commit="$(echo "$latest_release_record" | jq -r '.value.commit')"
@@ -2405,7 +2463,13 @@ function atfile.invoke.update() {
                 atfile.die "Unable to update (do you have permission?)"
             else
                 chmod +x "$_prog_path"
-                atfile.say "😎 Updated to $latest_version!"
+
+                if [[ $_os == "haiku" ]]; then
+                    atfile.say "Updated to $latest_version!"
+                else
+                    atfile.say "😎 Updated to $latest_version!"
+                fi
+
                 exit 0
             fi
         else
@@ -2420,9 +2484,7 @@ function atfile.invoke.upload() {
     file="$1"
     recipient="$2"
     key="$3"
-    
-    success=1
-    unset fail_reason
+    unset error
     
     if [[ ! -f "$file" ]]; then
         atfile.die "File '$file' does not exist"
@@ -2443,9 +2505,8 @@ function atfile.invoke.upload() {
         
         [[ $_output_json == 0 ]] && echo -e "Encrypting '$file_crypt'..."
         gpg --yes --quiet --recipient $recipient --output "$file_crypt" --encrypt "$file"
-        [[ $? != 0 ]] && success=0
         
-        if [[ $success == 1 ]]; then
+        if [[ $? == 0 ]]; then
             file="$file_crypt"
         else
             rm -f "$file_crypt"
@@ -2453,7 +2514,7 @@ function atfile.invoke.upload() {
         fi
     fi
 
-    if [[ $success == 1 ]]; then
+    if [[ -z "$error" ]]; then
         unset file_date
         unset file_size
         unset file_type
@@ -2509,22 +2570,21 @@ function atfile.invoke.upload() {
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
         
         blob="$(com.atproto.sync.uploadBlob "$file")"
-        success=$(atfile.util.is_xrpc_success $? "$blob")
-        [[ $success == 0 && "$blob" == "{"* ]] && failure_reason="$(echo "$blob" | jq -r ".message")"
-        
+        error="$(atfile.util.get_xrpc_error $? "$blob")"
+
         atfile.say.debug "Uploading blob...\n↳ Ref: $(echo "$blob" | jq -r ".ref.\"\$link\"")"
     
-        if [[ $success == 1 ]]; then
+        if [[ -z "$error" ]]; then
             file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
             
             if [[ -n "$key" ]]; then
                 atfile.say.debug "Updating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
                 record="$(com.atproto.repo.putRecord "$_username" "$_nsid_upload" "$key" "$file_record")"
-                success=$(atfile.util.is_xrpc_success $? "$record")
+                error="$(atfile.util.get_xrpc_error $? "$record")"
             else
                 atfile.say.debug "Creating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username"
                 record="$(com.atproto.repo.createRecord "$_username" "$_nsid_upload" "$file_record")"
-                success=$(atfile.util.is_xrpc_success $? "$record")
+                error="$(atfile.util.get_xrpc_error $? "$record")"
             fi
         fi
     fi
@@ -2533,7 +2593,7 @@ function atfile.invoke.upload() {
         rm -f "$file"
     fi
 
-    if [[ $success == 1 ]]; then
+    if [[ -z "$error" ]]; then
         unset recipient_key
         blob_uri="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $blob | jq -r ".ref.\"\$link\"")")"
         key="$(atfile.util.get_rkey_from_at_uri "$(echo $record | jq -r ".uri")")"
@@ -2567,9 +2627,7 @@ function atfile.invoke.upload() {
             fi
         fi
     else
-        die_message="Unable to upload '$file'"
-        [[ -n $failure_reason ]] && die_message="$die_message\n↳$failure_reason" 
-        atfile.die "$die_message"
+        atfile.die.xrpc_error "Unable to upload '$file'" "$error"
     fi
 }
 
@@ -2578,7 +2636,17 @@ function atfile.invoke.usage() {
         atfile.die "Command not available as JSON"
     fi
 
-    handle="$(atfile.util.resolve_identity "$_meta_did" | cut -d "|" -f 3 | sed -s 's/at:\/\///g')"
+    unset error
+    unset handle
+
+    resolved_did="$(atfile.util.resolve_identity "$_meta_did")"
+    error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
+    
+    if [[ -n "$error" ]]; then
+        handle="invalid.handle"
+    else
+        handle="$(echo "$resolved_did" | cut -d "|" -f 3 | sed -s 's/at:\/\///g')"
+    fi
 
 # ------------------------------------------------------------------------------
     usage_commands="upload <file> [<key>]
@@ -2763,12 +2831,14 @@ Files
     $usage_files
 "
 
-if [[ $_debug == 1 ]]; then
-    atfile.say.debug "Printing help..."
-    echo -e "$usage"
-else
-    echo -e "$usage" | less
-fi
+    if [[ $_debug == 1 ]]; then
+        atfile.say.debug "Printing help..."
+        echo -e "$usage"
+    else
+        echo -e "$usage" | less
+    fi
+
+    [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$_meta_did'" "$error"
 
 # ------------------------------------------------------------------------------
 }
@@ -3014,9 +3084,12 @@ if [[ -z "$_server" ]]; then
     if [[ $skip_resolving == 0 ]]; then
         atfile.say.debug "Resolving identity..."
 
-        resolved_id="$(atfile.util.resolve_identity "$_username")"
-        _username="$(echo $resolved_id | cut -d "|" -f 1)"
-        _server="$(echo $resolved_id | cut -d "|" -f 2)"
+        resolved_did="$(atfile.util.resolve_identity "$_username")"
+        error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
+        [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$_username'" "$resolved_did"
+
+        _username="$(echo $resolved_did | cut -d "|" -f 1)"
+        _server="$(echo $resolved_did | cut -d "|" -f 2)"
         
         atfile.say.debug "Resolved identity\n↳ DID: $_username\n↳ PDS: $_server"
     fi
@@ -3030,8 +3103,10 @@ if [[ -n $_server ]]; then
         atfile.say.debug "Checking authentication is valid..."
         
         session="$(com.atproto.server.getSession)"
-        if [[ $(atfile.util.is_xrpc_success $? "$session") == 0 ]]; then
-            atfile.die "Unable to authenticate"
+        error="$(atfile.util.get_xrpc_error $? "$session")"
+
+        if [[ -n "$error" ]]; then
+            atfile.die.xrpc_error "Unable to authenticate" "$error"
         else
             _username="$(echo $session | jq -r ".did")"
         fi
