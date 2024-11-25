@@ -447,14 +447,6 @@ function atfile.util.get_file_name_pretty() {
     echo -e "$(atfile.util.repeat_char "-" $output_last_line_length)"
 }
 
-function atfile.util.get_file_path() {
-    file="$1"
-    
-    if [ -f "$file" ]; then
-        echo "$(atfile.util.get_realpath "$file")"
-    fi
-}
-
 function atfile.util.get_file_size_pretty() {
     size="$1"
     suffix=""
@@ -1558,8 +1550,14 @@ function atfile.invoke.blob_list() {
 }
 
 function atfile.invoke.blob_upload() {
-    file="$(atfile.util.get_file_path "$1")"
-    [[ ! -f "$file" ]] && atfile.die "File '$file' does not exist"
+    file="$1"
+
+    if [[ ! -f "$file" ]]; then
+        atfile.die "File '$file' does not exist"
+    else
+        file="$(atfile.util.get_realpath "$file")"
+    fi
+
     atfile.say.debug "Uploading blob...\n↳ File: $file"
     com.atproto.sync.uploadBlob "$file" | jq
 }
@@ -2419,14 +2417,20 @@ function atfile.invoke.update() {
 }
 
 function atfile.invoke.upload() {
-    file="$(atfile.util.get_file_path "$1")"
+    file="$1"
     recipient="$2"
     key="$3"
     
     success=1
     unset fail_reason
     
-    [[ ! -f "$file" ]] && atfile.die "File '$file' does not exist"
+    if [[ ! -f "$file" ]]; then
+        atfile.die "File '$file' does not exist"
+    else
+        file="$(atfile.util.get_realpath "$file")"
+    fi
+
+    file="$(atfile.util.get_file_path "$1")"
 
     if [[ $_output_json == 0 ]]; then
         if [[ "$_server" == "https://bsky.social" ]] || [[ "$_server" == *".bsky.network" ]]; then
@@ -3203,4 +3207,5 @@ if [[ $_is_sourced == 0 ]]; then
     esac
 fi
 
-# lord help me
+# "Four million lines of BASIC"
+#  - Kif Kroker (3003)
