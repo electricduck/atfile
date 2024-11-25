@@ -715,11 +715,7 @@ function atfile.util.get_pds_pretty() {
 function atfile.util.get_realpath() {
     path="$1"
 
-    if [[ $_os == "bsd"* || $_os == "macos" || $_os == "linux-musl" ]]; then
-        realpath "$path"
-    else
-        realpath -s "$path"
-    fi
+    realpath "$path"
 }
 
 function atfile.util.get_region_pretty() {
