@@ -2426,7 +2426,9 @@ function atfile.invoke.upload() {
     file="$(atfile.util.get_file_path "$1")"
     recipient="$2"
     key="$3"
+    
     success=1
+    unset fail_reason
     
     [[ ! -f "$file" ]] && atfile.die "File '$file' does not exist"
 
@@ -2505,8 +2507,10 @@ function atfile.invoke.upload() {
         file_meta_record="$(atfile.util.get_meta_record "$file" "$file_type")"
         
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
+        
         blob="$(com.atproto.sync.uploadBlob "$file")"
         success=$(atfile.util.is_xrpc_success $? "$blob")
+        [[ $success == 0 && "$blob" == "{"* ]] && failure_reason="$(echo "$blob" | jq -r ".message")"
         
         atfile.say.debug "Uploading blob...\n↳ Ref: $(echo "$blob" | jq -r ".ref.\"\$link\"")"
     
@@ -2563,7 +2567,9 @@ function atfile.invoke.upload() {
             fi
         fi
     else
-        atfile.die "Unable to upload '$file'"
+        die_message="Unable to upload '$file'"
+        [[ -n $failure_reason ]] && die_message="$die_message\n↳$failure_reason" 
+        atfile.die "$die_message"
     fi
 }
 
