@@ -2856,7 +2856,7 @@ _is_sourced=0
 _meta_author="Ducky"
 _meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _meta_repo="https://github.com/electricduck/atfile"
-_version="0.7.3"
+_version="0.7.4"
 _meta_year="2024"
 _now="$(atfile.util.get_date)"
 
