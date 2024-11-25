@@ -282,7 +282,7 @@ function atfile.util.get_date() {
     else
         if [[ $_os == "linux-musl" ]]; then
             echo ""
-        elif [[ $_os == "macos" ]]; then
+        elif [[ $_os == "macos" || $_os == "bsd"* ]]; then
             date -u -j -f "$format" "$date" +"$format"
         else
             date --date "$date" -u +"$format"
@@ -715,7 +715,7 @@ function atfile.util.get_pds_pretty() {
 function atfile.util.get_realpath() {
     path="$1"
 
-    if [[ $_os == "macos" || $_os == "linux-musl" ]]; then
+    if [[ $_os == "bsd"* || $_os == "macos" || $_os == "linux-musl" ]]; then
         realpath "$path"
     else
         realpath -s "$path"
@@ -2373,20 +2373,20 @@ function atfile.invoke.update() {
     atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
 
     [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
-    if [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
-       [[ $_os == "linux"* && $_prog_dir == "/bin" ]] ||\
-       [[ $_os == "linux"* && $_prog_dir == "/opt/"* ]] ||\
-       [[ $_os == "linux"* && $_prog_dir == "/usr/bin" ]] ||\
+    if [[ $_os == "bsd"* || $_os == "linux"* ]] && [[ $_prog_dir == "/bin" ]] ||\
+       [[ $_os == "bsd"* || $_os == "linux"* ]] && [[ $_prog_dir == "/opt/"* ]] ||\
+       [[ $_os == "bsd"* || $_os == "linux"* ]] && [[ $_prog_dir == "/usr/bin" ]] ||\
+       [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
        [[ $_os == "macos" && $_prog_dir == "/opt/local/"* ]] ||\
        [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar/"* ]]; then
-        # OS        Path                Prog
-        # ------------------------------------------
-        # Haiku     /boot/system/bin    pkgman
-        # Linux     /bin                (various)
-        # Linux     /opt/*              (various)
-        # Linux     /usr/bin            (various)
-        # macOS     /opt/local/*        MacPorts
-        # macOS     /usr/local/Cellar/* Homebrew
+        # OS            Path                Prog
+        # ----------------------------------------------
+        # BSD/Linux     /bin                (various)
+        # BSD/Linux     /opt/*              (various)
+        # BSD/Linux     /usr/bin            (various)
+        # Haiku         /boot/system/bin    pkgman
+        # macOS         /opt/local/*        MacPorts
+        # macOS         /usr/local/Cellar/* Homebrew
 
         atfile.die "Cannot update system-managed version (update from your package manager)"
     fi
