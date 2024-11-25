@@ -2770,6 +2770,8 @@ function atfile.invoke.usage() {
            not be created:
            * audio/*: $_nsid_meta#audio
            * video/*: $_nsid_meta#video
+    ${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN <bool¹> (default: $_skip_unsupported_os_warn)
+        Do not error when running on an unsupported OS
 
     ${_envvar_prefix}_ENDPOINT_JETSTREAM <url> (default: $_endpoint_jetstream_default)
         Endpoint of the Jetstream relay
