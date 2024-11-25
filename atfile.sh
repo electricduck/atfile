@@ -265,6 +265,8 @@ function atfile.util.get_cdn_uri() {
     echo "$cdn_uri"
 }
 
+# TODO: Support BusyBox's shit `date` command
+#       `date -u +"$format" -s "1996-08-11 01:23:34"``
 function atfile.util.get_date() {
     date="$1"
     format="$2"
@@ -272,9 +274,15 @@ function atfile.util.get_date() {
     [[ -z $format ]] && format="%Y-%m-%dT%H:%M:%SZ"
     
     if [[ -z "$date" ]]; then
-        date -u +$format
+        if [[ $_os == "linux-musl" ]]; then
+            echo ""
+        else
+            date -u +$format
+        fi
     else
-        if [[ $_os == "macos" ]]; then
+        if [[ $_os == "linux-musl" ]]; then
+            echo ""
+        elif [[ $_os == "macos" ]]; then
             date -u -j -f "$format" "$date" +"$format"
         else
             date --date "$date" -u +"$format"
@@ -443,7 +451,7 @@ function atfile.util.get_file_path() {
     file="$1"
     
     if [ -f "$file" ]; then
-        echo "$(realpath "$file")"
+        echo "$(atfile.util.get_realpath "$file")"
     fi
 }
 
@@ -653,6 +661,7 @@ function atfile.util.get_os() {
         "darwin"*) echo "macos" ;;
         "haiku") echo "haiku" ;;
         "linux-gnu") echo "linux" ;;
+        "linux-musl") echo "linux-musl" ;;
         *) echo "unknown-$OSTYPE" ;;
     esac
 }
@@ -660,7 +669,7 @@ function atfile.util.get_os() {
 function atfile.util.get_pds_pretty() {
     pds="$1"
 
-    pds_host="$(echo $pds | cut -d "/" -f 3)"
+    pds_host="$(atfile.util.get_uri_segment "$pds" host)"
     unset pds_name
     unset pds_emoji
 
@@ -682,7 +691,7 @@ function atfile.util.get_pds_pretty() {
             pds_name="$(echo $pds_customization_data | jq -r '.name')"
             pds_emoji="🟦"
         else
-            pds_name="$pds"
+            pds_name="$pds_host"
         fi
     fi
                                 # BUG: Haiku Terminal has issues with emojis
@@ -696,7 +705,7 @@ function atfile.util.get_pds_pretty() {
 function atfile.util.get_realpath() {
     path="$1"
 
-    if [[ $_os == "macos" ]]; then
+    if [[ $_os == "macos" || $_os == "linux-musl" ]]; then
         realpath "$path"
     else
         realpath -s "$path"
@@ -1571,7 +1580,7 @@ function atfile.invoke.debug() {
         [[ -z "$version_arg" ]] && version_arg="--version"
 
         if [ -x "$(command -v $prog)" ]; then
-            eval "$prog $version_arg"
+            eval "$prog $version_arg 2>&1"
         else
             echo "$prog_not_installed_placeholder"
         fi
@@ -1581,14 +1590,24 @@ function atfile.invoke.debug() {
         atfile.die "Command not available as JSON"
     fi
     
-    md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum")"
+    unset md5sum_version
     mediainfo_version="$(atfile.invoke.debug.print_prog_version "mediainfo")"
     os="$(atfile.util.get_finger_record | jq -r ".os")"
+
+    if [[ $_os == "linux-musl" ]]; then
+        md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum" "--help")"
+    else
+        md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum")"
+    fi
     
     if [[ "$md5sum_version" != "$prog_not_installed_placeholder" ]]; then
         md5sum_version="$(echo "$md5sum_version" | head -n 1)"
         if [[ "$md5sum_version" == *GNU* ]]; then
             md5sum_version="$(echo "$md5sum_version" | cut -d " " -f 4) (GNU)"
+        elif [[ "$md5sum_version" == *BusyBox* ]]; then
+            md5sum_version="$(echo "$md5sum_version" | cut -d " " -f 2 | cut -d "v" -f 2) (BusyBox)"
+        else
+            md5sum_version="(?)"
         fi
     fi
     
@@ -1615,6 +1634,7 @@ $(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
 $(atfile.invoke.debug.print_envvar "SKIP_COPYRIGHT_WARN" $_skip_copyright_warn_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_EXIFTOOL" $_skip_ni_exiftool_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_MEDIAINFO" $_skip_ni_mediainfo_default)
+$(atfile.invoke.debug.print_envvar "SKIP_UNSUPPORTED_OS_WARN" $_skip_unsupported_os_warn)
 ↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "(Set)")
 $(atfile.invoke.debug.print_envvar "USERNAME")
 Environment
@@ -1696,11 +1716,11 @@ function atfile.invoke.download() {
         if [[ $_output_json == 1 ]]; then
             is_decrypted="false"
             [[ $decrypt == 1 ]] && is_decrypted="true"
-            echo -e "{ \"decrypted\": $is_decrypted, \"name\": \"$(basename "${downloaded_file}")\", \"path\": \"$(realpath "${downloaded_file}")\" }" | jq
+            echo -e "{ \"decrypted\": $is_decrypted, \"name\": \"$(basename "${downloaded_file}")\", \"path\": \"$(atfile.util.get_realpath "${downloaded_file}")\" }" | jq
         else
             echo -e "Downloaded: $key"
             [[ $decrypt == 1 ]] && echo "Decrypted: $downloaded_file"
-            echo -e "↳ Path: $(realpath "$downloaded_file")"
+            echo -e "↳ Path: $(atfile.util.get_realpath "$downloaded_file")"
         fi
     else
         [[ -f "$downloaded_file" ]] && rm -f "$downloaded_file"
@@ -1873,7 +1893,7 @@ function atfile.invoke.handle_atfile() {
         blob_uri="$(atfile.util.build_blob_uri "$_username" "$blob_cid")"
         file_type="$(echo $record | jq -r '.value.file.mimeType')"
 
-        if [[ $_os == "linux" ]] && \
+        if [[ $_os == "linux"* ]] && \
             [ -x "$(command -v xdg-mime)" ] && \
             [ -x "$(command -v xdg-open)" ] && \
             [ -x "$(command -v gtk-launch)" ]; then
@@ -2344,9 +2364,9 @@ function atfile.invoke.update() {
 
     [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
     if [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
-       [[ $_os == "linux" && $_prog_dir == "/bin" ]] ||\
-       [[ $_os == "linux" && $_prog_dir == "/opt/"* ]] ||\
-       [[ $_os == "linux" && $_prog_dir == "/usr/bin" ]] ||\
+       [[ $_os == "linux"* && $_prog_dir == "/bin" ]] ||\
+       [[ $_os == "linux"* && $_prog_dir == "/opt/"* ]] ||\
+       [[ $_os == "linux"* && $_prog_dir == "/usr/bin" ]] ||\
        [[ $_os == "macos" && $_prog_dir == "/opt/local/"* ]] ||\
        [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar/"* ]]; then
         # OS        Path                Prog
@@ -2441,12 +2461,9 @@ function atfile.invoke.upload() {
             *)
                 file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
                 file_size="$(stat -c %s "$file")"
+                file_type="$(file -b --mime-type "$file")"
                 ;;
         esac
-
-        if [ -x "$(command -v file)" ]; then
-            file_type="$(file -b --mime-type "$file")"
-        fi
 
         file_hash="$(atfile.util.get_md5 "$file")"
         file_hash_type="md5"
@@ -2746,23 +2763,24 @@ fi
 
 ### General
 
-_prog="$(basename "$(atfile.util.get_realpath "$0")")"
-_prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
-_prog_path="$(atfile.util.get_realpath "$0")"
-_version="0.7.1"
 _command="$1"
 _command_full="$@"
 _envvar_prefix="ATFILE"
+_os="$(atfile.util.get_os)"
+_is_git=0
 _is_sourced=0
 _meta_author="Ducky"
 _meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _meta_repo="https://github.com/electricduck/atfile"
+_version="0.7.1"
 _meta_year="2024"
 _now="$(atfile.util.get_date)"
-_os="$(atfile.util.get_os)"
 
 ### Paths
 
+_prog="$(basename "$(atfile.util.get_realpath "$0")")"
+_prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
+_prog_path="$(atfile.util.get_realpath "$0")"
 _dir_cache="$HOME/.cache/atfile"
 _dir_blobs_tmp="/tmp/at-blobs"
 _path_envvar="$HOME/.config/atfile.env"
@@ -2794,6 +2812,7 @@ _skip_auth_check_default=0
 _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
 _skip_ni_mediainfo_default=0
+_skip_unsupported_os_warn_default=0
 
 #### Fallbacks
 
@@ -2817,6 +2836,7 @@ _skip_auth_check="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "
 _skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
 _skip_ni_exiftool="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
 _skip_ni_mediainfo="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
+_skip_unsupported_os_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN" "$_skip_unsupported_os_warn_default")"
 _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
 _test_desktop_uas="Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
@@ -2841,7 +2861,12 @@ fi
 
 atfile.say.debug "Starting up..."
 
-## Cache/Temp
+## Envvar correction
+
+[[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]] &&  _max_list=100
+[[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
+
+## Directory creation
 
 atfile.say.debug "Creating necessary directories..."
 atfile.util.create_dir "$_dir_cache"
@@ -2849,20 +2874,25 @@ atfile.util.create_dir "$_dir_blobs_tmp"
 
 ## Git detection
 
-if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]] && [[ "$(realpath $(pwd))" == "$_prog_dir" ]]; then
+if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]] && [[ "$(atfile.util.get_realpath "$(pwd)")" == "$_prog_dir" ]]; then
     atfile.say.debug "Getting tag from Git..."
     git describe --exact-match --tags > /dev/null 2>&1
     [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
     _is_git=1
 fi
 
-## Envvar correction
+## OS detection
 
-if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
-    _max_list=100
+atfile.say.debug "Checking OS..."
+
+if [[ $_os == "unknown-"* ]] ||\
+   [[ $_is_git == 0 && $_os == "linux-musl" ]]; then
+    if [[ $_skip_unsupported_os_warn == 0 ]]; then
+        atfile.die "Unsupported OS ($(echo $_os | sed s/unknown-//g))\n↳ Set ${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN=1 to ignore"
+    else
+        atfile.say.debug "Skipping unsupported OS warning\n↳ ${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN is set ($_skip_unsupported_os_warn)"
+    fi
 fi
-
-[[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 
 ## Program detection
 
@@ -2874,6 +2904,7 @@ fi
 
 atfile.say.debug "Checking required programs..."
 atfile.util.check_prog "curl"
+[[ $_os == "linux"* ]] && atfile.util.check_prog "file"
 atfile.util.check_prog "jq" "$_prog_hint_jq"
 atfile.util.check_prog "md5sum"
 atfile.util.check_prog "xargs"
