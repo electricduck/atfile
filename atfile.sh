@@ -490,6 +490,24 @@ function atfile.util.get_file_size_pretty() {
     echo "$size $suffix"
 }
 
+# NOTE: There is currently no API for getting the filesize limit on the server
+function atfile.util.get_file_size_surplus_for_pds() {
+    size="$1"
+    pds="$2"
+
+    unset max_filesize
+
+    case $pds in
+        *".host.bsky.network") max_filesize=52428800 ;;
+    esac
+
+    if [[ -z $max_filesize ]] || [[ $max_filesize == 0 ]] || (( $size < $max_filesize )); then
+        echo 0
+    else
+        echo $(( $size - $max_filesize ))
+    fi
+}
+
 function atfile.util.get_file_type_emoji() {
     mime_type="$1"
     short_type="$(echo $mime_type | cut -d "/" -f 1)"
@@ -980,10 +998,10 @@ function atfile.util.print_blob_url_output() {
 function atfile.util.print_copyright_warning() {
     if [[ $_skip_copyright_warn == 0 ]]; then
         echo "
- ##########################################
- # You are uploading files to Bluesky PDS #
- #    Do not upload copyrighted files!    #
- ##########################################
+  ##########################################
+  # You are uploading files to Bluesky PDS #
+  #    Do not upload copyrighted files!    #
+  ##########################################
 "
     fi
 }
@@ -2493,7 +2511,7 @@ function atfile.invoke.upload() {
     fi
 
     if [[ $_output_json == 0 ]]; then
-        if [[ "$_server" == "https://bsky.social" ]] || [[ "$_server" == *".bsky.network" ]]; then
+        if [[ "$_server" == *".host.bsky.network" ]]; then
             atfile.util.print_copyright_warning
         fi
     fi
@@ -2564,11 +2582,20 @@ function atfile.invoke.upload() {
         
         file_finger_record="$(atfile.util.get_finger_record)"
         file_meta_record="$(atfile.util.get_meta_record "$file" "$file_type")"
+
+        atfile.say.debug "Checking filesize..."
+        file_size_surplus="$(atfile.util.get_file_size_surplus_for_pds "$file_size" "$_server")"
+
+        if [[ $file_size_surplus != 0 ]]; then
+            die_message="File '$file_name' is too large ($(atfile.util.get_file_size_pretty $file_size_surplus) over)"
+            atfile.die "$die_message"
+        fi
         
         [[ $_output_json == 0 ]] && echo "Uploading '$file'..."
         
         blob="$(com.atproto.sync.uploadBlob "$file")"
         error="$(atfile.util.get_xrpc_error $? "$blob")"
+        [[ $error == "?" ]] && error="Blob rejected by PDS"
 
         atfile.say.debug "Uploading blob...\n↳ Ref: $(echo "$blob" | jq -r ".ref.\"\$link\"")"
     
@@ -2676,15 +2703,16 @@ function atfile.invoke.usage() {
     unlock <key>
         Lock (or unlock) an uploaded file to prevent it from unintended
         deletions
-        ⚠️  Other clients may be able to delete the file. This is intended as a
-           safety-net to avoid inadvertently deleting the wrong file
+        ⚠️  Other clients may be able to delete the file. This is intended as
+           a safety-net to avoid inadvertently deleting the wrong file
 
     upload-crypt <file> <recipient> [<key>]
         Encrypt file (with GPG) for <recipient> and upload to the PDS
         ℹ️  Make sure the necessary GPG key has been imported first
         
     fetch-crypt <file> [<actor>]
-        Download an uploaded encrypted file and attempt to decrypt it (with GPG)
+        Download an uploaded encrypted file and attempt to decrypt it (with
+        GPG)
         ℹ️  Make sure the necessary GPG key has been imported first
 
     nick <nick>
@@ -2693,8 +2721,8 @@ function atfile.invoke.usage() {
 
     usage_commands_lifecycle="update
         Check for updates and update if outdated
-        ⚠️  If installed from your system's package manager, self-updating is not
-           possible
+        ⚠️  If installed from your system's package manager, self-updating is
+           not possible
 
     toggle-mime
         Install/uninstall desktop file to handle atfile:/at: protocol"
@@ -2708,8 +2736,8 @@ function atfile.invoke.usage() {
 
     handle <atfile-uri> [<handler>]
         Open atfile:// URI with relevant App
-        ℹ️  Set <handler> to a .desktop entry to force the application
-           <atfile-uri> opens with
+        ℹ️  Set <handler> to a .desktop entry (with '.desktop') to force the
+           application <atfile-uri> opens with
 
     record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
@@ -2732,7 +2760,8 @@ function atfile.invoke.usage() {
         Username of the PDS user (handle or DID)
     ${_envvar_prefix}_PASSWORD <string> (required)
         Password of the PDS user
-        An App Password is recommended (https://bsky.app/settings/app-passwords)
+        ℹ️  An App Password is recommended
+           (https://bsky.app/settings/app-passwords)
         
     ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool¹> (default: $_include_fingerprint_default)
         Apply machine fingerprint to uploaded files
@@ -2754,8 +2783,9 @@ function atfile.invoke.usage() {
         * [name]: Original name of uploaded file
     ${_envvar_prefix}_SKIP_AUTH_CHECK <bool¹> (default: $_skip_auth_check_default)
         Skip session validation on startup
-        If you're confident your credentials are correct, and \$${_envvar_prefix}_USERNAME
-        is a DID (*not* a handle), this will drastically improve performance!
+        If you're confident your credentials are correct, and
+        \$${_envvar_prefix}_USERNAME is a DID (*not* a handle), this will
+        drastically improve performance!
     ${_envvar_prefix}_SKIP_COPYRIGHT_WARN <bool¹> (default: $_skip_copyright_warn_default)
         Do not print copyright warning when uploading files to
         https://bsky.social
