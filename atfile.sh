@@ -2595,7 +2595,7 @@ function atfile.invoke.upload() {
         
         blob="$(com.atproto.sync.uploadBlob "$file")"
         error="$(atfile.util.get_xrpc_error $? "$blob")"
-        [[ $error == "?" ]] && error="Blob rejected by PDS"
+        [[ $error == "?" ]] && error="Blob rejected by PDS (too large?)"
 
         atfile.say.debug "Uploading blob...\n↳ Ref: $(echo "$blob" | jq -r ".ref.\"\$link\"")"
     
