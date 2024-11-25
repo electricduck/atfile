@@ -657,11 +657,21 @@ function atfile.util.get_md5() {
 }
 
 function atfile.util.get_os() {
-    case $OSTYPE in
-        "darwin"*) echo "macos" ;;
-        "haiku") echo "haiku" ;;
+    case ${OSTYPE,,} in
+        # Linux
         "linux-gnu") echo "linux" ;;
+        "cygwin") echo "linux-cygwin" ;;
         "linux-musl") echo "linux-musl" ;;
+        "linux-android") echo "linux-termux" ;;
+        # BSD
+        "freebsd") echo "bsd-freebsd" ;;
+        "netbsd") echo "bsd-netbsd" ;;
+        "openbsd"*) echo "bsd-openbsd" ;;
+        # Misc.
+        "haiku") echo "haiku" ;;
+        "darwin"*) echo "macos" ;;
+        "solaris"*) echo "solaris" ;;
+        # Unknown
         *) echo "unknown-$OSTYPE" ;;
     esac
 }
@@ -2886,7 +2896,11 @@ fi
 atfile.say.debug "Checking OS..."
 
 if [[ $_os == "unknown-"* ]] ||\
-   [[ $_is_git == 0 && $_os == "linux-musl" ]]; then
+   [[ $_is_git == 0 && $_os == "bsd"* ]] ||\
+   [[ $_is_git == 0 && $_os == "cygwin" ]] ||\
+   [[ $_is_git == 0 && $_os == "linux-musl" ]] ||\
+   [[ $_is_git == 0 && $_os == "linux-termux" ]] ||\
+   [[ $_is_git == 0 && $_os == "solaris" ]]; then
     if [[ $_skip_unsupported_os_warn == 0 ]]; then
         atfile.die "Unsupported OS ($(echo $_os | sed s/unknown-//g))\n↳ Set ${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN=1 to ignore"
     else
