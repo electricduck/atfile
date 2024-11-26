@@ -697,11 +697,19 @@ function atfile.util.get_meta_record() {
 
 function atfile.util.get_md5() {
     file="$1"
+
+    unset checksum
+    type="none"
     
-    hash="$(md5sum "$file" | cut -f 1 -d " ")"
-    if [[ ${#hash} == 32 ]]; then
-        echo "$hash"
+    if [ -x "$(command -v md5sum)" ]; then
+        hash="$(md5sum "$file" | cut -f 1 -d " ")"
+        if [[ ${#hash} == 32 ]]; then
+            checksum="$hash"
+            type="md5"
+        fi
     fi
+
+    echo "$checksum|$type"
 }
 
 function atfile.util.get_os() {
@@ -2586,12 +2594,9 @@ function atfile.invoke.upload() {
         esac
 
         file_hash="$(atfile.util.get_md5 "$file")"
-        file_hash_type="md5"
+        file_hash_checksum="$(echo $file_hash | cut -d "|" -f 1)"
+        file_hash_type="$(echo $file_hash | cut -d "|" -f 2)"
         file_name="$(basename "$file")"
-
-        if [[ -z "$file_hash" ]]; then
-            file_hash_type="none"
-        fi
         
         if [[ -n $recipient ]]; then
             file_type="application/prs.atfile.gpg-crypt"
@@ -2606,7 +2611,7 @@ function atfile.invoke.upload() {
         
         file_type_emoji="$(atfile.util.get_file_type_emoji "$file_type")"
 
-        atfile.say.debug "File: $file\n↳ Date: $file_date\n↳ Hash: $file_hash ($file_hash_type)\n↳ Name: $file_name\n↳ Size: $file_size\n↳ Type: $file_type_emoji $file_type"
+        atfile.say.debug "File: $file\n↳ Date: $file_date\n↳ Hash: $file_hash_checksum ($file_hash_type)\n↳ Name: $file_name\n↳ Size: $file_size\n↳ Type: $file_type_emoji $file_type"
         
         unset file_finger_record
         unset file_meta_record
@@ -2631,7 +2636,7 @@ function atfile.invoke.upload() {
         atfile.say.debug "Uploading blob...\n↳ Ref: $(echo "$blob" | jq -r ".ref.\"\$link\"")"
     
         if [[ -z "$error" ]]; then
-            file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
+            file_record="$(blue.zio.atfile.upload "$blob" "$_now" "$file_hash_checksum" "$file_hash_type" "$file_date" "$file_name" "$file_size" "$file_type" "$file_meta_record" "$file_finger_record")"
             
             if [[ -n "$key" ]]; then
                 atfile.say.debug "Updating record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
