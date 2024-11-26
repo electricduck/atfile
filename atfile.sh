@@ -2474,6 +2474,8 @@ function atfile.invoke.update() {
         # Haiku         /boot/system/bin    pkgman
         # macOS         /opt/local/*        MacPorts
         # macOS         /usr/local/Cellar/* Homebrew
+        #
+        # NOTE: FreeBSD 'pkg' installs to /usr/local/bin
 
         atfile.die "Cannot update system-managed version: update from your package manager"
     fi
@@ -3039,6 +3041,7 @@ atfile.say.debug "Checking OS ($_os) is supported..."
 is_os_supported=0
 
 if [[ $_os != "unknown-"* ]] &&\
+   [[ $_os == "bsd-"* ]] ||\
    [[ $_os == "haiku" ]] ||\
    [[ $_os == "linux" ]] ||\
    [[ $_os == "macos" ]]; then
