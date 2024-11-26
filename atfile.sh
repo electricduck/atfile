@@ -312,13 +312,13 @@ function atfile.util.get_date() {
     [[ -z $in_format ]] && in_format="$format"
 
     if [[ -z "$date" ]]; then
-        if [[ $_os == "linux-musl" ]]; then
+        if [[ $_os == "linux-musl" || $_os == "solaris" ]]; then
             echo ""
         else
             date -u +$format
         fi
     else
-        if [[ $_os == "linux-musl" ]]; then
+        if [[ $_os == "linux-musl" || $_os == "solaris" ]]; then
             echo ""
         elif [[ $_os == "bsd-"* || $_os == "macos" ]]; then
             date -u -j -f "$in_format" "$date" +"$format"
@@ -1061,7 +1061,11 @@ function atfile.util.repeat_char() {
     char="$1"
     amount="$2"
     
-    printf "%0.s$char" $(seq 1 $amount)
+    if [ -x "$(command -v seq)" ]
+        printf "%0.s$char" $(seq 1 $amount)
+    else
+        echo "$char"
+    fi
 }
 
 function atfile.util.resolve_identity() {
