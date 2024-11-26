@@ -695,16 +695,19 @@ function atfile.util.get_md5() {
 }
 
 function atfile.util.get_os() {
-    case ${OSTYPE,,} in
+    os="${OSTYPE,,}"
+
+    case $os in
         # Linux
         "linux-gnu") echo "linux" ;;
         "cygwin") echo "linux-cygwin" ;;
         "linux-musl") echo "linux-musl" ;;
         "linux-android") echo "linux-termux" ;;
         # BSD
-        "freebsd") echo "bsd-freebsd" ;;
-        "netbsd") echo "bsd-netbsd" ;;
+        "freebsd"*) echo "bsd-freebsd" ;;
+        "netbsd"*) echo "bsd-netbsd" ;;
         "openbsd"*) echo "bsd-openbsd" ;;
+        *"bsd"*) echo "bsd-unknown" ;;
         # Misc.
         "haiku") echo "haiku" ;;
         "darwin"*) echo "macos" ;;
@@ -3026,7 +3029,7 @@ atfile.say.debug "Checking OS..."
 
 if [[ $_os == "unknown-"* ]] ||\
    [[ $_is_git == 0 && $_os == "bsd"* ]] ||\
-   [[ $_is_git == 0 && $_os == "cygwin" ]] ||\
+   [[ $_is_git == 0 && $_os == "linux-cygwin" ]] ||\
    [[ $_is_git == 0 && $_os == "linux-musl" ]] ||\
    [[ $_is_git == 0 && $_os == "linux-termux" ]] ||\
    [[ $_is_git == 0 && $_os == "solaris" ]]; then
