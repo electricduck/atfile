@@ -298,9 +298,19 @@ function atfile.util.get_cdn_uri() {
 function atfile.util.get_date() {
     date="$1"
     format="$2"
+    unset in_format
 
     [[ -z $format ]] && format="%Y-%m-%dT%H:%M:%SZ"
+
+    if [[ $_os == "bsd-"* ]]; then
+        if [[ $date =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{3}){0,1})Z$ ]]; then
+            date="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            in_format="%Y-%m-%d %H:%M:%S"
+        fi
+    fi
     
+    [[ -z $in_format ]] && in_format="$format"
+
     if [[ -z "$date" ]]; then
         if [[ $_os == "linux-musl" ]]; then
             echo ""
@@ -310,8 +320,8 @@ function atfile.util.get_date() {
     else
         if [[ $_os == "linux-musl" ]]; then
             echo ""
-        elif [[ $_os == "macos" || $_os == "bsd"* ]]; then
-            date -u -j -f "$format" "$date" +"$format"
+        elif [[ $_os == "bsd-"* || $_os == "macos" ]]; then
+            date -u -j -f "$in_format" "$date" +"$format"
         else
             date --date "$date" -u +"$format"
         fi
@@ -707,7 +717,6 @@ function atfile.util.get_os() {
         "freebsd"*) echo "bsd-freebsd" ;;
         "netbsd"*) echo "bsd-netbsd" ;;
         "openbsd"*) echo "bsd-openbsd" ;;
-        *"bsd"*) echo "bsd-unknown" ;;
         # Misc.
         "haiku") echo "haiku" ;;
         "darwin"*) echo "macos" ;;
@@ -2451,9 +2460,9 @@ function atfile.invoke.update() {
     atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
 
     [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
-    if [[ $_os == "bsd"* || $_os == "linux"* ]] && [[ $_prog_dir == "/bin" ]] ||\
-       [[ $_os == "bsd"* || $_os == "linux"* ]] && [[ $_prog_dir == "/opt/"* ]] ||\
-       [[ $_os == "bsd"* || $_os == "linux"* ]] && [[ $_prog_dir == "/usr/bin" ]] ||\
+    if [[ $_os == "bsd-"* || $_os == "linux"* ]] && [[ $_prog_dir == "/bin" ]] ||\
+       [[ $_os == "bsd-"* || $_os == "linux"* ]] && [[ $_prog_dir == "/opt/"* ]] ||\
+       [[ $_os == "bsd-"* || $_os == "linux"* ]] && [[ $_prog_dir == "/usr/bin" ]] ||\
        [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
        [[ $_os == "macos" && $_prog_dir == "/opt/local/"* ]] ||\
        [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar/"* ]]; then
@@ -2544,16 +2553,17 @@ function atfile.invoke.upload() {
         unset file_type
 
         case "$_os" in
+            "bsd-"*|"macos")
+                file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
+                file_size="$(stat -f '%z' "$file")"
+                file_type="$(file -b --mime-type "$file")"
+                ;;
             "haiku")
                 haiku_file_attr="$(catattr BEOS:TYPE "$file" 2> /dev/null)"
                 [[ $? == 0 ]] && file_type="$(echo "$haiku_file_attr" | cut -d ":" -f 3 | xargs)"
 
                 file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
                 file_size="$(stat -c %s "$file")"
-                ;;
-            "macos")
-                file_date="$(atfile.util.get_date "$(stat -f '%Sm' -t "%Y-%m-%dT%H:%M:%SZ" "$file")")"
-                file_size="$(stat -f '%z' "$file")"
                 ;;
             *)
                 file_date="$(atfile.util.get_date "$(stat -c '%y' "$file")")"
@@ -3025,14 +3035,17 @@ fi
 
 ## OS detection
 
-atfile.say.debug "Checking OS..."
+atfile.say.debug "Checking OS ($_os) is supported..."
+is_os_supported=0
 
-if [[ $_os == "unknown-"* ]] ||\
-   [[ $_is_git == 0 && $_os == "bsd"* ]] ||\
-   [[ $_is_git == 0 && $_os == "linux-cygwin" ]] ||\
-   [[ $_is_git == 0 && $_os == "linux-musl" ]] ||\
-   [[ $_is_git == 0 && $_os == "linux-termux" ]] ||\
-   [[ $_is_git == 0 && $_os == "solaris" ]]; then
+if [[ $_os != "unknown-"* ]] &&\
+   [[ $_os == "haiku" ]] ||\
+   [[ $_os == "linux" ]] ||\
+   [[ $_os == "macos" ]]; then
+    is_os_supported=1
+fi
+
+if [[ $is_os_supported == 0 ]]; then
     if [[ $_skip_unsupported_os_warn == 0 ]]; then
         atfile.die "Unsupported OS ($(echo $_os | sed s/unknown-//g))\n↳ Set ${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN=1 to ignore"
     else
