@@ -3128,7 +3128,6 @@ if [[ $_command == "update" ]]; then
 fi
 
 if [[ $_command == "version" || $_command == "--version" ]]; then
-    atfile.say.debug "Printing version..."
     echo -e "$_version"
     exit 0
 fi
