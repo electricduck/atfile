@@ -100,7 +100,9 @@ function atfile.say.debug() {
     message="$1"
 
     if [[ $_debug == 1 ]]; then
-        atfile.say "$message" "Debug" 35
+        debug_seconds="$(atfile.util.get_date "" "%s")"
+        seconds_since_start="$(( $debug_seconds - $_start ))"
+        atfile.say "[$seconds_since_start] $message" "Debug" 35
     fi
 }
 
@@ -2281,8 +2283,9 @@ function atfile.invoke.profile() {
     fi
 }
 
+# test
+
 function atfile.invoke.release() {
-    [[ $_is_git == 0 ]] && atfile.die "Cannot run 'release' outside of Git directory"
     [[ $_version == *"+"* ]] && atfile.die "Not a stable version ($_version)"
 
     commit_hash="$(git rev-parse HEAD)"
@@ -2310,6 +2313,8 @@ function atfile.invoke.release() {
     
     rm -f "$dist_path"
 }
+
+# test
 
 function atfile.invoke.resolve() {
     actor="$1"
@@ -2727,9 +2732,23 @@ function atfile.invoke.usage() {
     toggle-mime
         Install/uninstall desktop file to handle atfile:/at: protocol"
 
+    usage_commands_atup="atup list <key>
+    atup delist <key>
+        ...
+
+    atup optout
+        ...
+        
+    atup nick <nick>
+        ..."
+
     usage_commands_tools="blob list
+        List blobs on authenticated repository
+
     blob upload <path>
-        Manage blobs on authenticated repository
+        Upload blobs to authenticated repository
+        ℹ️  Unless referenced by a record shortly after uploading, blob will be
+          garbage collected by the PDS
 
     handle <at-uri>
         Open at:// URI with relevant App
@@ -2848,10 +2867,13 @@ Usage
 Commands
     $usage_commands
 
-Commands ➔ Lifecycle
+Commands (Lifecycle)
     $usage_commands_lifecycle
 
-Commands ➔ Tools
+Commands (ATUp)
+    $usage_commands_atup
+
+Commands (Tools)
     $usage_commands_tools
 
 Environment Variables
@@ -2879,6 +2901,7 @@ Files
 
 ### General
 
+_start="$(atfile.util.get_date "" "%s")"
 _command="$1"
 _command_full="$@"
 _envvar_prefix="ATFILE"
