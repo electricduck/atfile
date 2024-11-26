@@ -1735,6 +1735,7 @@ $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
 $(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
 $(atfile.invoke.debug.print_envvar "SKIP_COPYRIGHT_WARN" $_skip_copyright_warn_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_EXIFTOOL" $_skip_ni_exiftool_default)
+$(atfile.invoke.debug.print_envvar "SKIP_NI_MD5SUM" $_skip_ni_md5sum_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_MEDIAINFO" $_skip_ni_mediainfo_default)
 $(atfile.invoke.debug.print_envvar "SKIP_UNSUPPORTED_OS_WARN" $_skip_unsupported_os_warn)
 ↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "(Set)")
@@ -2834,6 +2835,8 @@ function atfile.invoke.usage() {
         ⚠️  If Exiftool is not installed, the relevant metadata records will
            not be created:
            * image/*: $_nsid_meta#photo
+    ${_envvar_prefix}_SKIP_NI_MD5SUM <bool¹> (default: $_skip_ni_md5sum_default)
+        Do not check if MD5Sum is installed
     ${_envvar_prefix}_SKIP_NI_MEDIAINFO <bool¹> (default: $_skip_ni_mediainfo_default)
         Do not check if MediaInfo is installed
         ⚠️  If MediaInfo is not installed, the relevant metadata records will
@@ -2976,6 +2979,7 @@ _output_json_default=0
 _skip_auth_check_default=0
 _skip_copyright_warn_default=0
 _skip_ni_exiftool_default=0
+_skip_ni_md5sum_default=0
 _skip_ni_mediainfo_default=0
 _skip_unsupported_os_warn_default=0
 
@@ -3000,6 +3004,7 @@ _server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
 _skip_auth_check="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_AUTH_CHECK" "$_skip_auth_check_default")"
 _skip_copyright_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_COPYRIGHT_WARN" "$_skip_copyright_warn_default")"
 _skip_ni_exiftool="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_EXIFTOOL" "$_skip_ni_exiftool_default")"
+_skip_ni_md5sum="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MD5SUM" "$_skip_ni_md5sum_default")"
 _skip_ni_mediainfo="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_NI_MEDIAINFO" "$_skip_ni_mediainfo_default")"
 _skip_unsupported_os_warn="$(atfile.util.get_envvar "${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN" "$_skip_unsupported_os_warn_default")"
 _password="$(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD")"
@@ -3079,7 +3084,7 @@ atfile.say.debug "Checking required programs..."
 atfile.util.check_prog "curl"
 [[ $_os == "linux"* ]] && atfile.util.check_prog "file"
 atfile.util.check_prog "jq" "$_prog_hint_jq"
-atfile.util.check_prog "md5sum"
+[[ $_skip_ni_md5sum == 0 ]] && atfile.util.check_prog "md5sum" "" "${_envvar_prefix}_SKIP_NI_MD5SUM"
 atfile.util.check_prog "xargs"
 
 ## Lifecycle commands
