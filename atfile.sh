@@ -2860,6 +2860,7 @@ function atfile.invoke.usage() {
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 
     $_dir_cache/
+    $_dir_blobs_tmp/
         Cache and temporary storage"
 
     usage="ATFile"
@@ -2935,17 +2936,24 @@ _now="$(atfile.util.get_date)"
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_dir_cache="$HOME/.cache/atfile"
-_dir_blobs_tmp="/tmp/at-blobs"
-_path_envvar="$HOME/.config/atfile.env"
+_dir_cache="$HOME/.cache"
+_dir_blobs_tmp="/tmp"
+_path_envvar="$HOME/.config"
 
-case "$_os" in
+case $_os in
     "haiku")
-        _dir_blobs_tmp="/boot/system/cache/tmp/at-blobs"
+        _dir_blobs_tmp="/boot/system/cache/tmp"
         _dir_cache="$HOME/config/cache"
-        _path_envvar="$HOME/config/settings/atfile.env"
+        _path_envvar="$HOME/config/settings"
+        ;;
+    "macos")
+        _dir_blobs_tmp="/private/tmp"
         ;;
 esac
+
+_dir_cache="$_dir_cache/atfile"
+_dir_blobs_tmp="$_dir_blobs_tmp/at-blobs"
+_path_envvar="$_path_envvar/atfile.env"
 
 ### Envvars
 
@@ -3020,12 +3028,6 @@ atfile.say.debug "Starting up..."
 [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]] &&  _max_list=100
 [[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
 
-## Directory creation
-
-atfile.say.debug "Creating necessary directories..."
-atfile.util.create_dir "$_dir_cache"
-atfile.util.create_dir "$_dir_blobs_tmp"
-
 ## Git detection
 
 if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]] && [[ "$(atfile.util.get_realpath "$(pwd)")" == "$_prog_dir" ]]; then
@@ -3055,6 +3057,12 @@ if [[ $is_os_supported == 0 ]]; then
         atfile.say.debug "Skipping unsupported OS warning\n↳ ${_envvar_prefix}_SKIP_UNSUPPORTED_OS_WARN is set ($_skip_unsupported_os_warn)"
     fi
 fi
+
+## Directory creation
+
+atfile.say.debug "Creating necessary directories..."
+atfile.util.create_dir "$_dir_cache"
+atfile.util.create_dir "$_dir_blobs_tmp"
 
 ## Program detection
 

@@ -11,15 +11,17 @@ function check_prog() {
 }
 
 function get_os() {
-    case ${OSTYPE,,} in
+    os="${OSTYPE,,}"
+
+    case $os in
         # Linux
         "linux-gnu") echo "linux" ;;
         "cygwin") echo "linux-cygwin" ;;
         "linux-musl") echo "linux-musl" ;;
         "linux-android") echo "linux-termux" ;;
         # BSD
-        "freebsd") echo "bsd-freebsd" ;;
-        "netbsd") echo "bsd-netbsd" ;;
+        "freebsd"*) echo "bsd-freebsd" ;;
+        "netbsd"*) echo "bsd-netbsd" ;;
         "openbsd"*) echo "bsd-openbsd" ;;
         # Misc.
         "haiku") echo "haiku" ;;
@@ -69,21 +71,23 @@ found_version_record="$(xrpc_get "com.atproto.repo.getRecord" "blue.zio.atfile.u
 found_version_blob="$(echo "$found_version_record" | jq -r ".value.blob.ref.\"\$link\"")"
 url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$found_version_blob"
 
-case "$(get_os)" in
-    "haiku")
-        install_dir="/boot/system/non-packaged/bin"
-        conf_dir="$HOME/config/settings"
-        ;;
-    *)
-        if [[ $uid == 0 ]]; then
-            install_dir="/usr/local/bin"
+if [[ $(get_os) == "haiku" ]]; then
+    install_dir="/boot/system/non-packaged/bin"
+    conf_dir="$HOME/config/settings"
+else
+    if [[ $uid == 0 ]]; then
+        install_dir="/usr/local/bin"
+
+        if [[ -z $SUDO_DIR ]]; then
             conf_dir="/root/.config"
         else
-            install_dir="$(eval echo ~$USER)/.local/bin"
-            conf_dir="$(eval echo ~$USER)/.config"
+            conf_dir="$(eval echo ~$SUDO_USER)/.config"
         fi
-        ;;
-esac
+    else
+        install_dir="$(eval echo ~$USER)/.local/bin"
+        conf_dir="$(eval echo ~$USER)/.config"
+    fi
+fi
 
 mkdir -p "$install_dir"
 [[ $? != 0 ]] && die "Unable to create install directory ($install_dir)"
