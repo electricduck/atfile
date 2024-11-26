@@ -571,7 +571,19 @@ function atfile.util.get_file_type_emoji() {
 }
 
 function atfile.util.get_finger_record() {
+    fingerprint_override="$1"
+    unset enable_fingerprint_original
+
+    if [[ $fingerprint_override ]]; then
+        enable_fingerprint_original="$_enable_fingerprint"
+        _enable_fingerprint="$fingerprint_override"
+    fi
+
     echo -e "$(blue.zio.atfile.finger__machine)"
+
+    if [[ -n $enable_fingerprint_original ]]; then
+        _enable_fingerprint="$enable_fingerprint_original"
+    fi
 }
 
 function atfile.util.get_line() {
@@ -1405,7 +1417,7 @@ function blue.zio.atfile.finger__machine() {
     unset machine_id
     unset machine_os
 
-    if [[ $_include_fingerprint == 1 ]]; then
+    if [[ $_enable_fingerprint == 1 ]]; then
         machine_id_file="/etc/machine-id"
         os_release_file="/etc/os-release"
 
@@ -1697,8 +1709,8 @@ function atfile.invoke.debug() {
     fi
     
     unset md5sum_version
+    finger_record="$(atfile.util.get_finger_record 1)"
     mediainfo_version="$(atfile.invoke.debug.print_prog_version "mediainfo")"
-    os="$(atfile.util.get_finger_record | jq -r ".os")"
 
     if [[ $_os == "linux-musl" ]]; then
         md5sum_version="$(atfile.invoke.debug.print_prog_version "md5sum" "--help")"
@@ -1733,7 +1745,7 @@ $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_direc
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
 $(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
 $(atfile.invoke.debug.print_envvar "FMT_OUT_FILE" "$_fmt_out_file_default")
-$(atfile.invoke.debug.print_envvar "INCLUDE_FINGERPRINT" $_include_fingerprint_default)
+$(atfile.invoke.debug.print_envvar "ENABLE_FINGERPRINT" $_enable_fingerprint_default)
 $(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
 $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
 $(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
@@ -1745,7 +1757,7 @@ $(atfile.invoke.debug.print_envvar "SKIP_UNSUPPORTED_OS_WARN" $_skip_unsupported
 ↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "(Set)")
 $(atfile.invoke.debug.print_envvar "USERNAME")
 Environment
-↳ OS: $os
+↳ OS: $_os ($(echo "$finger_record" | jq -r ".os"))
 ↳ Shell: $SHELL
 ↳ Path: $PATH
 Deps
@@ -1756,7 +1768,7 @@ Deps
 ↳ md5sum: $md5sum_version
 ↳ MediaInfo: $mediainfo_version
 Misc.
-↳ md5sum Output: $(md5sum "$_prog_path")
+↳ Checksum: $([[ "$md5sum_version" != "$prog_not_installed_placeholder" ]] && md5sum "$_prog_path" || echo "(?)")
 ↳ Now: $_now
 ↳ Rows: $(atfile.util.get_term_rows)"
     
@@ -2480,29 +2492,10 @@ function atfile.invoke.update() {
     parsed_running_version="$(atfile.util.parse_version $_version)"
     
     atfile.say.debug "Checking version...\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
-
     atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
 
     [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
-    if [[ $_os == "bsd-"* || $_os == "linux"* ]] && [[ $_prog_dir == "/bin" ]] ||\
-       [[ $_os == "bsd-"* || $_os == "linux"* ]] && [[ $_prog_dir == "/opt/"* ]] ||\
-       [[ $_os == "bsd-"* || $_os == "linux"* ]] && [[ $_prog_dir == "/usr/bin" ]] ||\
-       [[ $_os == "haiku" && $_prog_dir == "/boot/system/bin" ]] ||\
-       [[ $_os == "macos" && $_prog_dir == "/opt/local/"* ]] ||\
-       [[ $_os == "macos" && $_prog_dir == "/usr/local/Cellar/"* ]]; then
-        # OS            Path                Prog
-        # ----------------------------------------------
-        # BSD/Linux     /bin                (various)
-        # BSD/Linux     /opt/*              (various)
-        # BSD/Linux     /usr/bin            (various)
-        # Haiku         /boot/system/bin    pkgman
-        # macOS         /opt/local/*        MacPorts
-        # macOS         /usr/local/Cellar/* Homebrew
-        #
-        # NOTE: FreeBSD 'pkg' installs to /usr/local/bin
-
-        atfile.die "Cannot update system-managed version: update from your package manager"
-    fi
+    [[ $_disable_updater == 1 ]] && atfile.die "Cannot update system-managed version: update from your package manager" # NOTE: This relies on packaged versions having a wrapper that sets this var
     
     if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
         temp_updated_path="$_prog_dir/${_prog}-${latest_version}.tmp"
@@ -2808,7 +2801,7 @@ function atfile.invoke.usage() {
         ℹ️  An App Password is recommended
            (https://bsky.app/settings/app-passwords)
         
-    ${_envvar_prefix}_INCLUDE_FINGERPRINT <bool¹> (default: $_include_fingerprint_default)
+    ${_envvar_prefix}_ENABLE_FINGERPRINT <bool¹> (default: $_enable_fingerprint_default)
         Apply machine fingerprint to uploaded files
     ${_envvar_prefix}_OUTPUT_JSON <bool¹> (default: $_output_json_default)
         Print all commands (and errors) as JSON
@@ -2864,6 +2857,8 @@ function atfile.invoke.usage() {
     ${_envvar_prefix}_DEBUG <bool¹> (default: $_debug_default)
         Print debug outputs
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
+    ${_envvar_prefix}_DISABLE_UPDATER <bool¹> (default: $_disable_updater_default)
+        Disable \`update\` command
            
     ¹ A bool in Bash is 1 (true) or 0 (false)
     ² These servers are ran by @ducky.ws (and @astra.blue). You can trust us!"
@@ -2970,13 +2965,14 @@ _path_envvar="$_path_envvar/atfile.env"
 #### Defaults
 
 _debug_default=0
+_disable_updater_default=0
 _dist_username_default="$_meta_did"
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.zio.blue"
 _fmt_blob_url_default="[server]/xrpc/com.atproto.sync.getBlob?did=[did]&cid=[cid]"
 _fmt_out_file_default="[key]__[name]"
-_include_fingerprint_default=0
+_enable_fingerprint_default=0
 _max_list_buffer=6
 _max_list_default=$(( $(atfile.util.get_term_rows) - $_max_list_buffer ))
 _output_json_default=0
@@ -2994,11 +2990,12 @@ _endpoint_plc_directory_fallback="https://plc.directory"
 #### Set
 
 _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
+_disable_updater="$(atfile.util.get_envvar "${_envvar_prefix}_DISABLE_UPDATER" $_disable_updater_default)"
 _dist_password="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD" $_dist_password_default)"
 _dist_username="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_USERNAME" $_dist_username_default)"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
-_include_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_include_fingerprint_default")"
+_enable_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_FINGERPRINT" "$_enable_fingerprint_default")"
 _endpoint_jetstream="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_JETSTREAM" "$_endpoint_jetstream_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
@@ -3367,6 +3364,9 @@ if [[ $_is_sourced == 0 ]]; then
             fi
             
             atfile.invoke.get_url "$2"
+            ;;
+        "temp-finger")
+            atfile.util.get_finger_record
             ;;
         *)
             atfile.die.unknown_command "$_command"
