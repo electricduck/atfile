@@ -209,7 +209,7 @@ function atfile.util.get_app_url_for_at_uri() {
             "app.bsky.graph.list") resolved_url="https://bsky.app/profile/$actor/lists/$rkey" ;;
             "app.bsky.graph.starterpack") resolved_url="https://bsky.app/starter-pack/$actor/$rkey" ;;
             "app.bsky.feed.post") resolved_url="https://bsky.app/profile/$actor/post/$rkey" ;;
-            "blue.linkat.board") ignore_url_validation=1 && resolved_url="https://linkat.blue/$actor_handle" ;;
+            "blue.linkat.board") resolved_url="https://linkat.blue/$actor_handle" ;;
             "blue.zio.atfile.upload") ignore_url_validation=1 && resolved_url="atfile://$actor/$rkey" ;;
             "chat.bsky.actor.declaration") resolved_url="https://bsky.app/messages/settings" ;;
             "com.shinolabs.pinksea.oekaki") resolved_url="https://pinksea.art/$actor/oekaki/$rkey" ;;
@@ -2747,16 +2747,6 @@ function atfile.invoke.usage() {
     toggle-mime
         Install/uninstall desktop file to handle atfile:/at: protocol"
 
-    usage_commands_atup="atup list <key>
-    atup delist <key>
-        ...
-
-    atup optout
-        ...
-        
-    atup nick <nick>
-        ..."
-
     usage_commands_tools="blob list
         List blobs on authenticated repository
 
@@ -2885,9 +2875,6 @@ Commands
 
 Commands (Lifecycle)
     $usage_commands_lifecycle
-
-Commands (ATUp)
-    $usage_commands_atup
 
 Commands (Tools)
     $usage_commands_tools
