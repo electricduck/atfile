@@ -765,7 +765,18 @@ function atfile.util.get_pds_pretty() {
 function atfile.util.get_realpath() {
     path="$1"
 
-    realpath "$path"
+    if [[ $_os == "solaris" ]]; then
+        # INVESTIGATE: Use this for every OS?
+        [ -d "$path" ] && (
+            cd_path= \cd "$1"
+            /bin/pwd
+        ) || (
+            cd_path= \cd "$(dirname "$1")" &&
+            printf "%s/%s\n" "$(/bin/pwd)" "$(basename $1)"
+        )
+    else
+        realpath "$path"
+    fi
 }
 
 function atfile.util.get_region_pretty() {
