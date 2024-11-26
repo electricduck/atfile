@@ -1738,6 +1738,7 @@ function atfile.invoke.debug() {
 ↳ UAS: $(atfile.util.get_uas)
 Variables
 $(atfile.invoke.debug.print_envvar "DEBUG" $_debug_default)
+$(atfile.invoke.debug.print_envvar "DISABLE_UPDATER" $_disable_updater_default)
 ↳ ${_envvar_prefix}_DIST_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD") ]] && echo "(Set)")
 $(atfile.invoke.debug.print_envvar "DIST_USERNAME" $_dist_username_default)
 $(atfile.invoke.debug.print_envvar "ENABLE_FINGERPRINT" $_enable_fingerprint_default)
