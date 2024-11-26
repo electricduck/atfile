@@ -7,7 +7,7 @@
 
 function atfile.die() {
     message="$1"
-    
+
     if [[ $_output_json == 0 ]]; then
         atfile.say.die "$message"
     else
@@ -100,9 +100,7 @@ function atfile.say.debug() {
     message="$1"
 
     if [[ $_debug == 1 ]]; then
-        debug_seconds="$(atfile.util.get_date "" "%s")"
-        seconds_since_start="$(( $debug_seconds - $_start ))"
-        atfile.say "[$seconds_since_start] $message" "Debug" 35
+        atfile.say "$message" "Debug" 35
     fi
 }
 
@@ -813,6 +811,11 @@ function atfile.util.get_rkey_from_at_uri() {
     echo $at_uri | cut -d "/" -f 5
 }
 
+function atfile.util.get_seconds_since_start() {
+    current="$(atfile.util.get_date "" "%s")"
+    echo "$(( $current - $_start ))"
+}
+
 function atfile.util.get_term_rows() {
     unset rows
     
@@ -1056,6 +1059,13 @@ function atfile.util.print_copyright_warning() {
 #       to have a debug output for it when called in the main command case
 function atfile.util.print_override_actor_debug() {
     atfile.say.debug "Overridden identity\n↳ DID: $_username\n↳ PDS: $_server\n↳ Blob URL: $_fmt_blob_url"
+}
+
+function atfile.util.print_seconds_since_start_debug() {
+    seconds=$(atfile.util.get_seconds_since_start)
+    second_unit="$([[ $seconds == 1 ]] && echo "second" || echo "seconds")"
+
+    atfile.say.debug "$seconds $second_unit since start"
 }
 
 function atfile.util.print_table_paginate_hint() {
@@ -1747,6 +1757,7 @@ $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_direc
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
 $(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
 $(atfile.invoke.debug.print_envvar "FMT_OUT_FILE" "$_fmt_out_file_default")
+$(atfile.invoke.debug.print_envvar "INCLUDE_FINGERPRINT" $_enable_fingerprint_default)
 $(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
 $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
 $(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
@@ -2987,6 +2998,7 @@ _skip_unsupported_os_warn_default=0
 #### Fallbacks
 
 _endpoint_plc_directory_fallback="https://plc.directory"
+_max_list_fallback=100
 
 #### Set
 
@@ -3035,8 +3047,22 @@ atfile.say.debug "Starting up..."
 
 ## Envvar correction
 
-[[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]] &&  _max_list=100
-[[ $(( $_max_list > 100 )) == 1 ]] && _max_list="100"
+if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
+    atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ ${_envvar_prefix}_OUTPUT_JSON set to 1"
+    _max_list=$_max_list_fallback
+fi
+
+if [[ $(( $_max_list > $_max_list_fallback )) == 1 ]]; then
+    atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ Maximum is $_max_list_fallback"
+    _max_list=$_max_list_fallback
+fi
+
+if [[ $_enable_fingerprint == $_enable_fingerprint_default ]]; then
+    _include_fingerprint_depr="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_enable_fingerprint_default")"
+
+    atfile.say.debug "Setting ${_envvar_prefix}_ENABLE_FINGERPRINT to $_include_fingerprint_depr\n↳ ${_envvar_prefix}_INCLUDE_FINGERPRINT (deprecated) set to 1"
+    _enable_fingerprint=$_include_fingerprint_depr
+fi
 
 ## Git detection
 
@@ -3374,6 +3400,8 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
     esac
 fi
+
+atfile.util.print_seconds_since_start_debug
 
 # "Four million lines of BASIC"
 #  - Kif Kroker (3003)
