@@ -1061,7 +1061,7 @@ function atfile.util.repeat_char() {
     char="$1"
     amount="$2"
     
-    if [ -x "$(command -v seq)" ]
+    if [ -x "$(command -v seq)" ]; then
         printf "%0.s$char" $(seq 1 $amount)
     else
         echo "$char"
