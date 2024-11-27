@@ -2300,22 +2300,22 @@ function atfile.invoke.manage_record() {
 
 function atfile.invoke.print() {
     key="$1"
-    success=1
+    unset error
     
     atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
     record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
-    [[ $? != 0 || -z "$record" || "$record" == "{}" || "$record" == *"\"error\":"* ]] && success=0
+    error="$(atfile.util.get_xrpc_error $? "$record")"
     
-    if [[ $success == 1 ]]; then
+    if [[ -z "$error" ]]; then
         blob_uri="$(atfile.util.build_blob_uri "$(echo $record | jq -r ".uri" | cut -d "/" -f 3)" "$(echo $record | jq -r ".value.blob.ref.\"\$link\"")")"
         file_type="$(echo "$record" | jq -r '.value.file.mimeType')"
         
         curl -H "$(atfile.util.get_uas)" -s -L "$blob_uri" --output -
-        [[ $? != 0 ]] && success=0
+        [[ $? != 0 ]] && error="?"
     fi
     
-    if [[ $success != 1 ]]; then
-        atfile.die "Unable to cat '$key'"
+    if [[ -n "$error" ]]; then
+        atfile.die "Unable to cat '$key'" "$error"
     fi
 }
 
