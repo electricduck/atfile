@@ -1120,9 +1120,10 @@ function atfile.util.resolve_identity() {
 
             didplc_dir="$(echo "$did_doc" | jq -r ".directory")"
             pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
-            handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[0]')"
+            handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[] | select(. | startswith("at://"))' | head -n1)"
 
             [[ $didplc_dir == "null" ]] && unset didplc_dir
+            [[ -z "$handle" ]] && handle="invalid.handle"
             
             echo "$did|$pds|$handle|$didplc_dir"
         fi
