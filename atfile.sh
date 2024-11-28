@@ -1767,7 +1767,7 @@ function atfile.invoke.bsky_profile() {
  $bio
  $(atfile.util.repeat_char "-" 3)
  🔌 @$handle ∙ #️⃣  $did 
- ⬆️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬇️  $count_following Following ∙ ↔️  $count_known Known
+ ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following ∙ ↔️  $count_known Known
  📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
  ✨ $date_created ∙ 🕷️  $date_indexed
  $(atfile.util.repeat_char "-" 3)
