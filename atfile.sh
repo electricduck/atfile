@@ -69,6 +69,10 @@ function atfile.say() {
     suffix="$6"
     
     prefix_length=0
+
+    if [[ $_os == "haiku" ]]; then
+        message="$(echo "$message" | sed 's/↳/>/g')"
+    fi
     
     [[ -z $color_prefix_message ]] && color_prefix_message=0
     [[ -z $suffix ]] && suffix="\n"
@@ -1763,6 +1767,7 @@ $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_direc
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
 $(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
 $(atfile.invoke.debug.print_envvar "FMT_OUT_FILE" "$_fmt_out_file_default")
+$(atfile.invoke.debug.print_envvar "FORCE_OS")
 $(atfile.invoke.debug.print_envvar "INCLUDE_FINGERPRINT" $_enable_fingerprint_default)
 $(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
 $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
@@ -2427,28 +2432,28 @@ function atfile.invoke.resolve() {
     \"type\": \"$did_type\"
 }" | jq
     else
-        echo "$did"
-        echo "↳ Type: $did_type"
-        echo " ↳ Doc: $did_doc"
-        echo "↳ Handle: @$handle"
+        atfile.say "$did"
+        atfile.say "↳ Type: $did_type"
+        atfile.say " ↳ Doc: $did_doc"
+        atfile.say "↳ Handle: @$handle"
 
         while IFS=$";" read -ra a; do
             unset first_alias
 
             for i in "${a[@]}"; do
                 if [[ -z "$first_alias" ]]; then
-                    echo " ↳ $i"
+                    atfile.say " ↳ $i"
                 else
-                    echo "   $i"
+                    atfile.say "   $i"
                 fi
 
                 first_alias="$a"
             done
         done <<< "$aliases"
 
-        echo "↳ PDS: $pds_name"
-        echo " ↳ Endpoint: $pds"
-        [[ $(atfile.util.is_null_or_empty "$pds_version") == 0 ]] && echo " ↳ Version: $pds_version"
+        atfile.say "↳ PDS: $pds_name"
+        atfile.say " ↳ Endpoint: $pds"
+        [[ $(atfile.util.is_null_or_empty "$pds_version") == 0 ]] && atfile.say " ↳ Version: $pds_version"
     fi
 }
 
@@ -3029,12 +3034,13 @@ _debug="$(atfile.util.get_envvar "${_envvar_prefix}_DEBUG" $_debug_default)"
 _disable_updater="$(atfile.util.get_envvar "${_envvar_prefix}_DISABLE_UPDATER" $_disable_updater_default)"
 _dist_password="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD" $_dist_password_default)"
 _dist_username="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_USERNAME" $_dist_username_default)"
-_fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
-_fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
 _enable_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_FINGERPRINT" "$_enable_fingerprint_default")"
 _endpoint_jetstream="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_JETSTREAM" "$_endpoint_jetstream_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
+_fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
+_fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
+_force_os="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_OS")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
 _server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
@@ -3069,6 +3075,11 @@ fi
 atfile.say.debug "Starting up..."
 
 ## Envvar correction
+
+if [[ -n $_force_os ]]; then
+    _os="$_force_os"
+    atfile.say.debug "Overriding OS (\$_os)\n↳ ${_envvar_prefix}_FORCE_OS set to '$_force_os'"
+fi
 
 if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
     atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ ${_envvar_prefix}_OUTPUT_JSON set to 1"
