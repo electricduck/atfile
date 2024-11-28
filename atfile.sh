@@ -1112,6 +1112,7 @@ function atfile.util.resolve_identity() {
         case "$actor" in
             "did:plc:"*) did_doc="$(atfile.util.get_didplc_doc "$actor")" ;;
             "did:web:"*) did_doc="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -L -X GET "$(atfile.util.get_didweb_doc_url "$actor")")" ;;
+            *) echo "Unknown DID type 'did:$(echo "$actor" | cut -d ":" -f 2)'"; exit 255;;
         esac
 
         if [[ -n "$did_doc" ]]; then
