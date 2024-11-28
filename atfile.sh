@@ -1118,14 +1118,19 @@ function atfile.util.resolve_identity() {
                 exit 255
             fi
 
+            unset aliases
             didplc_dir="$(echo "$did_doc" | jq -r ".directory")"
             pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
             handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[] | select(. | startswith("at://"))' | head -n1)"
 
             [[ $didplc_dir == "null" ]] && unset didplc_dir
             [[ -z "$handle" ]] && handle="invalid.handle"
+
+            while IFS=$"\n" read -r a; do
+                aliases+="$a;"
+            done <<< "$(echo "$did_doc" | jq -r '.alsoKnownAs[]')"
             
-            echo "$did|$pds|$handle|$didplc_dir"
+            echo "$did|$pds|$handle|$didplc_dir|$aliases"
         fi
     else
         echo "$error"
@@ -2386,7 +2391,7 @@ function atfile.invoke.resolve() {
     error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
     [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$actor'" "$resolved_did"
 
-    alias="$(echo $resolved_did | cut -d "|" -f 3)"
+    aliases="$(echo $resolved_did | cut -d "|" -f 5)"
     did="$(echo $resolved_did | cut -d "|" -f 1)"
     did_doc="$(echo $resolved_did | cut -d "|" -f 4)/$did"
     did_type="did:$(echo $did | cut -d ":" -f 2)"
@@ -2404,8 +2409,10 @@ function atfile.invoke.resolve() {
 
     if [[ $_output_json == 1 ]]; then
         did_doc_data="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -l -X GET "$did_doc")"
-    
+        aliases_json="$(echo "$did_doc_data" | jq -r ".alsoKnownAs")"
+
         echo -e "{
+    \"aka\": "$aliases_json",
     \"did\": \"$did\",
     \"doc\": {
         \"data\": $did_doc_data,
@@ -2424,9 +2431,24 @@ function atfile.invoke.resolve() {
         echo "↳ Type: $did_type"
         echo " ↳ Doc: $did_doc"
         echo "↳ Handle: @$handle"
+
+        while IFS=$";" read -ra a; do
+            unset first_alias
+
+            for i in "${a[@]}"; do
+                if [[ -z "$first_alias" ]]; then
+                    echo " ↳ $i"
+                else
+                    echo "   $i"
+                fi
+
+                first_alias="$a"
+            done
+        done <<< "$aliases"
+
         echo "↳ PDS: $pds_name"
         echo " ↳ Endpoint: $pds"
-        [[ $pds_version != "null" ]] && echo " ↳ Version: $pds_version"
+        [[ $(atfile.util.is_null_or_empty "$pds_version") == 0 ]] && echo " ↳ Version: $pds_version"
     fi
 }
 
