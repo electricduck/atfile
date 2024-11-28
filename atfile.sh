@@ -1767,7 +1767,12 @@ $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_direc
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
 $(atfile.invoke.debug.print_envvar "FMT_BLOB_URL" "$_fmt_blob_url_default")
 $(atfile.invoke.debug.print_envvar "FMT_OUT_FILE" "$_fmt_out_file_default")
+$(atfile.invoke.debug.print_envvar "FORCE_META_AUTHOR")
+$(atfile.invoke.debug.print_envvar "FORCE_META_DID")
+$(atfile.invoke.debug.print_envvar "FORCE_META_REPO")
+$(atfile.invoke.debug.print_envvar "FORCE_NOW")
 $(atfile.invoke.debug.print_envvar "FORCE_OS")
+$(atfile.invoke.debug.print_envvar "FORCE_VERSION")
 $(atfile.invoke.debug.print_envvar "INCLUDE_FINGERPRINT" $_enable_fingerprint_default)
 $(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
 $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
@@ -2972,9 +2977,9 @@ _is_sourced=0
 _meta_author="Ducky"
 _meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
 _meta_repo="https://github.com/electricduck/atfile"
-_version="0.7.7"
 _meta_year="2024"
 _now="$(atfile.util.get_date)"
+_version="0.7.7"
 
 ### Paths
 
@@ -3040,7 +3045,12 @@ _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PL
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
 _fmt_blob_url="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_BLOB_URL" "$_fmt_blob_url_default")"
 _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_out_file_default")"
+_force_meta_author="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_AUTHOR")"
+_force_meta_did="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_DID")"
+_force_meta_repo="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_REPO")"
+_force_now="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_NOW")"
 _force_os="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_OS")"
+_force_version="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_VERSION")"
 _max_list="$(atfile.util.get_envvar "${_envvar_prefix}_MAX_LIST" "$_max_list_default")"
 _output_json="$(atfile.util.get_envvar "${_envvar_prefix}_OUTPUT_JSON" "$_output_json_default")"
 _server="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PDS")"
@@ -3076,27 +3086,42 @@ atfile.say.debug "Starting up..."
 
 ## Envvar correction
 
-if [[ -n $_force_os ]]; then
-    _os="$_force_os"
+### Overrides
+
+[[ -n $_force_meta_author ]] && \
+    _meta_author="$_force_meta_author" &&\
+    atfile.say.debug "Overriding Author (\$_meta_author)\n↳ ${_envvar_prefix}_FORCE_META_AUTHOR set to '$_force_meta_author'"
+[[ -n $_force_meta_did ]] && \
+    _meta_did="$_force_meta_did" &&\
+    atfile.say.debug "Overriding DID (\$_meta_did)\n↳ ${_envvar_prefix}_FORCE_META_DID set to '$_force_meta_did'"
+[[ -n $_force_meta_repo ]] && \
+    _meta_repo="$_force_meta_repo" &&\
+    atfile.say.debug "Overriding OS (\$_meta_repo)\n↳ ${_envvar_prefix}_FORCE_META_REPO set to '$_force_meta_repo'"
+[[ -n $_force_now ]] && \
+    _now="$_force_now" &&\
+    atfile.say.debug "Overriding Now (\$_now)\n↳ ${_envvar_prefix}_FORCE_NOW set to '$_force_now'"
+[[ -n $_force_os ]] &&\
+    _os="$_force_os" &&\
     atfile.say.debug "Overriding OS (\$_os)\n↳ ${_envvar_prefix}_FORCE_OS set to '$_force_os'"
-fi
+[[ -n $_force_version ]] && \
+    _version="$_force_version" &&\
+    atfile.say.debug "Overriding Version (\$_version)\n↳ ${_envvar_prefix}_FORCE_VERSION set to '$_force_version'"
 
-if [[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]]; then
-    atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ ${_envvar_prefix}_OUTPUT_JSON set to 1"
-    _max_list=$_max_list_fallback
-fi
+### Legacy
 
-if [[ $(( $_max_list > $_max_list_fallback )) == 1 ]]; then
-    atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ Maximum is $_max_list_fallback"
-    _max_list=$_max_list_fallback
-fi
-
-if [[ $_enable_fingerprint == $_enable_fingerprint_default ]]; then
-    _include_fingerprint_depr="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_enable_fingerprint_default")"
-
-    atfile.say.debug "Setting ${_envvar_prefix}_ENABLE_FINGERPRINT to $_include_fingerprint_depr\n↳ ${_envvar_prefix}_INCLUDE_FINGERPRINT (deprecated) set to 1"
+[[ $_enable_fingerprint == $_enable_fingerprint_default ]] &&\
+    _include_fingerprint_depr="$(atfile.util.get_envvar "${_envvar_prefix}_INCLUDE_FINGERPRINT" "$_enable_fingerprint_default")" &&\
+    atfile.say.debug "Setting ${_envvar_prefix}_ENABLE_FINGERPRINT to $_include_fingerprint_depr\n↳ ${_envvar_prefix}_INCLUDE_FINGERPRINT (deprecated) set to 1" &&\
     _enable_fingerprint=$_include_fingerprint_depr
-fi
+
+### Validation
+
+[[ $_output_json == 1 ]] && [[ $_max_list == $_max_list_default ]] &&\
+    atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ ${_envvar_prefix}_OUTPUT_JSON set to 1" &&\
+    _max_list=$_max_list_fallback
+[[ $(( $_max_list > $_max_list_fallback )) == 1 ]] &&\
+    atfile.say.debug "Setting ${_envvar_prefix}_MAX_LIST to $_max_list_fallback\n↳ Maximum is $_max_list_fallback" &&\
+    _max_list=$_max_list_fallback
 
 ## Git detection
 
