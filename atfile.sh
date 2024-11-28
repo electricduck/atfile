@@ -572,6 +572,16 @@ function atfile.util.get_file_type_emoji() {
     esac
 }
 
+function atfile.util.get_int_suffix() {
+    int="$1"
+    singular="$2"
+    plural="$3"
+
+    [[ -z "$plural" ]] && plural="${singular}s"
+
+    [[ $int == 1 ]] && echo "$singular" || echo "$plural"
+}
+
 function atfile.util.get_finger_record() {
     fingerprint_override="$1"
     unset enable_fingerprint_original
@@ -818,6 +828,20 @@ function atfile.util.get_rkey_from_at_uri() {
 function atfile.util.get_seconds_since_start() {
     current="$(atfile.util.get_date "" "%s")"
     echo "$(( $current - $_start ))"
+}
+
+function atfile.util.get_term_cols() {
+    unset rows
+    
+    if [ -x "$(command -v tput)" ]; then
+        cols=$(tput cols)
+    fi
+
+    if [[ -n $cols ]]; then
+        echo $cols
+    else
+        echo 80
+    fi
 }
 
 function atfile.util.get_term_rows() {
@@ -1067,7 +1091,7 @@ function atfile.util.print_override_actor_debug() {
 
 function atfile.util.print_seconds_since_start_debug() {
     seconds=$(atfile.util.get_seconds_since_start)
-    second_unit="$([[ $seconds == 1 ]] && echo "second" || echo "seconds")"
+    second_unit="$(atfile.util.get_int_suffix $seconds "second" "seconds")"
 
     atfile.say.debug "$seconds $second_unit since start"
 }
@@ -1696,6 +1720,63 @@ function atfile.invoke.blob_upload() {
     com.atproto.sync.uploadBlob "$file" | jq
 }
 
+function atfile.invoke.bsky_profile() {
+    actor="$1"
+
+    function atfile.invoke.bsky_profile.get_pretty_date() {
+        atfile.util.get_date "$1" "%Y-%m-%d %H:%M:%S"
+    }
+
+    if [[ -z "$actor" ]]; then
+        actor="$_username"
+    else
+        resolved_did="$(atfile.util.resolve_identity "$actor")"
+        error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
+        [[ -n "$error" ]] && atfile.die.xrpc_error "Unable to resolve '$actor'" "$resolved_did"
+    
+        actor="$(echo $resolved_did | cut -d "|" -f 1)"
+    fi
+
+    atfile.say.debug "Getting Bluesky profile for '$actor'..."
+    bsky_profile="$(app.bsky.actor.getProfile "$actor")"
+
+    if [[ $_output_json == 1 ]]; then
+        echo "$bsky_profile" | jq
+    else
+        bio="$(echo "$bsky_profile" | jq '.description')"
+        bio="${bio%\"}"; bio="${bio#\"}"
+        count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
+        count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
+        count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
+        count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
+        count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
+        count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
+        count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
+        date_created="$(echo "$bsky_profile" | jq -r '.createdAt')"
+        date_created="$(atfile.invoke.bsky_profile.get_pretty_date "$date_created")"
+        date_indexed="$(echo "$bsky_profile" | jq -r '.indexedAt')"
+        date_indexed="$(atfile.invoke.bsky_profile.get_pretty_date "$date_indexed")"
+        did="$(echo "$bsky_profile" | jq -r '.did')"
+        handle="$(echo "$bsky_profile" | jq -r '.handle')"
+        name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
+        name_length=${#name}
+
+        bsky_profile_output="
+ $name
+ $(atfile.util.repeat_char "-" $name_length)
+ $bio
+ $(atfile.util.repeat_char "-" 3)
+ 🔌 @$handle ∙ #️⃣  $did 
+ ⬆️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬇️  $count_following Following ∙ ↔️  $count_known Known
+ 📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
+ ✨ $date_created ∙ 🕷️  $date_indexed
+ $(atfile.util.repeat_char "-" 3)
+ 🦋 https://bsky.app/profile/$actor\n"
+
+        atfile.say "$bsky_profile_output"
+    fi
+}
+
 function atfile.invoke.debug() {
     prog_not_installed_placeholder="(Not Installed)"
 
@@ -1797,8 +1878,8 @@ Deps
 ↳ MediaInfo: $mediainfo_version
 Misc.
 ↳ Checksum: $([[ "$md5sum_version" != "$prog_not_installed_placeholder" ]] && md5sum "$_prog_path" || echo "(?)")
-↳ Now: $_now
-↳ Rows: $(atfile.util.get_term_rows)"
+↳ Dimensions: $(atfile.util.get_term_cols) Cols / $(atfile.util.get_term_rows) Rows
+↳ Now: $_now"
     
     atfile.say "$debug_output"
 }
@@ -2395,6 +2476,8 @@ function atfile.invoke.release() {
 function atfile.invoke.resolve() {
     actor="$1"
 
+    [[ -z $actor && -n $_username ]] && actor="$_username"
+
     atfile.say.debug "Resolving actor '$actor'..."
 
     resolved_did="$(atfile.util.resolve_identity "$actor")"
@@ -2813,6 +2896,9 @@ function atfile.invoke.usage() {
         Upload blobs to authenticated repository
         ℹ️  Unless referenced by a record shortly after uploading, blob will be
           garbage collected by the PDS
+
+    bsky [<actor>]
+        Get Bluesky profile for <actor>
 
     handle <at-uri>
         Open at:// URI with relevant App
@@ -3311,6 +3397,9 @@ if [[ $_is_sourced == 0 ]]; then
                 "upload"|"u") atfile.invoke.blob_upload "$3" ;;
                 *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
             esac  
+            ;;
+        "bsky")
+            atfile.invoke.bsky_profile "$2"
             ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
