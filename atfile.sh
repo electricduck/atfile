@@ -2896,7 +2896,7 @@ function atfile.invoke.usage() {
     blob upload <path>
         Upload blobs to authenticated repository
         ℹ️  Unless referenced by a record shortly after uploading, blob will be
-          garbage collected by the PDS
+           garbage collected by the PDS
 
     bsky [<actor>]
         Get Bluesky profile for <actor>
