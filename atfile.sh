@@ -2496,6 +2496,11 @@ function atfile.invoke.resolve() {
     pds_version="$(curl -H "User-Agent: $(atfile.util.get_uas)" -s -l -X GET "$pds/xrpc/_health" | jq -r '.version')"
 
     case "$did_type" in
+        "did:plc")
+            # SEE: https://bsky.app/profile/did:web:bhh.sh/post/3lc2jkmhxq225
+            #      pls stop breaking my shit, @benharri.org
+            [[ $actor == "did:web:"* ]] && did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
+            ;;
         "did:web")
             did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
             ;;
