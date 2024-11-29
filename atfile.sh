@@ -2648,7 +2648,7 @@ function atfile.invoke.update() {
                 chmod +x "$_prog_path"
 
                 if [[ $_os == "haiku" ]]; then
-                    atfile.say "Updated to $latest_version!"
+                    atfile.say "Updated to $latest_version!" # BUG: Haiku Terminal has issues with emojis
                 else
                     atfile.say "😎 Updated to $latest_version!"
                 fi
