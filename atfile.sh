@@ -2419,7 +2419,7 @@ function atfile.invoke.resolve() {
             [[ $actor == "did:web:"* ]] && did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
             ;;
         "did:web")
-            did_doc="$(atfile.util.get_didweb_doc_url "$actor")"
+            did_doc="$(atfile.util.get_didweb_doc_url "$did")"
             ;;
     esac
 
