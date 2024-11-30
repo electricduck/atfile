@@ -1145,19 +1145,23 @@ function atfile.util.resolve_identity() {
             if [[ $(atfile.util.is_null_or_empty "$did") == 1 ]]; then
                 echo "$error"
                 exit 255
-            fi
+            fi 
 
             unset aliases
+            unset handle
             didplc_dir="$(echo "$did_doc" | jq -r ".directory")"
             pds="$(echo "$did_doc" | jq -r '.service[] | select(.id == "#atproto_pds") | .serviceEndpoint')"
-            handle="$(echo "$did_doc" | jq -r '.alsoKnownAs[] | select(. | startswith("at://"))' | head -n1)"
-
-            [[ $didplc_dir == "null" ]] && unset didplc_dir
-            [[ -z "$handle" ]] && handle="invalid.handle"
 
             while IFS=$"\n" read -r a; do
                 aliases+="$a;"
+
+                if [[ -z $handle && "$a" == "at://"* && "$a" != "at://did:"* ]]; then
+                    handle="$a"
+                fi
             done <<< "$(echo "$did_doc" | jq -r '.alsoKnownAs[]')"
+
+            [[ $didplc_dir == "null" ]] && unset didplc_dir
+            [[ -z "$handle" ]] && handle="invalid.handle"
             
             echo "$did|$pds|$handle|$didplc_dir|$aliases"
         fi
