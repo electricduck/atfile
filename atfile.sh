@@ -1750,11 +1750,11 @@ function atfile.invoke.bsky_profile() {
     else
         bio="$(echo "$bsky_profile" | jq '.description')"
         bio="${bio%\"}"; bio="${bio#\"}"
+        count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
         count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
         count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
-        count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
-        count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
         count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
+        count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
         count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
         count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
         date_created="$(echo "$bsky_profile" | jq -r '.createdAt')"
@@ -1764,6 +1764,18 @@ function atfile.invoke.bsky_profile() {
         did="$(echo "$bsky_profile" | jq -r '.did')"
         handle="$(echo "$bsky_profile" | jq -r '.handle')"
         name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
+
+        [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]] && bio="(No Bio)"
+        [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
+        [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
+        [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
+        [[ $(atfile.util.is_null_or_empty "$count_known") == 1 ]] && count_known="0"
+        [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
+        [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
+        [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
+        [[ $(atfile.util.is_null_or_empty "$handle") == 1 ]] && handle="handle.invalid"
+        [[ $(atfile.util.is_null_or_empty "$name") == 1 ]] && name="$handle"
+
         name_length=${#name}
 
         bsky_profile_output="
@@ -2400,6 +2412,11 @@ function atfile.invoke.manage_record() {
     esac
 }
 
+function atfile.invoke.now() {
+    date="$1"
+    atfile.util.get_date "$1"
+}
+
 function atfile.invoke.print() {
     key="$1"
     unset error
@@ -2559,6 +2576,10 @@ function atfile.invoke.stream() {
     collection="$1"
     [[ -z "$collection" ]] && collection="blue.zio.atfile.upload"
     atfile.js.subscribe "$collection"
+}
+
+function atfile.invoke.token() {
+    atfile.xrpc.jwt
 }
 
 function atfile.invoke.toggle_desktop() {
@@ -2917,6 +2938,9 @@ function atfile.invoke.usage() {
         Open atfile:// URI with relevant App
         ℹ️  Set <handler> to a .desktop entry (with '.desktop') to force the
            application <atfile-uri> opens with
+           
+    now
+        Get date in ISO-8601 format
 
     record add <record-json> [<collection>]
     record get <key> [<collection>] [<actor>]
@@ -2933,7 +2957,10 @@ function atfile.invoke.usage() {
         Get details for <actor>
 
     stream <collection>
-        Stream records from Jetstream"
+        Stream records from Jetstream
+        
+    token
+        Get JWT for authenticated account"
 
     usage_envvars="${_envvar_prefix}_USERNAME <string> (required)
         Username of the PDS user (handle or DID)
@@ -3344,6 +3371,7 @@ if [[ -z "$_server" ]]; then
         if [[ $_command == "at:"* ]] ||\
            [[ $_command == "atfile:"* ]] ||\
            [[ $_command == "handle" ]] ||\
+           [[ $_command == "now" ]] ||\
            [[ $_command == "resolve" ]] ||\
            [[ $_command == "something-broke" ]]; then
             atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
@@ -3500,6 +3528,9 @@ if [[ $_is_sourced == 0 ]]; then
         "nick")
             atfile.invoke.profile "$2"
             ;;
+        "now")
+            atfile.invoke.now "$2"
+            ;;
         "record")
             # NOTE: Performs no validation (apart from JSON)! Here be dragons
             case "$2" in
@@ -3521,6 +3552,9 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "stream")
             atfile.invoke.stream "$2"
+            ;;
+        "token")
+            atfile.invoke.token
             ;;
         "toggle-mime")
             atfile.invoke.toggle_desktop
