@@ -1,4 +1,5 @@
 .test_files/*
 *~
+atfile-release.sh
 atfile-*.*.sh
 atfile-*.*.*.sh
