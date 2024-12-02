@@ -3034,7 +3034,7 @@ function atfile.invoke.usage() {
     Licensed as MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
-       Follow on Bluesky at @$handle
+       Follow @$handle on Bluesky
     
 Usage
     $_prog <command> [<arguments>]
