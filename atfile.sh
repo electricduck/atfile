@@ -1717,11 +1717,64 @@ function atfile.invoke.blob_upload() {
     com.atproto.sync.uploadBlob "$file" | jq
 }
 
-function atfile.invoke.bsky_profile() {
-    actor="$1"
+function atfile.invoke.profile() {
+    app="$1"
+    actor="$2"
 
-    function atfile.invoke.bsky_profile.get_pretty_date() {
+    function atfile.invoke.profile.get_pretty_date() {
         atfile.util.get_date "$1" "%Y-%m-%d %H:%M:%S"
+    }
+
+    function atfile.invoke.profile.get_profile_bsky() {
+        bsky_profile="$(app.bsky.actor.getProfile "$actor")"
+
+        if [[ $_output_json == 1 ]]; then
+            echo "$bsky_profile" | jq
+        else
+            bio="$(echo "$bsky_profile" | jq '.description')"
+            bio="${bio%\"}"; bio="${bio#\"}"
+            count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
+            count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
+            count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
+            count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
+            count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
+            count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
+            count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
+            date_created="$(echo "$bsky_profile" | jq -r '.createdAt')"
+            date_created="$(atfile.invoke.profile.get_pretty_date "$date_created")"
+            date_indexed="$(echo "$bsky_profile" | jq -r '.indexedAt')"
+            date_indexed="$(atfile.invoke.profile.get_pretty_date "$date_indexed")"
+            did="$(echo "$bsky_profile" | jq -r '.did')"
+            handle="$(echo "$bsky_profile" | jq -r '.handle')"
+            name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
+
+            [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]] && bio="(No Bio)"
+            [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
+            [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
+            [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
+            [[ $(atfile.util.is_null_or_empty "$count_known") == 1 ]] && count_known="0"
+            [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
+            [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
+            [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
+            [[ $(atfile.util.is_null_or_empty "$handle") == 1 ]] && handle="handle.invalid"
+            [[ $(atfile.util.is_null_or_empty "$name") == 1 ]] && name="$handle"
+
+            name_length=${#name}
+
+            bsky_profile_output="
+ $name
+ $(atfile.util.repeat_char "-" $name_length)
+ $bio
+ $(atfile.util.repeat_char "-" 3)
+ 🔌 @$handle ∙ #️⃣  $did 
+ ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following ∙ ↔️  $count_known Known
+ 📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
+ ✨ $date_created ∙ 🕷️  $date_indexed
+ $(atfile.util.repeat_char "-" 3)
+ 🦋 https://bsky.app/profile/$actor\n"
+
+            atfile.say "$bsky_profile_output"
+        fi
     }
 
     if [[ -z "$actor" ]]; then
@@ -1734,56 +1787,16 @@ function atfile.invoke.bsky_profile() {
         actor="$(echo $resolved_did | cut -d "|" -f 1)"
     fi
 
-    atfile.say.debug "Getting Bluesky profile for '$actor'..."
-    bsky_profile="$(app.bsky.actor.getProfile "$actor")"
-
-    if [[ $_output_json == 1 ]]; then
-        echo "$bsky_profile" | jq
-    else
-        bio="$(echo "$bsky_profile" | jq '.description')"
-        bio="${bio%\"}"; bio="${bio#\"}"
-        count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
-        count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
-        count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
-        count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
-        count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
-        count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
-        count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
-        date_created="$(echo "$bsky_profile" | jq -r '.createdAt')"
-        date_created="$(atfile.invoke.bsky_profile.get_pretty_date "$date_created")"
-        date_indexed="$(echo "$bsky_profile" | jq -r '.indexedAt')"
-        date_indexed="$(atfile.invoke.bsky_profile.get_pretty_date "$date_indexed")"
-        did="$(echo "$bsky_profile" | jq -r '.did')"
-        handle="$(echo "$bsky_profile" | jq -r '.handle')"
-        name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
-
-        [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]] && bio="(No Bio)"
-        [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
-        [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
-        [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
-        [[ $(atfile.util.is_null_or_empty "$count_known") == 1 ]] && count_known="0"
-        [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
-        [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
-        [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
-        [[ $(atfile.util.is_null_or_empty "$handle") == 1 ]] && handle="handle.invalid"
-        [[ $(atfile.util.is_null_or_empty "$name") == 1 ]] && name="$handle"
-
-        name_length=${#name}
-
-        bsky_profile_output="
- $name
- $(atfile.util.repeat_char "-" $name_length)
- $bio
- $(atfile.util.repeat_char "-" 3)
- 🔌 @$handle ∙ #️⃣  $did 
- ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following ∙ ↔️  $count_known Known
- 📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
- ✨ $date_created ∙ 🕷️  $date_indexed
- $(atfile.util.repeat_char "-" 3)
- 🦋 https://bsky.app/profile/$actor\n"
-
-        atfile.say "$bsky_profile_output"
-    fi
+    case "$app" in
+        "bsky")
+            atfile.say.debug "Getting Bluesky profile for '$actor'..."
+            atfile.invoke.profile.get_profile_bsky "$actor"
+            ;;
+        "fyi")
+            atfile.say.debug "Getting Frontpage profile for '$actor'..."
+            #atfile.invoke.profile.get_profile_fyi "$actor"
+            ;;
+    esac
 }
 
 function atfile.invoke.debug() {
@@ -3293,6 +3306,7 @@ if [[ $_is_sourced == 0 ]]; then
         "rm") _command="delete" ;;
         "download"|"f"|"d") _command="fetch" ;;
         "download-crypt"|"fc"|"dc") _command="fetch-crypt" ;;
+        "fp") _command="fyi" ;;
         "at") _command="handle" ;;
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
@@ -3408,7 +3422,7 @@ if [[ $_is_sourced == 0 ]]; then
             esac  
             ;;
         "bsky")
-            atfile.invoke.bsky_profile "$2"
+            atfile.invoke.profile "bsky" "$2"
             ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -3442,6 +3456,9 @@ if [[ $_is_sourced == 0 ]]; then
             
             atfile.invoke.download "$2" 1
             ;;
+        #"fyi")
+        #    atfile.invoke.profile "fyi" "$2"
+        #    ;;
         "handle")
             uri="$2"
             protocol="$(atfile.util.get_uri_segment $uri protocol)"
