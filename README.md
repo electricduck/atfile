@@ -19,8 +19,8 @@
 ## ✨ Quick Start
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/electricduck/atfile/refs/heads/main/atfile-install.sh | bash
-echo 'ATFILE_USERNAME="<your-atproto-username>"' > ~/.config/atfile.env  # e.g. jay.bsky.team, did:plc:oky5czdrnfjpqslsw2a5iclo
+curl -sSL https://raw.githubusercontent.com/ziodotsh/atfile/refs/heads/main/atfile-install.sh | bash
+echo 'ATFILE_USERNAME="<your-atproto-username>"' > ~/.config/atfile.env  # e.g. alice.bsky.social, did:plc:vdjlpwlhbnug4fnjodwr3vzh
 echo 'ATFILE_PASSWORD="<your-atproto-password>"' >> ~/.config/atfile.env
 atfile help
 ```

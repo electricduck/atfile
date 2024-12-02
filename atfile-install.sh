@@ -46,15 +46,15 @@ function xrpc_get() {
     collection="$2"
     key="$3"
 
-    curl -s -L -X GET "$endpoint/$lexi?collection=$collection&repo=$did&rkey=$key"
+    curl -s -L -X GET "$pds/xrpc/$lexi?collection=$collection&repo=$did&rkey=$key"
 }
 
 check_prog "curl"
 check_prog "jq"
 
 uid="$(id -u)"
-did="did:plc:wennm3p5pufuib7vo5ex4sqw"
-endpoint="https://zio.blue/xrpc"
+did="did:web:zio.sh"
+pds="https://zio.blue"
 install_file="atfile"
 conf_file="atfile.env"
 unset install_dir
@@ -65,11 +65,11 @@ latest_version_record="$(xrpc_get "com.atproto.repo.getRecord" "self.atfile.late
 
 latest_version="$(echo "$latest_version_record" | jq -r '.value.version')"
 parsed_latest_version="$(parse_version $latest_version)"
-found_version_record="$(xrpc_get "com.atproto.repo.getRecord" "blue.zio.atfile.upload" "$parsed_latest_version")"
+found_version_record="$(xrpc_get "com.atproto.repo.getRecord" "blue.zio.atfile.upload" "atfile-$parsed_latest_version")"
 [[ $? != 0 ]] && die "Unable to fetch record for '$parsed_latest_version'"
 
 found_version_blob="$(echo "$found_version_record" | jq -r ".value.blob.ref.\"\$link\"")"
-url="https://zio.blue/blob/did:plc:wennm3p5pufuib7vo5ex4sqw/$found_version_blob"
+url="$pds/blob/$did/$found_version_blob"
 
 if [[ $(get_os) == "haiku" ]]; then
     install_dir="/boot/system/non-packaged/bin"
