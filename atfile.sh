@@ -2442,7 +2442,7 @@ function atfile.invoke.release() {
 
     # HACK: As we transition to @zio.sh, we need to support @atfile.zio.blue
     #       for the meantime, otherwise people won't be able to automatically update!
-    if [[ $_username != "did:plc:wennm3p5pufuib7vo5ex4sqw" ]]; then
+    if [[ $_username == "did:plc:wennm3p5pufuib7vo5ex4sqw" ]]; then
         version_record_id="$parsed_version"
     fi
 
