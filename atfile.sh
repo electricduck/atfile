@@ -2472,12 +2472,19 @@ function atfile.invoke.release() {
     dist_file="$(echo "$_prog" | cut -d "." -f 1)-${_version}.sh"
     dist_path="$_prog_dir/$dist_file"
     parsed_version="$(atfile.util.parse_version "$_version")"
+    version_record_id="atfile-$parsed_version"
+
+    # HACK: As we transition to @zio.sh, we need to support @atfile.zio.blue
+    #       for the meantime, otherwise people won't be able to automatically update!
+    if [[ $_username != "did:plc:wennm3p5pufuib7vo5ex4sqw" ]]; then
+        version_record_id="$parsed_version"
+    fi
 
     atfile.say "Copying working version to '$dist_file'..."
     cp -f "$_prog_path" "$dist_path"
     [[ $? != 0 ]] && atfile.die "Unable to create '$dist_path'"
 
-    atfile.invoke.upload "$dist_path" "" "$parsed_version"
+    atfile.invoke.upload "$dist_path" "" "$version_record_id"
     [[ $? != 0 ]] && atfile.die "Unable to upload '$dist_path'"
     echo "---"
 
@@ -2635,11 +2642,13 @@ function atfile.invoke.update() {
         atfile.die "Command not available as JSON"
     fi
 
-    atfile.util.override_actor "$_meta_did"
+    update_did="$_dist_username"
+
+    atfile.util.override_actor "$update_did"
     atfile.util.print_override_actor_debug
 
     atfile.say.debug "Getting latest release..."
-    latest_release_record="$(com.atproto.repo.getRecord "$_meta_did" "self.atfile.latest" "self")"
+    latest_release_record="$(com.atproto.repo.getRecord "$update_did" "self.atfile.latest" "self")"
     error="$(atfile.util.get_xrpc_error $? "$latest_release_record")"
 
     [[ -n "$error" ]] && atfile.die "Unable to get latest version" "$error"
@@ -2649,11 +2658,12 @@ function atfile.invoke.update() {
     latest_version_date="$(echo "$latest_release_record" | jq -r '.value.releasedAt')"
     parsed_latest_version="$(atfile.util.parse_version $latest_version)"
     parsed_running_version="$(atfile.util.parse_version $_version)"
+    latest_version_record_id="atfile-$parsed_latest_version"
     
     atfile.say.debug "Checking version...\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
     atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
 
-    [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
+    #[[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
     [[ $_disable_updater == 1 ]] && atfile.die "Cannot update system-managed version: update from your package manager" # NOTE: This relies on packaged versions having a wrapper that sets this var
     
     if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
@@ -2663,8 +2673,8 @@ function atfile.invoke.update() {
         touch "$temp_updated_path"
         [[ $? != 0 ]] && atfile.die "Unable to create temporary file (do you have permission?)"
         
-        atfile.say.debug "Getting blob URL for $latest_version ($parsed_latest_version)..."
-        blob_url="$(atfile.invoke.get_url $parsed_latest_version)"
+        atfile.say.debug "Getting blob URL for $latest_version ($latest_version_record_id)..."
+        blob_url="$(atfile.invoke.get_url $latest_version_record_id)"
         [[ $? != 0 ]] && atfile.die "Unable to get blob URL"
         blob_url="$(echo -e "$blob_url" | tail -n 1)" # HACK: ATFILE_DEBUG=1 screws up output, so we'll `tail` for safety
 
@@ -3029,7 +3039,7 @@ function atfile.invoke.usage() {
         Disable \`update\` command
            
     ¹ A bool in Bash is 1 (true) or 0 (false)
-    ² These servers are ran by @ducky.ws (and @astra.blue). You can trust us!"
+    ² These servers are ran by @$handle. You can trust us!"
 
     usage_files="$_path_envvar
         List of key/values of the above environment variables. Exporting these
@@ -3097,9 +3107,9 @@ _envvar_prefix="ATFILE"
 _os="$(atfile.util.get_os)"
 _is_git=0
 _is_sourced=0
-_meta_author="Ducky"
-_meta_did="did:plc:wennm3p5pufuib7vo5ex4sqw" # @atfile.zio.blue
-_meta_repo="https://github.com/electricduck/atfile"
+_meta_author="zio"
+_meta_did="did:web:zio.sh" # @zio.sh
+_meta_repo="https://github.com/ziodotsh/atfile"
 _meta_year="2024"
 _now="$(atfile.util.get_date)"
 _version="0.7.10"
