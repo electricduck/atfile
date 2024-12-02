@@ -1555,14 +1555,6 @@ function blue.zio.atfile.upload() {
 }"
 }
 
-function blue.zio.meta.profile() {
-    nickname="$1"
-    
-    echo "{
-    \"nickname\": \"$nickname\"  
-}"
-}
-
 ## Queries
 
 function app.bsky.actor.getProfile() {
@@ -2438,32 +2430,6 @@ function atfile.invoke.print() {
     fi
 }
 
-function atfile.invoke.profile() {
-    nick="$1"
-    unset error
-    
-    profile_record="$(blue.zio.meta.profile "$1")"
-    atfile.say.debug "Updating record...\n↳ NSID: $_nsid_profile\n↳ Repo: $_username\n↳ Key: self"
-    record="$(com.atproto.repo.putRecord "$_username" "$_nsid_profile" "self" "$profile_record")"
-    error="$(atfile.util.get_xrpc_error $? "$record")"
-
-    if [[ -z "$error" ]]; then
-        atfile.say.debug "Getting record...\n↳ NSID: $_nsid_profile\n↳ Repo: $_username\n↳ Key: self"
-        record="$(com.atproto.repo.getRecord "$_username" "$_nsid_profile" "self")"
-    
-        if [[ $_output_json == 1 ]]; then
-            echo -e "{ \"profile\": $(echo "$record" | jq -r ".value") }" | jq
-        else
-            echo "Updated profile"
-            echo "↳ Nickname: $(echo "$record" | jq -r ".value.nickname")"
-        fi
-    else
-        atfile.die "Unable to update profile" "$error"
-    fi
-}
-
-# test
-
 function atfile.invoke.release() {
     [[ $_version == *"+"* ]] && atfile.die "Not a stable version ($_version)"
 
@@ -2916,11 +2882,7 @@ function atfile.invoke.usage() {
     fetch-crypt <file> [<actor>]
         Download an uploaded encrypted file and attempt to decrypt it (with
         GPG)
-        ℹ️  Make sure the necessary GPG key has been imported first
-
-    nick <nick>
-        Set nickname
-        ℹ️  Intended for future use"
+        ℹ️  Make sure the necessary GPG key has been imported first"
 
     usage_commands_lifecycle="update
         Check for updates and update if outdated
@@ -3202,7 +3164,6 @@ _username="$(atfile.util.get_envvar "${_envvar_prefix}_USERNAME")"
 _nsid_prefix="blue.zio"
 _nsid_lock="${_nsid_prefix}.atfile.lock"
 _nsid_meta="${_nsid_prefix}.atfile.meta"
-_nsid_profile="${_nsid_prefix}.meta.profile"
 _nsid_upload="${_nsid_prefix}.atfile.upload"
 
 ## Source detection
@@ -3534,9 +3495,6 @@ if [[ $_is_sourced == 0 ]]; then
             ;;
         "lock")
             atfile.invoke.lock "$2" 1
-            ;;
-        "nick")
-            atfile.invoke.profile "$2"
             ;;
         "now")
             atfile.invoke.now "$2"
