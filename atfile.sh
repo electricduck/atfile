@@ -1873,6 +1873,7 @@ $(atfile.invoke.debug.print_envvar "FMT_OUT_FILE" "$_fmt_out_file_default")
 $(atfile.invoke.debug.print_envvar "FORCE_META_AUTHOR")
 $(atfile.invoke.debug.print_envvar "FORCE_META_DID")
 $(atfile.invoke.debug.print_envvar "FORCE_META_REPO")
+$(atfile.invoke.debug.print_envvar "FORCE_META_YEAR")
 $(atfile.invoke.debug.print_envvar "FORCE_NOW")
 $(atfile.invoke.debug.print_envvar "FORCE_OS")
 $(atfile.invoke.debug.print_envvar "FORCE_VERSION")
@@ -3034,7 +3035,8 @@ function atfile.invoke.usage() {
     Licensed as MIT License ✨
     
     😎 Stay updated with \`$_prog update\`
-       Follow @$handle on Bluesky
+    🦋 Follow @$handle on Bluesky
+       ↳ https://bsky.app/profile/$handle
     
 Usage
     $_prog <command> [<arguments>]
@@ -3156,6 +3158,7 @@ _fmt_out_file="$(atfile.util.get_envvar "${_envvar_prefix}_FMT_OUT_FILE" "$_fmt_
 _force_meta_author="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_AUTHOR")"
 _force_meta_did="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_DID")"
 _force_meta_repo="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_REPO")"
+_force_meta_year="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_META_YEAR")"
 _force_now="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_NOW")"
 _force_os="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_OS")"
 _force_version="$(atfile.util.get_envvar "${_envvar_prefix}_FORCE_VERSION")"
@@ -3197,13 +3200,16 @@ atfile.say.debug "Starting up..."
 
 [[ -n $_force_meta_author ]] && \
     _meta_author="$_force_meta_author" &&\
-    atfile.say.debug "Overriding Author (\$_meta_author)\n↳ ${_envvar_prefix}_FORCE_META_AUTHOR set to '$_force_meta_author'"
+    atfile.say.debug "Overriding Copyright Author (\$_meta_author)\n↳ ${_envvar_prefix}_FORCE_META_AUTHOR set to '$_force_meta_author'"
 [[ -n $_force_meta_did ]] && \
     _meta_did="$_force_meta_did" &&\
     atfile.say.debug "Overriding DID (\$_meta_did)\n↳ ${_envvar_prefix}_FORCE_META_DID set to '$_force_meta_did'"
 [[ -n $_force_meta_repo ]] && \
     _meta_repo="$_force_meta_repo" &&\
-    atfile.say.debug "Overriding OS (\$_meta_repo)\n↳ ${_envvar_prefix}_FORCE_META_REPO set to '$_force_meta_repo'"
+    atfile.say.debug "Overriding Repo URL (\$_meta_repo)\n↳ ${_envvar_prefix}_FORCE_META_REPO set to '$_force_meta_repo'"
+[[ -n $_force_meta_year ]] && \
+    _meta_year="$_force_meta_year" &&\
+    atfile.say.debug "Overriding Copyright Year (\$_meta_year)\n↳ ${_envvar_prefix}_FORCE_META_YEAR set to '$_force_meta_year'"
 [[ -n $_force_now ]] && \
     _now="$_force_now" &&\
     atfile.say.debug "Overriding Now (\$_now)\n↳ ${_envvar_prefix}_FORCE_NOW set to '$_force_now'"
