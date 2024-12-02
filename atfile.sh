@@ -737,7 +737,7 @@ function atfile.util.get_md5() {
 }
 
 function atfile.util.get_os() {
-    os="${OSTYPE,,}"
+    os="$OSTYPE"
 
     case $os in
         # Linux
@@ -746,7 +746,7 @@ function atfile.util.get_os() {
         "linux-musl") echo "linux-musl" ;;
         "linux-android") echo "linux-termux" ;;
         # BSD
-        "freebsd"*) echo "bsd-freebsd" ;;
+        "FreeBSD"*|"freebsd"*) echo "bsd-freebsd" ;;
         "netbsd"*) echo "bsd-netbsd" ;;
         "openbsd"*) echo "bsd-openbsd" ;;
         # Misc.
