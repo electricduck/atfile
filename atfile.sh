@@ -3074,7 +3074,7 @@ _meta_did="did:web:zio.sh" # @zio.sh
 _meta_repo="https://github.com/ziodotsh/atfile"
 _meta_year="2024"
 _now="$(atfile.util.get_date)"
-_version="0.7.10"
+_version="0.7.100"
 
 ### Paths
 
