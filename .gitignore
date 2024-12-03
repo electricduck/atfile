@@ -3,3 +3,4 @@
 atfile-release.sh
 atfile-*.*.sh
 atfile-*.*.*.sh
+examples/dww.sh

@@ -1193,6 +1193,13 @@ function atfile.http.download() {
         -o "$out_path"
 }
 
+function atfile.http.get() {
+    uri="$1"
+    
+    curl -s -X GET "$uri" \
+        -H "User-Agent: $(atfile.util.get_uas)"
+}
+
 # XRPC
 
 function atfile.xrpc.jwt() {
