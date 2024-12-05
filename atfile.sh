@@ -3121,7 +3121,7 @@ function atfile.invoke.usage() {
     usage="ATFile"
     [[ $_os != "haiku" ]] && usage+=" | 📦 ➔ 🦋"
 
-    usage+="\nStore and retrieve files on the ATmosphere
+    usage+="\n    Store and retrieve files on the ATmosphere
     
     Version $_version
     (c) $_meta_year $_meta_author <$_meta_repo>
