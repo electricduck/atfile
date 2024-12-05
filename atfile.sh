@@ -22,7 +22,7 @@ function atfile.die.gui() {
     gui_error="$2"
 
     [[ -z "$gui_error" ]] && gui_error="$cli_error"
-
+ 
     if [ -x "$(command -v zenity)" ] && [[ $_is_sourced == 0 ]]; then
         zenity --error --text "$gui_error"
     fi
@@ -1660,7 +1660,10 @@ function atfile.auth() {
     override_password="$2"
 
     function atfile.auth.get_command_segment() {
-        echo $_command_full | cut -d' ' -f$1
+        IFS=' ' read -r -a command_array <<< "$_command_full"
+        index=$1
+        #echo "$_command_full" | cut -d' ' -f$1
+        echo "${command_array[index]}"
     }
 
     [[ -n "$override_password" ]] && _password="$override_password"
@@ -1682,14 +1685,15 @@ function atfile.auth() {
         if [[ $_is_sourced == 0 ]]; then
             # NOTE: Speeds things up a little if the user is overriding actor
             #       Keep this in-sync with the main command case below!
-            if [[ $_command == "cat" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
-            [[ $_command == "fetch" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
-            [[ $_command == "fetch-crypt" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
-            [[ $_command == "info" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
-            [[ $_command == "list" ]] && [[ "$(atfile.auth.get_command_segment 2)" == *.* || "$(atfile.auth.get_command_segment 2)" == did:* ]] ||\
-            [[ $_command == "list" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
-            [[ $_command == "url" && -n "$(atfile.auth.get_command_segment 3)" ]]; then
-                atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
+            if [[ $_command == "cat" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
+               [[ $_command == "fetch" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
+               [[ $_command == "fetch-crypt" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
+               [[ $_command == "info" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
+               [[ $_command == "list" && "$(atfile.auth.get_command_segment 1)" == *.* ]] ||\
+               [[ $_command == "list" && "$(atfile.auth.get_command_segment 1)" == did:* ]] ||\
+               [[ $_command == "list" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
+               [[ $_command == "url" && -n "$(atfile.auth.get_command_segment 2)" ]]; then
+                atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden by command ('$_command_full')"
                 skip_resolving=1 
             fi
 
