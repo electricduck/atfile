@@ -577,9 +577,7 @@ function atfile.util.get_int_suffix() {
     singular="$2"
     plural="$3"
 
-    [[ -z "$plural" ]] && plural="${singular}s"
-
-    [[ $int == 1 ]] && echo "$singular" || echo "$plural"
+    [[ $int == 1 ]] && echo -e "$singular" || echo -e "$plural"
 }
 
 function atfile.util.get_finger_record() {
@@ -1875,14 +1873,14 @@ function atfile.invoke.profile() {
 
         # Do not modify the spacing here!
         bsky_profile_output="
-  $name
-  $(atfile.util.repeat_char "-" $name_length)
- $bio_formatted $(atfile.util.repeat_char "-" 3)
+  \e[1;37m$name\e[0m
+  \e[37m$(atfile.util.repeat_char "-" $name_length)\e[0m
+ $bio_formatted \e[37m$(atfile.util.repeat_char "-" 3)\e[0m
   🔌 @$handle ∙ #️⃣  $did 
-  ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following
-  📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
+  ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "\e[37mFollower\e[0m" "\e[37mFollowers\e[0m") ∙ ⬆️  $count_following \e[37mFollowing\e[0m
+  📃 $count_posts $(atfile.util.get_int_suffix $count_followers "\e[37mPost\e[0m" "\e[37mPosts\e[0m") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "\e[37mFeed\e[0m" "\e[37mFeeds\e[0m") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "\e[37mList\e[0m" "\e[37mLists\e[0m") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "\e[37mPack\e[0m" "\e[37mPacks\e[0m")
   ✨ $date_created ∙ 🕷️  $date_indexed
-  $(atfile.util.repeat_char "-" 3)
+  \e[37m$(atfile.util.repeat_char "-" 3)\e[0m
   🦋 https://bsky.app/profile/$actor\n"
 
         atfile.say "$bsky_profile_output"
