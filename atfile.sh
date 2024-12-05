@@ -1501,7 +1501,7 @@ function blue.zio.atfile.finger__machine() {
                 machine_os="Haiku $os_version"
                 ;;
             "linux-termux")
-                os_version="Termux $TERMUX_VERSION"
+                machine_os="Termux $TERMUX_VERSION"
                 ;;
             "macos")
                 os_version="$(sw_vers -productVersion | cut -d '.' -f 1,2)"
