@@ -1840,7 +1840,6 @@ function atfile.invoke.profile() {
         count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
         count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
         count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
-        count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
         count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
         count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
         count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
@@ -1852,11 +1851,20 @@ function atfile.invoke.profile() {
         handle="$(echo "$bsky_profile" | jq -r '.handle')"
         name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
 
-        [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]] && bio="(No Bio)"
+        if [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]]; then
+            bio="(No Bio)"
+        else
+            bio="$(echo -e "$bio" | fold -sw 78)"
+            unset bio_formatted
+
+            while IFS= read -r line; do
+                bio_formatted+=" $line\n"
+            done <<< "$bio"
+        fi
+
         [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
         [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
         [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
-        [[ $(atfile.util.is_null_or_empty "$count_known") == 1 ]] && count_known="0"
         [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
         [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
         [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
@@ -1865,13 +1873,13 @@ function atfile.invoke.profile() {
 
         name_length=${#name}
 
+        # Do not modify the spacing here!
         bsky_profile_output="
   $name
   $(atfile.util.repeat_char "-" $name_length)
-  $bio
-  $(atfile.util.repeat_char "-" 3)
+ $bio_formatted $(atfile.util.repeat_char "-" 3)
   🔌 @$handle ∙ #️⃣  $did 
-  ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following ∙ ↔️  $count_known Known
+  ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following
   📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
   ✨ $date_created ∙ 🕷️  $date_indexed
   $(atfile.util.repeat_char "-" 3)
