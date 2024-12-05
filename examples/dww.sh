@@ -4,19 +4,19 @@
 
 unset _atfile_path
 
-if [[ -d "$(basename "$(realpath "$0")")/../.git" ]]; then
-    _atfile_path="../atfile.sh"
+if [[ -d "$(dirname "$(realpath "$0")")/../.git" ]]; then
+    _atfile_path="$(dirname "$(realpath "$0")")/../atfile.sh"
 else
     _atfile_path="$(which atfile)"
     [[ $? != 0 ]] && unset _atfile_path
 fi
 
-if [[ -f "$_atfile_path" ]]; then
-    source "$_atfile_path"
-else
+if [[ ! -f "$_atfile_path" ]]; then
     echo -e "\033[1;31mError: ATFile not found\033[0m"
     exit 0
 fi
+
+source "$_atfile_path"
 
 # Die
 
@@ -174,7 +174,7 @@ function dww.bot() {
     }"
 
     unset post_message_facets
-    post_message="did:web Stats $change_phrase\n—\n👥  Users: $(dww.fmt_int $dw_users_active) Active · $(dww.fmt_int $dw_users_errors) Errors · $(dww.fmt_int $dw_users_max) Max\n🖥️  Nodes: $(dww.fmt_int $dw_nodes_total) Total\n ↳ Top: "
+    post_message="did:web Stats $change_phrase\n—\n👥  Users: $(dww.util.fmt_int $dw_users_active) Active · $(dww.util.fmt_int $dw_users_errors) Errors · $(dww.util.fmt_int $dw_users_max) Max\n🖥️  Nodes: $(dww.util.fmt_int $dw_nodes_total) Total\n ↳ Top: "
 
     if [[ -n $dw_nodes_top ]]; then
         for a in "${dw_nodes_top_array[@]}"; do
@@ -203,7 +203,7 @@ function dww.bot() {
     fi
 
     post_message="${post_message::-2}"
-    post_message+="\n↔️  Distrib.: $dw_dist% ($(dww.fmt_int $bsky_users) Total)\n—\n📅  Updated: $dw_cursor_pretty"
+    post_message+="\n↔️  Distrib.: $dw_dist% ($(dww.util.fmt_int $bsky_users) Total)\n—\n📅  Updated: $dw_cursor_pretty"
     post_message_facets="${post_message_facets::-1}"
 
     post_record="{
@@ -230,14 +230,14 @@ function dww.bot() {
     echo "---
 ℹ️  Update: $dw_cursor_pretty
    Phrase: $change_phrase
-   Nodes: $(dww.fmt_int $dw_nodes_total)
+   Nodes: $(dww.util.fmt_int $dw_nodes_total)
    ↳ Top: $(echo "${dw_nodes_top::-1}" | sed -e 's/;/, /g' -e 's/\///g' -e 's/https://g')
-   Users: $(dww.fmt_int $dw_users_total)
-   ↳ Active: $(dww.fmt_int $dw_users_active)
-   ↳ Errors: $(dww.fmt_int $dw_users_errors)
-   ↳ Max: $(dww.fmt_int $dw_users_max)
+   Users: $(dww.util.fmt_int $dw_users_total)
+   ↳ Active: $(dww.util.fmt_int $dw_users_active)
+   ↳ Errors: $(dww.util.fmt_int $dw_users_errors)
+   ↳ Max: $(dww.util.fmt_int $dw_users_max)
    Dist: $dw_dist%
-   ↳ Total: $(dww.fmt_int $bsky_users)
+   ↳ Total: $(dww.util.fmt_int $bsky_users)
 ---"
 
     if [[ $is_error == 0 ]] && [[ $_force_update == 1 ]] || [[ $is_update == 1 ]]; then
@@ -338,6 +338,6 @@ if [[ $_delete_stats == 1 ]]; then
 fi
 
 while true; do
-    dww.main
+    dww.bot
     sleep $_sleep
 done
