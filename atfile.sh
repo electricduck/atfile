@@ -165,7 +165,7 @@ function atfile.util.check_prog_gpg() {
 }
 
 function atfile.util.check_prog_optional_metadata() {
-    [[ $_skip_ni_exiftool == 0 ]] && atfile.util.check_prog "exiftool" "https://exiftool.org/" "${_envvar_prefix}_SKIP_NI_EXIFTOOL"
+    [[ $_skip_ni_exiftool == 0 ]] && atfile.util.check_prog "exiftool" "https://exiftool.org" "${_envvar_prefix}_SKIP_NI_EXIFTOOL"
     [[ $_skip_ni_mediainfo == 0 ]] && atfile.util.check_prog "mediainfo" "https://mediaarea.net/en/MediaInfo" "${_envvar_prefix}_SKIP_NI_MEDIAINFO"
 }
 
@@ -1122,7 +1122,7 @@ function atfile.util.resolve_identity() {
     actor="$1"
     
     if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
+        resolved_handle="$(bsky.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
         error="$(atfile.util.get_xrpc_error $? "$resolved_handle")"
 
         if [[ -z "$error" ]]; then
@@ -1253,12 +1253,24 @@ function atfile.xrpc.post_blob() {
         --data-binary @"$file" | jq
 }
 
+function bsky.xrpc.get() {
+    lexi="$1"
+    query="$2"
+    type="$3"
+
+    [[ -z $type ]] && type="application/json"
+
+    curl -s -X GET $_endpoint_appview_bsky/xrpc/$lexi?$query \
+        -H "Content-Type: $type" \
+        -H "User-Agent: $(atfile.util.get_uas)" \ | jq 
+}
+
 ## JetStream
 
 function atfile.js.subscribe() {
     collection="$1"
 
-    atfile.util.check_prog "websocat"
+    atfile.util.check_prog "websocat" "https://github.com/vi/websocat"
     websocat "$_endpoint_jetstream/subscribe?wantedCollections=$collection"
 }
 
@@ -1567,7 +1579,7 @@ function blue.zio.atfile.upload() {
 function app.bsky.actor.getProfile() {
     actor="$1"
     
-    atfile.xrpc.get "app.bsky.actor.getProfile" "actor=$actor" 
+    bsky.xrpc.get "app.bsky.actor.getProfile" "actor=$actor"
 }
 
 function com.atproto.repo.createRecord() {
@@ -1814,6 +1826,8 @@ function atfile.invoke.profile() {
     app="$1"
     actor="$2"
 
+    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
+
     function atfile.invoke.profile.get_pretty_date() {
         atfile.util.get_date "$1" "%Y-%m-%d %H:%M:%S"
     }
@@ -1821,53 +1835,49 @@ function atfile.invoke.profile() {
     function atfile.invoke.profile.get_profile_bsky() {
         bsky_profile="$(app.bsky.actor.getProfile "$actor")"
 
-        if [[ $_output_json == 1 ]]; then
-            echo "$bsky_profile" | jq
-        else
-            bio="$(echo "$bsky_profile" | jq '.description')"
-            bio="${bio%\"}"; bio="${bio#\"}"
-            count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
-            count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
-            count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
-            count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
-            count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
-            count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
-            count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
-            date_created="$(echo "$bsky_profile" | jq -r '.createdAt')"
-            date_created="$(atfile.invoke.profile.get_pretty_date "$date_created")"
-            date_indexed="$(echo "$bsky_profile" | jq -r '.indexedAt')"
-            date_indexed="$(atfile.invoke.profile.get_pretty_date "$date_indexed")"
-            did="$(echo "$bsky_profile" | jq -r '.did')"
-            handle="$(echo "$bsky_profile" | jq -r '.handle')"
-            name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
+        bio="$(echo "$bsky_profile" | jq '.description')"
+        bio="${bio%\"}"; bio="${bio#\"}"
+        count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
+        count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
+        count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
+        count_known="$(echo "$bsky_profile" | jq -r '.viewer.knownFollowers.count')"
+        count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
+        count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
+        count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
+        date_created="$(echo "$bsky_profile" | jq -r '.createdAt')"
+        date_created="$(atfile.invoke.profile.get_pretty_date "$date_created")"
+        date_indexed="$(echo "$bsky_profile" | jq -r '.indexedAt')"
+        date_indexed="$(atfile.invoke.profile.get_pretty_date "$date_indexed")"
+        did="$(echo "$bsky_profile" | jq -r '.did')"
+        handle="$(echo "$bsky_profile" | jq -r '.handle')"
+        name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
 
-            [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]] && bio="(No Bio)"
-            [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
-            [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
-            [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
-            [[ $(atfile.util.is_null_or_empty "$count_known") == 1 ]] && count_known="0"
-            [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
-            [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
-            [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
-            [[ $(atfile.util.is_null_or_empty "$handle") == 1 ]] && handle="handle.invalid"
-            [[ $(atfile.util.is_null_or_empty "$name") == 1 ]] && name="$handle"
+        [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]] && bio="(No Bio)"
+        [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
+        [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
+        [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
+        [[ $(atfile.util.is_null_or_empty "$count_known") == 1 ]] && count_known="0"
+        [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
+        [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
+        [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
+        [[ $(atfile.util.is_null_or_empty "$handle") == 1 ]] && handle="handle.invalid"
+        [[ $(atfile.util.is_null_or_empty "$name") == 1 ]] && name="$handle"
 
-            name_length=${#name}
+        name_length=${#name}
 
-            bsky_profile_output="
- $name
- $(atfile.util.repeat_char "-" $name_length)
- $bio
- $(atfile.util.repeat_char "-" 3)
- 🔌 @$handle ∙ #️⃣  $did 
- ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following ∙ ↔️  $count_known Known
- 📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
- ✨ $date_created ∙ 🕷️  $date_indexed
- $(atfile.util.repeat_char "-" 3)
- 🦋 https://bsky.app/profile/$actor\n"
+        bsky_profile_output="
+$name
+$(atfile.util.repeat_char "-" $name_length)
+$bio
+$(atfile.util.repeat_char "-" 3)
+🔌 @$handle ∙ #️⃣  $did 
+⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "Follower") ∙ ⬆️  $count_following Following ∙ ↔️  $count_known Known
+📃 $count_posts $(atfile.util.get_int_suffix $count_followers "Post") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "Feed") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "List") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "Pack")
+✨ $date_created ∙ 🕷️  $date_indexed
+$(atfile.util.repeat_char "-" 3)
+🦋 https://bsky.app/profile/$actor\n"
 
-            atfile.say "$bsky_profile_output"
-        fi
+        atfile.say "$bsky_profile_output"
     }
 
     if [[ -z "$actor" ]]; then
@@ -1958,6 +1968,8 @@ $(atfile.invoke.debug.print_envvar "DISABLE_UPDATER" $_disable_updater_default)
 ↳ ${_envvar_prefix}_DIST_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD") ]] && echo "(Set)")
 $(atfile.invoke.debug.print_envvar "DIST_USERNAME" $_dist_username_default)
 $(atfile.invoke.debug.print_envvar "ENABLE_FINGERPRINT" $_enable_fingerprint_default)
+$(atfile.invoke.debug.print_envvar "ENDPOINT_APPVIEW_BSKY" $_endpoint_appview_bsky_default)
+$(atfile.invoke.debug.print_envvar "ENDPOINT_JETSTREAM" $_endpoint_jetstream_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PDS")
 $(atfile.invoke.debug.print_envvar "ENDPOINT_PLC_DIRECTORY" $_endpoint_plc_directory_default)
 $(atfile.invoke.debug.print_envvar "ENDPOINT_RESOLVE_HANDLE" $_endpoint_resolve_handle_default)
@@ -3230,6 +3242,7 @@ _path_envvar="$_path_envvar/$_file_envvar"
 _debug_default=0
 _disable_updater_default=0
 _dist_username_default="$_meta_did"
+_endpoint_appview_bsky_default="https://api.bsky.app"
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.zio.blue"
@@ -3258,6 +3271,7 @@ _disable_updater="$(atfile.util.get_envvar "${_envvar_prefix}_DISABLE_UPDATER" $
 _dist_password="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD" $_dist_password_default)"
 _dist_username="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_USERNAME" $_dist_username_default)"
 _enable_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_FINGERPRINT" "$_enable_fingerprint_default")"
+_endpoint_appview_bsky="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_APPVIEW_BSKY" "$_endpoint_appview_bsky_default")"
 _endpoint_jetstream="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_JETSTREAM" "$_endpoint_jetstream_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
@@ -3389,11 +3403,10 @@ if [[ "$_os" == "haiku" ]]; then
 fi
 
 atfile.say.debug "Checking required programs..."
-atfile.util.check_prog "curl"
-[[ $_os == "linux"* ]] && atfile.util.check_prog "file"
+atfile.util.check_prog "curl" "https://curl.se"
+[[ $os != "haiku" && $os != "solaris" ]] && atfile.util.check_prog "file" "https://www.darwinsys.com/file"
 atfile.util.check_prog "jq" "$_prog_hint_jq"
 [[ $_skip_ni_md5sum == 0 ]] && atfile.util.check_prog "md5sum" "" "${_envvar_prefix}_SKIP_NI_MD5SUM"
-atfile.util.check_prog "xargs"
 
 ## Lifecycle commands
 
