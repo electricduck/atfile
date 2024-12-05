@@ -3232,6 +3232,9 @@ case $_os in
         _path_cache="$_path_home/config/cache"
         _path_envvar="$_path_home/config/settings"
         ;;
+    "linux-termux")
+        _path_blobs_tmp="/data/data/com.termux/files/tmp"
+        ;;
     "macos")
         _path_blobs_tmp="/private/tmp"
         ;;
