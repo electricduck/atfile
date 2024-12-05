@@ -3392,8 +3392,8 @@ if [[ $_os != "unknown-"* ]] &&\
    [[ $_os == "bsd-"* ]] ||\
    [[ $_os == "haiku" ]] ||\
    [[ $_os == "linux" ]] ||\
-   [[ $_os == "linux-termux" ]]\
-   [[ $_os == "macos" ]] ||\; then
+   [[ $_os == "linux-termux" ]] ||\
+   [[ $_os == "macos" ]] ; then
     is_os_supported=1
 fi
 
