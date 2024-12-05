@@ -290,7 +290,7 @@ function dww.bot_error() {
     com.atproto.repo.createRecord "$_username" "app.bsky.feed.post" "$error_post_record"
 }
 
-dww.reset() {
+function dww.reset() {
     echo "🗑️ Deleting stats...\n---"
     com.atproto.repo.deleteRecord "$_username" "$_stats_record_nsid" "self"
     echo "---"
