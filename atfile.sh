@@ -1500,6 +1500,9 @@ function blue.zio.atfile.finger__machine() {
                 machine_host="$(hostname)"
                 machine_os="Haiku $os_version"
                 ;;
+            "linux-termux")
+                os_version="Termux $TERMUX_VERSION"
+                ;;
             "macos")
                 os_version="$(sw_vers -productVersion | cut -d '.' -f 1,2)"
                 
@@ -3389,7 +3392,8 @@ if [[ $_os != "unknown-"* ]] &&\
    [[ $_os == "bsd-"* ]] ||\
    [[ $_os == "haiku" ]] ||\
    [[ $_os == "linux" ]] ||\
-   [[ $_os == "macos" ]]; then
+   [[ $_os == "linux-termux" ]]\
+   [[ $_os == "macos" ]] ||\; then
     is_os_supported=1
 fi
 

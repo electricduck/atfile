@@ -31,7 +31,7 @@ atfile help
 * **OS¹:** Linux, macOS, *BSD, Haiku
     * BSD: FreeBSD, NetBSD, and OpenBSD only; other non-detected BSDs may work (see ¹)
     * Haiku: [Yes, really](https://bsky.app/profile/did:plc:kv7sv4lynbv5s6gdhn5r5vcw/post/3lboqznyqgs26)
-    * Linux: GNU only; musl² and Termux not supported
+    * Linux: GNU and Termux only; musl² not supported
     * macOS: Compatible with built-in version of Bash (3.2.57)
     * Solaris: Has issues, low priority
     * Windows: WSL only (see Linux caveats above); Cygwin not supported
@@ -60,8 +60,8 @@ atfile help
 
 * **¹** You can bypass OS detection in one of two ways:
     * Set `ATFILE_SKIP_UNSUPPORTED_OS=1`<br />Be careful! There's a reason some OSes are not supported
-    * Set `ATFILE_FORCE_OS=<os>`<br />This overwrites the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `linux`, `linux-cygwin`, `linux-musl`, `linux-termux`, `haiku`, `macos`, `solaris`, `unknown`
+    * Set `ATFILE_FORCE_OS=<os>`<br />This overwrites the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `haiku`, `linux`, `linux-cygwin`, `linux-musl`, `linux-termux`, `macos`, `solaris`, `unknown`
 * **²** musl-powered distros do not use GNU/glibc packages, and have problems currently
-    * Known distros to use musl: Alpine, Chimera, Dragora, Gentoo (musl), Morpheus, OpenWrt, postmarketOS, Sabotage, Void
+    * Known musl distros: Alpine, Chimera, Dragora, Gentoo (musl), Morpheus, OpenWrt, postmarketOS, Sabotage, Void
     * Bypassing OS detection (see ¹) will work, but dates will not be handled correctly
 * **³** As long as you have Bash installed, running from another shell will not be problematic ([`#!/usr/bin/env bash`](https://github.com/ziodotsh/atfile/blob/main/atfile.sh#L1) forces Bash)
