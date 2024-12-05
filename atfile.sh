@@ -271,7 +271,7 @@ function atfile.util.get_app_url_for_at_uri() {
 }
 
 function atfile.util.get_cache() {
-    file="$_dir_cache/$1"
+    file="$_path_cache/$1"
     
     if [[ ! -f "$file" ]]; then
         touch "$file"
@@ -1173,7 +1173,7 @@ function atfile.util.resolve_identity() {
 
 function atfile.util.write_cache() {
     file="$1"
-    file_path="$_dir_cache/$1"
+    file_path="$_path_cache/$1"
     content="$2"
     
     atfile.util.get_cache "$file"
@@ -1981,6 +1981,10 @@ $(atfile.invoke.debug.print_envvar "SKIP_NI_MEDIAINFO" $_skip_ni_mediainfo_defau
 $(atfile.invoke.debug.print_envvar "SKIP_UNSUPPORTED_OS_WARN" $_skip_unsupported_os_warn)
 ↳ ${_envvar_prefix}_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_PASSWORD") ]] && echo "(Set)")
 $(atfile.invoke.debug.print_envvar "USERNAME")
+Paths
+↳ Blobs: $_path_blobs_tmp
+↳ Cache: $_path_cache
+↳ Config: $_path_envvar
 Environment
 ↳ OS: $_os ($(echo "$finger_record" | jq -r ".os"))
 ↳ Shell: $SHELL
@@ -1995,7 +1999,8 @@ Deps
 Misc.
 ↳ Checksum: $([[ "$md5sum_version" != "$prog_not_installed_placeholder" ]] && md5sum "$_prog_path" || echo "(?)")
 ↳ Dimensions: $(atfile.util.get_term_cols) Cols / $(atfile.util.get_term_rows) Rows
-↳ Now: $_now"
+↳ Now: $_now
+↳ Sudo: $SUDO_USER"
     
     atfile.say "$debug_output"
 }
@@ -2263,7 +2268,7 @@ function atfile.invoke.handle_atfile() {
                     atfile.say.debug "Unsupported for streaming"
 
                     download_success=1
-                    tmp_path="$_dir_blobs_tmp/$blob_cid"
+                    tmp_path="$_path_blobs_tmp/$blob_cid"
 
                     if ! [[ -f "$tmp_path" ]]; then
                         atfile.say.debug "Downloading '$blob_cid'..."
@@ -3110,12 +3115,12 @@ function atfile.invoke.usage() {
     ¹ A bool in Bash is 1 (true) or 0 (false)
     ² These servers are ran by @$handle. You can trust us!"
 
-    usage_files="$_path_envvar
+    usage_paths="$_path_envvar
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
 
-    $_dir_cache/
-    $_dir_blobs_tmp/
+    $_path_cache/
+    $_path_blobs_tmp/
         Cache and temporary storage"
 
     usage="ATFile"
@@ -3148,8 +3153,8 @@ Commands (Tools)
 Environment Variables
     $usage_envvars
 
-Files
-    $usage_files
+Paths
+    $usage_paths
 "
 
     if [[ $_debug == 1 ]]; then
@@ -3184,29 +3189,39 @@ _meta_year="2024"
 _now="$(atfile.util.get_date)"
 _version="0.8.1"
 
-### Paths
+### Reflection
 
 _prog="$(basename "$(atfile.util.get_realpath "$0")")"
 _prog_dir="$(dirname "$(atfile.util.get_realpath "$0")")"
 _prog_path="$(atfile.util.get_realpath "$0")"
-_dir_cache="$HOME/.cache"
-_dir_blobs_tmp="/tmp"
-_path_envvar="$HOME/.config"
+
+### Paths
+
+_path_home="$HOME"
+
+if [[ -n "$SUDO_USER" ]]; then
+    _path_home="$(eval echo "~$SUDO_USER")"
+fi
+
+_file_envvar="atfile.env"
+_path_blobs_tmp="/tmp"
+_path_cache="$_path_home/.cache"
+_path_envvar="$_path_home/.config"
 
 case $_os in
     "haiku")
-        _dir_blobs_tmp="/boot/system/cache/tmp"
-        _dir_cache="$HOME/config/cache"
-        _path_envvar="$HOME/config/settings"
+        _path_blobs_tmp="/boot/system/cache/tmp"
+        _path_cache="$_path_home/config/cache"
+        _path_envvar="$_path_home/config/settings"
         ;;
     "macos")
-        _dir_blobs_tmp="/private/tmp"
+        _path_blobs_tmp="/private/tmp"
         ;;
 esac
 
-_dir_cache="$_dir_cache/atfile"
-_dir_blobs_tmp="$_dir_blobs_tmp/at-blobs"
-_path_envvar="$_path_envvar/atfile.env"
+_path_blobs_tmp="$_path_blobs_tmp/at-blobs"
+_path_cache="$_path_cache/atfile"
+_path_envvar="$_path_envvar/$_file_envvar"
 
 ### Envvars
 
@@ -3362,8 +3377,8 @@ fi
 ## Directory creation
 
 atfile.say.debug "Creating necessary directories..."
-atfile.util.create_dir "$_dir_cache"
-atfile.util.create_dir "$_dir_blobs_tmp"
+atfile.util.create_dir "$_path_cache"
+atfile.util.create_dir "$_path_blobs_tmp"
 
 ## Program detection
 
