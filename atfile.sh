@@ -1656,6 +1656,10 @@ function atfile.auth() {
     override_username="$1"
     override_password="$2"
 
+    function atfile.auth.get_command_segment() {
+        echo $_command_full | cut -d' ' -f$1
+    }
+
     [[ -n "$override_password" ]] && _password="$override_password"
     [[ -n "$override_username" ]] && _username="$override_username"
 
@@ -1675,13 +1679,13 @@ function atfile.auth() {
         if [[ $_is_sourced == 0 ]]; then
             # NOTE: Speeds things up a little if the user is overriding actor
             #       Keep this in-sync with the main command case below!
-            if [[ $_command == "cat" && -n "$3" ]] ||\
-            [[ $_command == "fetch" && -n "$3" ]] ||\
-            [[ $_command == "fetch-crypt" && -n "$3" ]] ||\
-            [[ $_command == "info" && -n "$2" ]] ||\
-            [[ $_command == "list" ]] && [[ "$2" == *.* || "$2" == did:* ]] ||\
-            [[ $_command == "list" && -n "$3" ]] ||\
-            [[ $_command == "url" && -n "$3" ]]; then
+            if [[ $_command == "cat" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
+            [[ $_command == "fetch" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
+            [[ $_command == "fetch-crypt" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
+            [[ $_command == "info" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
+            [[ $_command == "list" ]] && [[ "$(atfile.auth.get_command_segment 2)" == *.* || "$(atfile.auth.get_command_segment 2)" == did:* ]] ||\
+            [[ $_command == "list" && -n "$(atfile.auth.get_command_segment 3)" ]] ||\
+            [[ $_command == "url" && -n "$(atfile.auth.get_command_segment 3)" ]]; then
                 atfile.say.debug "Skipping identity resolving\n↳ Actor is overridden"
                 skip_resolving=1 
             fi
@@ -3458,8 +3462,8 @@ fi
 ## Authentication
 
 if [[ $_is_sourced == 0 ]]; then
-    [[ -z "$_username" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
-    [[ -z "$_password" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
+    [[ -z "$_username" || "$_username" == "<your-username>" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
+    [[ -z "$_password" || "$_password" == "<your-password>" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
 fi
 
 atfile.auth
