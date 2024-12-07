@@ -1870,7 +1870,7 @@ function atfile.invoke.profile() {
         date_indexed="$(atfile.invoke.profile.get_pretty_date "$date_indexed")"
         did="$(echo "$bsky_profile" | jq -r '.did')"
         handle="$(echo "$bsky_profile" | jq -r '.handle')"
-        name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
+        name="$(echo "$bsky_profile" | jq -r '.displayName')"
         type="🔵 User"
 
         if [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]]; then
@@ -1922,6 +1922,25 @@ function atfile.invoke.profile() {
         fi
     }
 
+    function atfile.invoke.profile.get_profile_fyi() {
+        bsky_profile="$(app.bsky.actor.getProfile "$actor")"
+
+        did="$(echo "$bsky_profile" | jq -r '.did')"
+        handle="$(echo "$bsky_profile" | jq -r '.handle')"
+        name="$(echo "$bsky_profile" | jq -r '.handle')"
+
+        name_length=${#name}
+
+        fyi_profile_output="
+  \e[1;37m$name\e[0m
+  \e[37m$(atfile.util.repeat_char "-" $name_length)\e[0m
+  🔌 @$handle ∙ #️⃣  $did
+  \e[37m$(atfile.util.repeat_char "-" 3)\e[0m
+  📃 https://frontpage.fyi/profile/$actor\n"
+
+        atfile.say "$fyi_profile_output"
+    }
+
     if [[ -z "$actor" ]]; then
         actor="$_username"
     else
@@ -1939,7 +1958,7 @@ function atfile.invoke.profile() {
             ;;
         "fyi")
             atfile.say.debug "Getting Frontpage profile for '$actor'..."
-            #atfile.invoke.profile.get_profile_fyi "$actor"
+            atfile.invoke.profile.get_profile_fyi "$actor"
             ;;
     esac
 }
@@ -3059,6 +3078,12 @@ function atfile.invoke.usage() {
     toggle-mime
         Install/uninstall desktop file to handle atfile:/at: protocol"
 
+    usage_commands_profiles="bsky [<actor>]
+        Get Bluesky profile for <actor>
+        
+    fyi [actor]
+        Get Frontpage profile for <actor>"
+
     usage_commands_tools="blob list
         List blobs on authenticated repository
 
@@ -3066,9 +3091,6 @@ function atfile.invoke.usage() {
         Upload blobs to authenticated repository
         ℹ️  Unless referenced by a record shortly after uploading, blob will be
            garbage collected by the PDS
-
-    bsky [<actor>]
-        Get Bluesky profile for <actor>
 
     handle <at-uri>
         Open at:// URI with relevant App
@@ -3205,6 +3227,9 @@ Commands (Lifecycle)
 
 Commands (Tools)
     $usage_commands_tools
+
+Commands (Profiles)
+    $usage_commands_profiles
 
 Environment Variables
     $usage_envvars
@@ -3558,9 +3583,9 @@ if [[ $_is_sourced == 0 ]]; then
             
             atfile.invoke.download "$2" 1
             ;;
-        #"fyi")
-        #    atfile.invoke.profile "fyi" "$2"
-        #    ;;
+        "fyi")
+            atfile.invoke.profile "fyi" "$2"
+            ;;
         "handle")
             uri="$2"
             protocol="$(atfile.util.get_uri_segment $uri protocol)"
