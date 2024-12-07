@@ -2002,6 +2002,7 @@ $(atfile.invoke.debug.print_envvar "FORCE_VERSION")
 $(atfile.invoke.debug.print_envvar "INCLUDE_FINGERPRINT" $_enable_fingerprint_default)
 $(atfile.invoke.debug.print_envvar "MAX_LIST" $_max_list_default)
 $(atfile.invoke.debug.print_envvar "OUTPUT_JSON" $_output_json_default)
+$(atfile.invoke.debug.print_envvar "PATH_CONF" "$_path_envvar")
 $(atfile.invoke.debug.print_envvar "SKIP_AUTH_CHECK" $_skip_auth_check_default)
 $(atfile.invoke.debug.print_envvar "SKIP_COPYRIGHT_WARN" $_skip_copyright_warn_default)
 $(atfile.invoke.debug.print_envvar "SKIP_NI_EXIFTOOL" $_skip_ni_exiftool_default)
@@ -3134,7 +3135,7 @@ function atfile.invoke.usage() {
         Endpoint of the PLC directory
     ${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE <url> (default: ${_endpoint_resolve_handle_default}$([[ $_endpoint_plc_directory_default == *"zio.blue" ]] && echo "²"))
         Endpoint of the PDS/AppView used for handle resolving
-           
+
     ${_envvar_prefix}_DEBUG <bool¹> (default: $_debug_default)
         Print debug outputs
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
@@ -3147,6 +3148,7 @@ function atfile.invoke.usage() {
     usage_paths="$_path_envvar
         List of key/values of the above environment variables. Exporting these
         on the shell (with \`export \$ATFILE_VARIABLE\`) overrides these values
+        ℹ️  Set ${_envvar_prefix}_PATH_CONF to override
 
     $_path_cache/
     $_path_blobs_tmp/
@@ -3253,7 +3255,7 @@ esac
 
 _path_blobs_tmp="$_path_blobs_tmp/at-blobs"
 _path_cache="$_path_cache/atfile"
-_path_envvar="$_path_envvar/$_file_envvar"
+_path_envvar="$(atfile.util.get_envvar "${_envvar_prefix}_PATH_CONF" "$_path_envvar/$_file_envvar")" 
 
 ### Envvars
 
