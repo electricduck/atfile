@@ -223,6 +223,7 @@ function atfile.util.get_app_url_for_at_uri() {
             "events.smokesignal.app.profile") resolved_url="https://smokesignal.events/$actor" ;;
             "events.smokesignal.calendar.event") resolved_url="https://smokesignal.events/$actor/$rkey" ;;
             "fyi.unravel.frontpage.post") resolved_url="https://frontpage.fyi/post/$actor/$rkey" ;;
+            "link.pastesphere.snippet") resolved_url="https://pastesphere.link/user/$actor/snippet/$rkey" ;;
             "app.bsky.feed.like"| \
             "app.bsky.feed.postgate"| \
             "app.bsky.feed.repost"| \
