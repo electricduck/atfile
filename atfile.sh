@@ -2626,12 +2626,6 @@ function atfile.invoke.release() {
     parsed_version="$(atfile.util.parse_version "$_version")"
     version_record_id="atfile-$parsed_version"
 
-    # HACK: As we transition to @zio.sh, we need to support @atfile.zio.blue
-    #       for the meantime, otherwise people won't be able to automatically update!
-    if [[ $_username == "did:plc:wennm3p5pufuib7vo5ex4sqw" ]]; then
-        version_record_id="$parsed_version"
-    fi
-
     atfile.say "Copying working version to '$dist_file'..."
     cp -f "$_prog_path" "$dist_path"
     [[ $? != 0 ]] && atfile.die "Unable to create '$dist_path'"
