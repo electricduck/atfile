@@ -178,6 +178,10 @@ function atfile.util.create_dir() {
     fi
 }
 
+function atfile.util.fmt_int() {
+    printf "%'d\n" "$1"
+}
+
 function atfile.util.get_app_url_for_at_uri() {
     uri="$1"
 
@@ -1887,13 +1891,13 @@ function atfile.invoke.profile() {
             type="🟦 Labeler"
         fi
 
-        [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
-        [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
-        [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
-        [[ $(atfile.util.is_null_or_empty "$count_likes") == 1 ]] && count_likes="0"
-        [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
-        [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
-        [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
+        [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0" || count_feeds="$(atfile.util.fmt_int $count_feeds)"
+        [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0" || count_followers="$(atfile.util.fmt_int $count_followers)"
+        [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0" || count_following="$(atfile.util.fmt_int $count_following)"
+        [[ $(atfile.util.is_null_or_empty "$count_likes") == 1 ]] && count_likes="0" || count_likes="$(atfile.util.fmt_int $count_likes)"
+        [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0" || count_lists="$(atfile.util.fmt_int $count_lists)"
+        [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0" || count_packs="$(atfile.util.fmt_int $count_packs)"
+        [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0" || count_posts="$(atfile.util.fmt_int $count_posts)"
         [[ $(atfile.util.is_null_or_empty "$handle") == 1 ]] && handle="handle.invalid"
         [[ $(atfile.util.is_null_or_empty "$name") == 1 ]] && name="$handle"
 
