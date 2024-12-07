@@ -1583,6 +1583,12 @@ function app.bsky.actor.getProfile() {
     bsky.xrpc.get "app.bsky.actor.getProfile" "actor=$actor"
 }
 
+function app.bsky.labeler.getServices() {
+    did="$1"
+    
+    bsky.xrpc.get "app.bsky.labeler.getServices" "dids=$did"
+}
+
 function com.atproto.repo.createRecord() {
     repo="$1"
     collection="$2"
@@ -1700,6 +1706,7 @@ function atfile.auth() {
             # NOTE: Speeds things up a little if the command doesn't need actor resolving
             if [[ $_command == "at:"* ]] ||\
             [[ $_command == "atfile:"* ]] ||\
+            [[ $_command == "bsky" ]] ||\
             [[ $_command == "handle" ]] ||\
             [[ $_command == "now" ]] ||\
             [[ $_command == "resolve" ]] ||\
@@ -1849,6 +1856,7 @@ function atfile.invoke.profile() {
         count_feeds="$(echo "$bsky_profile" | jq -r '.associated.feedgens')"
         count_followers="$(echo "$bsky_profile" | jq -r '.followersCount')"
         count_following="$(echo "$bsky_profile" | jq -r '.followsCount')"
+        count_likes=0
         count_lists="$(echo "$bsky_profile" | jq -r '.associated.lists')"
         count_packs="$(echo "$bsky_profile" | jq -r '.associated.starterPacks')"
         count_posts="$(echo "$bsky_profile" | jq -r '.postsCount')"
@@ -1859,6 +1867,7 @@ function atfile.invoke.profile() {
         did="$(echo "$bsky_profile" | jq -r '.did')"
         handle="$(echo "$bsky_profile" | jq -r '.handle')"
         name="👤 $(echo "$bsky_profile" | jq -r '.displayName')"
+        type="🔵 User"
 
         if [[ $(atfile.util.is_null_or_empty "$bio") == 1 ]]; then
             bio="(No Bio)"
@@ -1871,9 +1880,17 @@ function atfile.invoke.profile() {
             done <<< "$bio"
         fi
 
+        if [[ "$(echo "$bsky_profile" | jq -r '.associated.labeler')" == "true" ]]; then
+            labeler_services="$(app.bsky.labeler.getServices "$did")"
+
+            count_likes="$(echo "$labeler_services" | jq -r '.views[] | select(."$type" == "app.bsky.labeler.defs#labelerView") | .likeCount')"
+            type="🟦 Labeler"
+        fi
+
         [[ $(atfile.util.is_null_or_empty "$count_feeds") == 1 ]] && count_feeds="0"
         [[ $(atfile.util.is_null_or_empty "$count_followers") == 1 ]] && count_followers="0"
         [[ $(atfile.util.is_null_or_empty "$count_following") == 1 ]] && count_following="0"
+        [[ $(atfile.util.is_null_or_empty "$count_likes") == 1 ]] && count_likes="0"
         [[ $(atfile.util.is_null_or_empty "$count_lists") == 1 ]] && count_lists="0"
         [[ $(atfile.util.is_null_or_empty "$count_packs") == 1 ]] && count_packs="0"
         [[ $(atfile.util.is_null_or_empty "$count_posts") == 1 ]] && count_posts="0"
@@ -1888,13 +1905,17 @@ function atfile.invoke.profile() {
   \e[37m$(atfile.util.repeat_char "-" $name_length)\e[0m
  $bio_formatted \e[37m$(atfile.util.repeat_char "-" 3)\e[0m
   🔌 @$handle ∙ #️⃣  $did 
-  ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "\e[37mFollower\e[0m" "\e[37mFollowers\e[0m") ∙ ⬆️  $count_following \e[37mFollowing\e[0m
+  ⬇️  $count_followers $(atfile.util.get_int_suffix $count_followers "\e[37mFollower\e[0m" "\e[37mFollowers\e[0m") ∙ ⬆️  $count_following \e[37mFollowing\e[0m ∙ ⭐️ $count_likes \e[37mLikes\e[0m
   📃 $count_posts $(atfile.util.get_int_suffix $count_followers "\e[37mPost\e[0m" "\e[37mPosts\e[0m") ∙ ⚙️  $count_feeds $(atfile.util.get_int_suffix $count_feeds "\e[37mFeed\e[0m" "\e[37mFeeds\e[0m") ∙ 📋 $count_lists $(atfile.util.get_int_suffix $count_lists "\e[37mList\e[0m" "\e[37mLists\e[0m") ∙ 👥 $count_packs $(atfile.util.get_int_suffix $count_packs "\e[37mPack\e[0m" "\e[37mPacks\e[0m")
-  ✨ $date_created ∙ 🕷️  $date_indexed
+  $type ∙ ✨ $date_created ∙ 🕷️  $date_indexed
   \e[37m$(atfile.util.repeat_char "-" 3)\e[0m
   🦋 https://bsky.app/profile/$actor\n"
 
-        atfile.say "$bsky_profile_output"
+        if [[ "$date_indexed" == "0001-01-01 00:00:00" ]]; then
+            atfile.die "No Bluesky profile for '$actor'"
+        else
+            atfile.say "$bsky_profile_output"
+        fi
     }
 
     if [[ -z "$actor" ]]; then
