@@ -60,7 +60,7 @@ atfile help
 
 * **¹** You can bypass OS detection in one of two ways:
     * Set `ATFILE_SKIP_UNSUPPORTED_OS=1`<br />Be careful! There's a reason some OSes are not supported
-    * Set `ATFILE_FORCE_OS=<os>`<br />This overwrites the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `haiku`, `linux`, `linux-cygwin`, `linux-musl`, `linux-termux`, `macos`, `solaris`, `unknown`
+    * Set `ATFILE_FORCE_OS=<os>`<br />This overrides the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `haiku`, `linux`, `linux-cygwin`, `linux-musl`, `linux-termux`, `macos`, `solaris`, `unknown`
 * **²** musl-powered distros do not use GNU/glibc packages, and have problems currently
     * Known musl distros: Alpine, Chimera, Dragora, Gentoo (musl), Morpheus, OpenWrt, postmarketOS, Sabotage, Void
     * Bypassing OS detection (see ¹) will work, but dates will not be handled correctly
