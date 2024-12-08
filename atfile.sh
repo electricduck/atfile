@@ -1764,10 +1764,6 @@ function atfile.profile() {
     actor="$2"
 
     [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
-    if [[ -z "$actor" ]]; then
-        atfile.util.override_actor "$_username"
-        atfile.util.print_override_actor_debug
-    fi
 
     function atfile.profile.get_pretty_date() {
         atfile.util.get_date "$1" "%Y-%m-%d %H:%M:%S"
@@ -3551,8 +3547,12 @@ if [[ $_is_sourced == 0 ]]; then
                 *) atfile.die.unknown_command "$(echo "$_command $2" | xargs)" ;;
             esac  
             ;;
-        "bsky")
-            atfile.profile "bsky" "$2"
+        "bsky"|"fyi")
+            if [[ -n "$3" ]]; then
+                atfile.util.override_actor "$_username"
+                atfile.util.print_override_actor_debug
+            fi
+            atfile.profile "$_command" "$2"
             ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
@@ -3585,9 +3585,6 @@ if [[ $_is_sourced == 0 ]]; then
             fi
             
             atfile.invoke.download "$2" 1
-            ;;
-        "fyi")
-            atfile.profile "fyi" "$2"
             ;;
         "handle")
             uri="$2"
