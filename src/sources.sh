@@ -15,6 +15,7 @@ declare -a ATFILE_DEVEL_SOURCES=(
     "commands/profile"
     "commands/release"
     "commands/resolve"
+    "commands/sl"
     "commands/something_broke"
     # Commands (Legacy)
     "commands/old_cmds"
