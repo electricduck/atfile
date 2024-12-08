@@ -3548,11 +3548,13 @@ if [[ $_is_sourced == 0 ]]; then
             esac  
             ;;
         "bsky"|"fyi")
-            if [[ -n "$3" ]]; then
+            if [[ -z "$2" ]]; then
                 atfile.util.override_actor "$_username"
                 atfile.util.print_override_actor_debug
+                atfile.profile "$_command" "$_username"
+            else
+                atfile.profile "$_command" "$2"
             fi
-            atfile.profile "$_command" "$2"
             ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
