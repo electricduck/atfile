@@ -38,7 +38,7 @@ function atfile.release() {
 # Author:  $commit_author
 # Build:   $id ($(hostname) [$(atfile.util.get_os)])     
 # ---
-# Psst! You can \`source \"\$(which atfile)\"\` in your own Bash scripts!
+# Psst! You can \`source atfile\` in your own Bash scripts!
 " >> $dist_path
 
     for s in "${ATFILE_DEVEL_SOURCES[@]}"
