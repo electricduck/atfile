@@ -13,9 +13,11 @@ declare -a ATFILE_DEVEL_SOURCES=(
     "commands/auth"
     "commands/help"
     "commands/profile"
-    "commands/old_cmds"
     "commands/release"
+    "commands/resolve"
     "commands/something_broke"
+    # Commands (Legacy)
+    "commands/old_cmds"
     # Entry
     "entry"
 )

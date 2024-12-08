@@ -417,7 +417,7 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             fi
             ;;
         "resolve")
-            atfile.invoke.resolve "$2"
+            atfile.resolve "$2"
             ;;
         "something-broke")
             atfile.something_broke
