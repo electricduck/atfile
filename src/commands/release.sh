@@ -77,6 +77,7 @@ function atfile.release() {
     chmod +x "$dist_path"
 
     if [[ $_devel_publish == 1 ]]; then
+        echo "---"
         atfile.auth "$_dist_username" "$_dist_password"
         [[ $_version == *"+"* ]] && atfile.die "Unable to upload a Git version ($_version)"
 
