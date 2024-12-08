@@ -16,7 +16,7 @@ function get_os() {
     case $os in
         # Linux
         "linux-gnu") echo "linux" ;;
-        "cygwin") echo "linux-cygwin" ;;
+        "cygwin"|"msys") echo "linux-mingw64" ;;
         "linux-musl") echo "linux-musl" ;;
         "linux-android") echo "linux-termux" ;;
         # BSD

@@ -198,6 +198,7 @@ if [[ $_os != "unknown-"* ]] &&\
    [[ $_os == "bsd-"* ]] ||\
    [[ $_os == "haiku" ]] ||\
    [[ $_os == "linux" ]] ||\
+   [[ $_os == "linux-mingw" ]] ||\
    [[ $_os == "linux-termux" ]] ||\
    [[ $_os == "macos" ]] ; then
     is_os_supported=1

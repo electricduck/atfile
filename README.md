@@ -28,13 +28,14 @@ atfile help
 
 ## ✅ Requirements
 
-* **OS¹:** Linux, macOS, *BSD, Haiku
-    * BSD: FreeBSD, NetBSD, and OpenBSD only; other non-detected BSDs may work (see ¹)
-    * Haiku: [Yes, really](https://bsky.app/profile/did:plc:kv7sv4lynbv5s6gdhn5r5vcw/post/3lboqznyqgs26)
-    * Linux: GNU and Termux only; musl² not supported
-    * macOS: Compatible with built-in version of Bash (3.2.57)
-    * Solaris: Has issues, low priority
-    * Windows: WSL only (see Linux caveats above); Cygwin not supported
+* **OS¹**
+    * 🟡 **Linux**: GNU, MinGW and Termux only; musl² not supported
+    * 🟢 **macOS**: Compatible with built-in version of Bash (3.2)
+    * 🟡 **Windows**: MinGW (Cygwin, Git Bash, MSYS2, etc.) and WSL (see Linux caveats above)
+        * This repository **does not** provide a native version for Windows
+    * 🟢 **BSD**: FreeBSD, NetBSD and OpenBSD; other non-detected BSDs should work (see ¹)
+    * 🟢 **Haiku**: [Yes, really](https://bsky.app/profile/did:plc:kv7sv4lynbv5s6gdhn5r5vcw/post/3lboqznyqgs26)
+    * 🔴 **Solaris**: <span title="Don't we all?">Has issues</span>; low priority
 * **Bash³:** 3.x or later
 * **Packages**
     * [`curl`](https://curl.se)
@@ -60,7 +61,7 @@ atfile help
 
 * **¹** You can bypass OS detection in one of two ways:
     * Set `ATFILE_SKIP_UNSUPPORTED_OS=1`<br />Be careful! There's a reason some OSes are not supported
-    * Set `ATFILE_FORCE_OS=<os>`<br />This overrides the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `haiku`, `linux`, `linux-cygwin`, `linux-musl`, `linux-termux`, `macos`, `solaris`, `unknown`
+    * Set `ATFILE_FORCE_OS=<os>`<br />This overrides the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `haiku`, `linux`, `linux-mingw64`, `linux-musl`, `linux-termux`, `macos`, `solaris`, `unknown`
 * **²** musl-powered distros do not use GNU/glibc packages, and have problems currently
     * Known musl distros: Alpine, Chimera, Dragora, Gentoo (musl), Morpheus, OpenWrt, postmarketOS, Sabotage, Void
     * Bypassing OS detection (see ¹) will work, but dates will not be handled correctly
