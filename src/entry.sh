@@ -275,11 +275,6 @@ fi
 
 ## Authentication
 
-if [[ $_is_sourced == 0 ]]; then
-    [[ -z "$_username" || "$_username" == "<your-username>" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
-    [[ -z "$_password" || "$_password" == "<your-password>" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
-fi
-
 atfile.auth
 
 ## Protocol handling

@@ -7,14 +7,12 @@ function atfile.auth() {
     function atfile.auth.get_command_segment() {
         IFS=' ' read -r -a command_array <<< "$_command_full"
         index=$1
-        #echo "$_command_full" | cut -d' ' -f$1
+
         echo "${command_array[index]}"
     }
 
     [[ -n "$override_password" ]] && _password="$override_password"
     [[ -n "$override_username" ]] && _username="$override_username"
-
-    atfile.say.debug "Authenticating as '$_username'..."
 
     if [[ -z "$_server" ]]; then
         skip_resolving=0
@@ -49,7 +47,10 @@ function atfile.auth() {
         fi
         
         if [[ $skip_resolving == 0 ]]; then
-            atfile.say.debug "Resolving identity..."
+            [[ -z "$_username" || "$_username" == "<your-username>" ]] && atfile.die "\$${_envvar_prefix}_USERNAME not set"
+            [[ -z "$_password" || "$_password" == "<your-password>" ]] && atfile.die "\$${_envvar_prefix}_PASSWORD not set"
+
+            atfile.say.debug "Authenticating as '$_username'..."
 
             resolved_did="$(atfile.util.resolve_identity "$_username")"
             error="$(atfile.util.get_xrpc_error $? "$resolved_did")"
