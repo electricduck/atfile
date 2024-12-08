@@ -26,7 +26,9 @@ echo 'ATFILE_PASSWORD="<your-atproto-password>"' >> ~/.config/atfile.env
 atfile help
 ```
 
-## ✅ Requirements
+## 👀 Using
+
+### ✅ Requirements
 
 * **OS¹**
     * 🟡 **Linux**: GNU, MinGW and Termux only; musl² not supported
@@ -56,6 +58,28 @@ atfile help
 * **ATProto account**
     * `bsky.network` (`*.bsky.social`) accounts supported<br />If you can, limit the amount of files you upload to Bluesky's servers. It's a miracle this even works with, what's currently, an entirely free service. Heed the copyright warning too: **do not upload copyrighted files.**
     * `did:web` is supported!<br ><em><a href="https://bsky.app/profile/did:web:didd.uk/post/3lccdv7uvjs2o">(Seriously, it ain't hard)</a></em>
+
+### 🤔 _(Todo)_
+
+_(Todo)_
+
+## 🏗️ Building
+
+_(Todo)_
+
+---
+
+## ⌨️ Contributing
+
+_(Todo)_
+
+## 🤝 Acknowledgements
+
+* **Paul Frazee** &mdash; [🦋 @pfrazee.com](https://bsky.app/profile/did:plc:ragtjsm2j2vknwkz3zp4oxrd)<br /><a href="https://bsky.app/profile/did:plc:ragtjsm2j2vknwkz3zp4oxrd/post/3l63zzvthqj2o">His kind words</a>
+* **Laurens Hof** &mdash; [🦋 @laurenshof.online](https://bsky.app/profile/did:plc:mdjhvva6vlrswsj26cftjttd)<br />Featuring ATFile on [The Fediverse Report](https://fediversereport.com): _["Last Week in the ATmosphere – Oct 2024 week 4"](https://fediversereport.com/last-week-in-the-atmosphere-oct-2024-week-4/)_
+* **Samir** &mdash; [🐙 @bdotsamir](https://github.com/bdotsamir)<br />Testing, and diagnosing problems with, support for macOS (`macos`)
+* **Astra** &mdash; [🦋 @astra.blue](https://bsky.app/profile/did:plc:ejy6lkhb72rxvkk57tnrmpjl)<br />[Various PRs](https://github.com/ziodotsh/atfile/pulls?q=is%3Apr+author%3Aastravexton); testing, and diagnosing problems with, support for MinGW (`linux-mingw`) and Termux (`linux-termux`).
+* _(Forgot about you? [You know what to do](https://github.com/ziodotsh/atfile/compare))_
 
 ---
 
