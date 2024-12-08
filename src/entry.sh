@@ -13,12 +13,12 @@ _envvar_prefix="ATFILE"
 _os="$(atfile.util.get_os)"
 _is_git=0
 _is_sourced=0
-_meta_author="zio"
-_meta_did="did:web:zio.sh" # @zio.sh
-_meta_repo="https://github.com/ziodotsh/atfile"
-_meta_year="2024"
+_meta_author="{:meta_author:}"
+_meta_did="{:meta_did:}"
+_meta_repo="{:meta_repo:}"
+_meta_year="{:meta_year:}"
 _now="$(atfile.util.get_date)"
-_version="0.9"
+_version="{:version:}"
 
 ### Reflection
 
@@ -149,6 +149,7 @@ atfile.say.debug "Starting up..."
     atfile.say.debug "Overriding Copyright Author (\$_meta_author)\n↳ ${_envvar_prefix}_FORCE_META_AUTHOR set to '$_force_meta_author'"
 [[ -n $_force_meta_did ]] && \
     _meta_did="$_force_meta_did" &&\
+    _dist_username="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_USERNAME" $_meta_did)" &&\
     atfile.say.debug "Overriding DID (\$_meta_did)\n↳ ${_envvar_prefix}_FORCE_META_DID set to '$_force_meta_did'"
 [[ -n $_force_meta_repo ]] && \
     _meta_repo="$_force_meta_repo" &&\
@@ -185,9 +186,6 @@ atfile.say.debug "Starting up..."
 ## Git detection
 
 if [ -x "$(command -v git)" ] && [[ -d "$_prog_dir/.git" ]] && [[ "$(atfile.util.get_realpath "$(pwd)")" == "$_prog_dir" ]]; then
-    atfile.say.debug "Getting tag from Git..."
-    git describe --exact-match --tags > /dev/null 2>&1
-    [[ $? != 0 ]] && _version+="+git.$(git rev-parse --short HEAD)"
     _is_git=1
 fi
 

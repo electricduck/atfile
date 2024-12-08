@@ -14,20 +14,12 @@ function atfile.auth() {
     [[ -n "$override_password" ]] && _password="$override_password"
     [[ -n "$override_username" ]] && _username="$override_username"
 
-    if [[ $_is_git == 1 ]] && [[ $_command == "release" ]]; then
-        atfile.say.debug "Authenticating as '$_dist_username'..."
-
-        _fmt_blob_url="$_fmt_blob_url_default"
-        _password="$_dist_password"
-        _username="$_dist_username"
-    else
-        atfile.say.debug "Authenticating as '$_username'..."
-    fi
+    atfile.say.debug "Authenticating as '$_username'..."
 
     if [[ -z "$_server" ]]; then
         skip_resolving=0
         
-        if [[ $_is_sourced == 0 ]]; then
+        if [[ -z $override_username ]] && [[ $_is_sourced == 0 ]]; then
             # NOTE: Speeds things up a little if the user is overriding actor
             #       Keep this in-sync with the main command case below!
             if [[ $_command == "cat" && -n "$(atfile.auth.get_command_segment 2)" ]] ||\
@@ -48,6 +40,7 @@ function atfile.auth() {
             [[ $_command == "bsky" ]] ||\
             [[ $_command == "handle" ]] ||\
             [[ $_command == "now" ]] ||\
+            [[ $_command == "release" ]] ||\
             [[ $_command == "resolve" ]] ||\
             [[ $_command == "something-broke" ]]; then
                 atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"

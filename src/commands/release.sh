@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
 function atfile.release() {
-    [[ $_version == *"+"* ]] && atfile.die "Not a stable version ($_version)"
+    [[ $_os != "linux" ]] && atfile.die "Only available on Linux (GNU)\n↳ Detected OS: $_os"
+
+    function atfile.release.replace_template_var() {
+        string="$1"
+        key="$2"
+        value="$3"
+
+        echo "$(echo "$string" | sed -s "s|{:$key:}|$value|g")"
+    }
 
     atfile.util.check_prog "git"
     atfile.util.check_prog "md5sum"
@@ -40,13 +48,21 @@ function atfile.release() {
 
             if [[ -f "$path" ]]; then
                 echo "↳ Compiling: $s"
-                #cat "$path" | tail -n +3 >> "$dist_path"
 
                 while IFS="" read -r line
                 do
                     if [[ $line != "#"* ]] &&\
                        [[ $line != *"    #"* ]] &&\
                        [[ $line != "" ]]; then
+                        if [[ $line == *"{:"* && $line == *":}"* ]]; then
+                            # NOTE: Not using atfile.util.get_envvar() here, as confusion can arise from config file
+                            line="$(atfile.release.replace_template_var "$line" "meta_author" $ATFILE_FORCE_META_AUTHOR)"
+                            line="$(atfile.release.replace_template_var "$line" "meta_did" $ATFILE_FORCE_META_DID)"
+                            line="$(atfile.release.replace_template_var "$line" "meta_repo" $ATFILE_FORCE_META_REPO)"
+                            line="$(atfile.release.replace_template_var "$line" "meta_year" $ATFILE_FORCE_META_YEAR)"
+                            line="$(atfile.release.replace_template_var "$line" "version" $ATFILE_FORCE_VERSION)"
+                        fi
+
                         echo "$line" >> "$dist_path"
                     fi
                 done < "$path"
@@ -61,6 +77,9 @@ function atfile.release() {
     chmod +x "$dist_path"
 
     if [[ $_devel_publish == 1 ]]; then
+        atfile.auth "$_dist_username" "$_dist_password"
+        [[ $_version == *"+"* ]] && atfile.die "Unable to upload a Git version ($_version)"
+
         checksum="$(atfile.util.get_md5 "$dist_path")"
 
         atfile.say "Uploading '$dist_path'..."
