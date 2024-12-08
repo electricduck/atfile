@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 function atfile.release() {
-    #[[ $_version == *"+"* ]] && atfile.die "Not a stable version ($_version)"
+    [[ $_version == *"+"* ]] && atfile.die "Not a stable version ($_version)"
 
     atfile.util.check_prog "git"
     atfile.util.check_prog "md5sum"
