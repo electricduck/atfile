@@ -53,7 +53,8 @@ function atfile.help() {
 
     usage_commands_devel="Commands (Devel)
     release
-        ..."
+        Build (and release) as one file (to ./bin)
+        ℹ️  Set ${_envvar_prefix}_DEVEL_PUBLISH=1 to upload release"
 
     usage_commands_lifecycle="Commands (Lifecycle)
     update
