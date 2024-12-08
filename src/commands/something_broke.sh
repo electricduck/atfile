@@ -66,7 +66,7 @@ $(atfile.something_broke.print_envvar "DEBUG" $_debug_default)
 $(atfile.something_broke.print_envvar "DEVEL")
 $(atfile.something_broke.print_envvar "DEVEL_DIR")
 $(atfile.something_broke.print_envvar "DEVEL_ENTRY")
-$(atfile.something_broke.print_envvar "DEVEL_PUBLISH")
+$(atfile.something_broke.print_envvar "DEVEL_PUBLISH" $_devel_publish_default)
 ↳ ${_envvar_prefix}_DEVEL_SOURCES:
 $(for s in "${ATFILE_DEVEL_SOURCES[@]}"; do echo " ↳ $s"; done)
 $(atfile.something_broke.print_envvar "DISABLE_UPDATER" $_disable_updater_default)

@@ -4,7 +4,7 @@
 
 function atfile.devel.die() {
     echo -e "\033[1;31mError: $1\033[0m"
-    exit 0
+    exit 255
 }
 
 function atfile.devel.get_source_path() {
@@ -12,16 +12,11 @@ function atfile.devel.get_source_path() {
     echo "$prefix/$1.sh"
 }
 
-function atfile.devel.print_help() {
-    echo "ATFile Builder"
-}
-
 # Variables
 
 ATFILE_DEVEL=1
 ATFILE_DEVEL_DIR="$(dirname "$(realpath "$0")")"
 ATFILE_DEVEL_ENTRY="$(realpath "$0")"
-ATFILE_DEVEL_PUBLISH=0
 
 # Main
 
