@@ -290,6 +290,9 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
     atfile.say.debug "Running '$_command_full'...\n↳ Command: $_command\n↳ Arguments: ${@:2}"
 
     case "$_command" in
+        "ai")
+            atfile.ai
+            ;;
         "blob")
             case "$2" in
                 "list"|"ls"|"l") atfile.invoke.blob_list "$3" ;;
@@ -422,7 +425,7 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             atfile.something_broke
             ;;
         "stream")
-            atfile.invoke.stream "$2"
+            atfile.stream "$2" "$3" "$4" "$5"
             ;;
         "token")
             atfile.invoke.token

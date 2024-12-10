@@ -619,12 +619,6 @@ function atfile.invoke.print() {
     fi
 }
 
-function atfile.invoke.stream() {
-    collection="$1"
-    [[ -z "$collection" ]] && collection="blue.zio.atfile.upload"
-    atfile.js.subscribe "$collection"
-}
-
 function atfile.invoke.token() {
     atfile.xrpc.jwt
 }

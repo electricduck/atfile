@@ -40,7 +40,9 @@ function atfile.auth() {
             [[ $_command == "now" ]] ||\
             [[ $_command == "release" ]] ||\
             [[ $_command == "resolve" ]] ||\
-            [[ $_command == "something-broke" ]]; then
+            [[ $_command == "scrape" ]] ||\
+            [[ $_command == "something-broke" ]] ||\
+            [[ $_command == "stream" ]]; then
                 atfile.say.debug "Skipping identity resolving\n↳ Not required for command '$_command'"
                 skip_resolving=1
             fi

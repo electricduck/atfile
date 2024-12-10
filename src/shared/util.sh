@@ -15,6 +15,23 @@ function atfile.util.build_out_filename() {
     echo "$_fmt_out_file" | sed -e "s|\[name\]|$name|g" -e "s|\[key\]|$key|g"
 }
 
+function atfile.util.build_query_array() {
+    key="$1"
+    values="$2"
+
+    unset query
+
+    if [[ -n "$values" ]]; then
+        while IFS=$";" read -ra values_array; do
+            for value in "${values_array[@]}"; do
+                query+="$key=$value&"
+            done
+        done <<< "$values"
+    fi
+
+    echo "$query"
+}
+
 function atfile.util.check_prog() {
     command="$1"
     download_hint="$2"

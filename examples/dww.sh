@@ -4,12 +4,12 @@
 
 unset _atfile_path
 
-if [[ -d "$(dirname "$(realpath "$0")")/../.git" ]]; then
-    _atfile_path="$(dirname "$(realpath "$0")")/../atfile.sh"
-else
+#if [[ -d "$(dirname "$(realpath "$0")")/../.git" ]]; then
+#    _atfile_path="$(dirname "$(realpath "$0")")/../atfile.sh"
+#else
     _atfile_path="$(which atfile)"
-    [[ $? != 0 ]] && unset _atfile_path
-fi
+#    [[ $? != 0 ]] && unset _atfile_path
+#fi
 
 if [[ ! -f "$_atfile_path" ]]; then
     echo -e "\033[1;31mError: ATFile not found\033[0m"

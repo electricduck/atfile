@@ -97,8 +97,9 @@ function atfile.help() {
         ℹ️  <collection> defaults to '$_nsid_upload'\n
     resolve <actor>
         Get details for <actor>\n
-    stream <collection>
-        Stream records from Jetstream\n
+    stream [<collection(s)>] [<did(s)>] [<cursor>] [<compress>]
+        Stream records from Jetstream
+        ℹ️  For multiple values (where appropriate) separate with ';'\n
     token
         Get JWT for authenticated account"
 
