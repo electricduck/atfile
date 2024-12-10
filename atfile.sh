@@ -42,7 +42,7 @@
 author="zio"
 did="did:web:zio.sh"
 repo="https://github.com/ziodotsh/atfile"
-version="0.10.2"
+version="0.10.3"
 year="$(date +%Y)"
 
 # Entry
