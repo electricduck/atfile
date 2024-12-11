@@ -29,7 +29,7 @@ function atfile.update() {
     atfile.say.debug "Checking version...\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
     atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
 
-    #[[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
+    [[ $_is_git == 1 ]] && atfile.die "Cannot update in Git repository"
     [[ $_disable_updater == 1 ]] && atfile.die "Cannot update system-managed version: update from your package manager" # NOTE: This relies on packaged versions having a wrapper that sets this var
     
     parsed_running_version="1"
