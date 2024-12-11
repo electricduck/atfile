@@ -21,6 +21,7 @@ function atfile.release() {
     dist_file="$(echo "$_prog" | cut -d "." -f 1)-${_version}.sh"
     dist_dir="$_prog_dir/bin"
     dist_path="$dist_dir/$dist_file"
+    dist_path_relative="$(realpath --relative-to="$(pwd)" "$dist_path")"
     parsed_version="$(atfile.util.parse_version "$_version")"
     version_record_id="atfile-$parsed_version"
 
@@ -28,7 +29,7 @@ function atfile.release() {
 
     mkdir -p "$dist_dir"
 
-    echo "↳ Creating '$dist_file' (at '$(dirname "$dist_path")')..."
+    echo "↳ Creating '$dist_file'..."
     echo "#!/usr/bin/env bash" > "$dist_path"
 
     echo -e "\n# ATFile <https://github.com/ziodotsh/atfile>
@@ -36,7 +37,7 @@ function atfile.release() {
 # Version: $_version
 # Commit:  $commit_hash
 # Author:  $commit_author
-# Build:   $id ($(hostname) [$(atfile.util.get_os)])     
+# Build:   $id ($(hostname):$(atfile.util.get_os))     
 # ---
 # Psst! You can \`source atfile\` in your own Bash scripts!
 " >> $dist_path
@@ -74,14 +75,21 @@ function atfile.release() {
     
     echo -e "\n# \"Four million lines of BASIC\"\n#  - Kif Kroker (3003)" >> "$dist_path"
 
+    checksum="$(atfile.util.get_md5 "$dist_path")"
+
+    echo -e "Built: $_version
+↳ Path: ./$dist_path_relative
+ ↳ Check: $checksum
+ ↳ Size: "$(atfile.util.get_file_size_pretty "$(stat -c %s "$dist_path")")"
+ ↳ Lines: $(atfile.util.fmt_int "$(cat "$dist_path" | wc -l)")
+↳ ID: $id"
+
     chmod +x "$dist_path"
 
     if [[ $_devel_publish == 1 ]]; then
         echo "---"
         atfile.auth "$_dist_username" "$_dist_password"
         [[ $_version == *"+"* ]] && atfile.die "Cannot publish a Git version ($_version)"
-
-        checksum="$(atfile.util.get_md5 "$dist_path")"
 
         atfile.say "Uploading '$dist_path'..."
         atfile.invoke.upload "$dist_path" "" "$version_record_id"
