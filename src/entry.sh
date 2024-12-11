@@ -241,7 +241,7 @@ if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_com
 fi
 
 if [[ $_command == "update" ]]; then
-    atfile.invoke.update
+    atfile.update install
     atfile.util.print_seconds_since_start_debug
     exit 0
 fi
@@ -461,6 +461,9 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             atfile.die.unknown_command "$_command"
             ;;
     esac
+
+    # TODO: Add cache for when this was last done so we're not doing it all the time
+    atfile.update check-only
 fi
 
 atfile.util.print_seconds_since_start_debug

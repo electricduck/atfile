@@ -18,6 +18,7 @@ declare -a ATFILE_DEVEL_SOURCES=(
     "commands/stream"
     "commands/sl"
     "commands/something_broke"
+    "commands/update"
     # Commands (Legacy)
     "commands/old_cmds"
     # Entry
