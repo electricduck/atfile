@@ -79,7 +79,7 @@ function atfile.release() {
     if [[ $_devel_publish == 1 ]]; then
         echo "---"
         atfile.auth "$_dist_username" "$_dist_password"
-        [[ $_version == *"+"* ]] && atfile.die "Cannot upload a Git version ($_version)"
+        [[ $_version == *"+"* ]] && atfile.die "Cannot publish a Git version ($_version)"
 
         checksum="$(atfile.util.get_md5 "$dist_path")"
 
