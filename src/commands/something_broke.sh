@@ -73,6 +73,7 @@ $(atfile.something_broke.print_envvar "DISABLE_UPDATER" $_disable_updater_defaul
 ↳ ${_envvar_prefix}_DIST_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD") ]] && echo "(Set)")
 $(atfile.something_broke.print_envvar "DIST_USERNAME" $_dist_username_default)
 $(atfile.something_broke.print_envvar "ENABLE_FINGERPRINT" $_enable_fingerprint_default)
+$(atfile.something_broke.print_envvar "ENABLE_UPDATE_GIT_CLOBBER" $_enable_update_git_clobber)
 $(atfile.something_broke.print_envvar "ENDPOINT_APPVIEW_BSKY" $_endpoint_appview_bsky_default)
 $(atfile.something_broke.print_envvar "ENDPOINT_JETSTREAM" $_endpoint_jetstream_default)
 $(atfile.something_broke.print_envvar "ENDPOINT_PDS")
