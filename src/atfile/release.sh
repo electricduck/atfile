@@ -42,12 +42,10 @@ function atfile.release() {
 # Psst! You can \`source atfile\` in your own Bash scripts!
 " >> $dist_path
 
-    for s in "${ATFILE_DEVEL_SOURCES[@]}"
+    for s in "${ATFILE_DEVEL_PACKAGE_PATHS[@]}"
     do
         if [[ "$s" != "commands/release" ]]; then
-            path="$(atfile.devel.get_source_path "$s")"
-
-            if [[ -f "$path" ]]; then
+            if [[ -f "$s" ]]; then
                 echo "↳ Compiling: $s"
 
                 while IFS="" read -r line
@@ -66,7 +64,7 @@ function atfile.release() {
 
                         echo "$line" >> "$dist_path"
                     fi
-                done < "$path"
+                done < "$s"
             fi
         else
             echo "↳ Skipping: $s"

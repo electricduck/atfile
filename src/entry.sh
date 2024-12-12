@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# TODO: Refactor to allow for multiple packages
 # Entry
 
 ## Global variables

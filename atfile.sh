@@ -59,7 +59,8 @@ function atfile.devel.get_source_path() {
 
 ATFILE_DEVEL=1
 ATFILE_DEVEL_DIR="$(dirname "$(realpath "$0")")"
-ATFILE_DEVEL_ENTRY="$(realpath "$0")"
+[[ -z "$ATFILE_DEVEL_PACKAGE" ]] && ATFILE_DEVEL_PACKAGE="atfile"
+ATFILE_DEVEL_PACKAGE_DIR="$ATFILE_DEVEL_DIR/src/${ATFILE_DEVEL_PACKAGE}"
 
 git describe --exact-match --tags > /dev/null 2>&1
 [[ $? != 0 ]] && version+="+git.$(git rev-parse --short HEAD)"
@@ -71,14 +72,18 @@ git describe --exact-match --tags > /dev/null 2>&1
 [[ -z $ATFILE_FORCE_META_YEAR ]] && ATFILE_FORCE_META_YEAR="$year"
 [[ -z $ATFILE_FORCE_VERSION ]] && ATFILE_FORCE_VERSION="$version"
 
-source "$(atfile.devel.get_source_path "sources")"
+[[ ! -d "$ATFILE_DEVEL_PACKAGE_DIR" ]] && atfile.devel.die "Package '$ATFILE_DEVEL_PACKAGE' not found (in './src/$ATFILE_DEVEL_PACKAGE/')"
 
-for s in "${ATFILE_DEVEL_SOURCES[@]}"
+declare -a ATFILE_DEVEL_PACKAGE_PATHS
+
+for f in "$ATFILE_DEVEL_DIR/src/shared/"*; do ATFILE_DEVEL_PACKAGE_PATHS+=("$f"); done
+for f in "$ATFILE_DEVEL_PACKAGE_DIR/"*; do ATFILE_DEVEL_PACKAGE_PATHS+=("$f"); done
+ATFILE_DEVEL_PACKAGE_PATHS+=("$ATFILE_DEVEL_DIR/src/entry.sh")
+
+for path in "${ATFILE_DEVEL_PACKAGE_PATHS[@]}"
 do
-    path="$(atfile.devel.get_source_path "$s")"
-
     if [[ ! -f "$path" ]]; then
-        atfile.devel.die "Unable to find source for '$s'"
+        atfile.devel.die "Unable to find source for '$path'"
     fi
 
     source "$path"
