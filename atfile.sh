@@ -52,11 +52,6 @@ function atfile.devel.die() {
     exit 255
 }
 
-function atfile.devel.get_source_path() {
-    prefix="$ATFILE_DEVEL_DIR/src"
-    echo "$prefix/$1.sh"
-}
-
 ATFILE_DEVEL=1
 ATFILE_DEVEL_DIR="$(dirname "$(realpath "$0")")"
 ATFILE_DEVEL_ENTRY="$(realpath "$0")"
@@ -71,14 +66,16 @@ git describe --exact-match --tags > /dev/null 2>&1
 [[ -z $ATFILE_FORCE_META_YEAR ]] && ATFILE_FORCE_META_YEAR="$year"
 [[ -z $ATFILE_FORCE_VERSION ]] && ATFILE_FORCE_VERSION="$version"
 
-source "$(atfile.devel.get_source_path "sources")"
+declare -a ATFILE_DEVEL_SOURCES
 
-for s in "${ATFILE_DEVEL_SOURCES[@]}"
+for f in "$ATFILE_DEVEL_DIR/src/commands/"*; do ATFILE_DEVEL_SOURCES+=("$f"); done
+for f in "$ATFILE_DEVEL_DIR/src/shared/"*; do ATFILE_DEVEL_SOURCES+=("$f"); done
+ATFILE_DEVEL_SOURCES+=("$ATFILE_DEVEL_DIR/src/entry.sh")
+
+for path in "${ATFILE_DEVEL_SOURCES[@]}"
 do
-    path="$(atfile.devel.get_source_path "$s")"
-
     if [[ ! -f "$path" ]]; then
-        atfile.devel.die "Unable to find source for '$s'"
+        atfile.devel.die "Unable to find source for '$path'"
     fi
 
     source "$path"
