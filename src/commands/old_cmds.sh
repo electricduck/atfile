@@ -620,7 +620,7 @@ function atfile.invoke.print() {
 }
 
 function atfile.invoke.token() {
-    atfile.xrpc.jwt
+    atfile.xrpc.pds.jwt
 }
 
 function atfile.invoke.toggle_desktop() {

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# Records
+# blue.zio.atfile.*
+
+## Records
 
 function blue.zio.atfile.meta__unknown() {
     reason="$1"
@@ -299,88 +301,4 @@ function blue.zio.atfile.upload() {
     \"meta\": $meta_record,
     \"blob\": $blob_record
 }"
-}
-
-# Queries
-
-function app.bsky.actor.getProfile() {
-    actor="$1"
-    
-    bsky.xrpc.get "app.bsky.actor.getProfile" "actor=$actor"
-}
-
-function app.bsky.labeler.getServices() {
-    did="$1"
-    
-    bsky.xrpc.get "app.bsky.labeler.getServices" "dids=$did"
-}
-
-function com.atproto.repo.createRecord() {
-    repo="$1"
-    collection="$2"
-    record="$3"
-    
-    atfile.xrpc.post "com.atproto.repo.createRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"record\": $record }"
-}
-
-function com.atproto.repo.deleteRecord() {
-    repo="$1"
-    collection="$2"
-    rkey="$3"
-
-    atfile.xrpc.post "com.atproto.repo.deleteRecord" "{ \"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\" }"
-}
-
-function com.atproto.repo.getRecord() {
-    repo="$1"
-    collection="$2"
-    key="$3"
-
-    atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$repo&collection=$collection&rkey=$key"
-}
-
-function com.atproto.repo.listRecords() {
-    repo="$1"
-    collection="$2"
-    cursor="$3"
-    
-    atfile.xrpc.get "com.atproto.repo.listRecords" "repo=$repo&collection=$collection&limit=$_max_list&cursor=$cursor"
-}
-
-function com.atproto.repo.putRecord() {
-    repo="$1"
-    collection="$2"
-    rkey="$3"
-    record="$4"
-    
-    atfile.xrpc.post "com.atproto.repo.putRecord" "{\"repo\": \"$repo\", \"collection\": \"$collection\", \"rkey\": \"$rkey\", \"record\": $record }"
-}
-
-function com.atproto.identity.resolveHandle() {
-    handle="$1"
-
-    atfile.xrpc.get "com.atproto.identity.resolveHandle" "handle=$handle"
-}
-
-function com.atproto.server.getSession() {
-    atfile.xrpc.get "com.atproto.server.getSession"
-}
-
-function com.atproto.sync.getBlob() {
-    did="$1"
-    cid="$2"
-
-    atfile.xrpc.get "com.atproto.sync.getBlob" "did=$did&cid=$cid" "*/*"
-}
-
-function com.atproto.sync.listBlobs() {
-    did="$1"
-    cursor="$2"
-    
-    atfile.xrpc.get "com.atproto.sync.listBlobs" "did=$did&limit=$_max_list&cursor=$cursor"
-}
-
-function com.atproto.sync.uploadBlob() {
-    file="$1"
-    atfile.xrpc.post_blob "$1" | jq -r ".blob"
 }

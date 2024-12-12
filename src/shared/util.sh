@@ -130,7 +130,7 @@ function atfile.util.get_app_url_for_at_uri() {
             "events.smokesignal.calendar.rsvp"| \
             "fyi.unravel.frontpage.comment"| \
             "fyi.unravel.frontpage.vote")
-                record="$(atfile.xrpc.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
+                record="$(atfile.xrpc.pds.get "com.atproto.repo.getRecord" "repo=$actor&collection=$collection&rkey=$rkey" "" "$actor_pds")"
 
                 if [[ -z "$(atfile.util.get_xrpc_error $? "$record")" ]]; then
                     case "$collection" in
@@ -1021,7 +1021,7 @@ function atfile.util.resolve_identity() {
     actor="$1"
     
     if [[ "$actor" != "did:"* ]]; then
-        resolved_handle="$(bsky.xrpc.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
+        resolved_handle="$(atfile.xrpc.bsky.get "com.atproto.identity.resolveHandle" "handle=$actor" "" "$_endpoint_resolve_handle")"
         error="$(atfile.util.get_xrpc_error $? "$resolved_handle")"
 
         if [[ -z "$error" ]]; then

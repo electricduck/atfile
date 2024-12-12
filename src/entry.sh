@@ -68,6 +68,7 @@ _dist_username_default="$_meta_did"
 _enable_fingerprint_default=0
 _enable_update_git_clobber_default=0
 _endpoint_appview_bsky_default="https://api.bsky.app"
+_endpoint_appview_bsky_video_default="https://video.bsky.app"
 _endpoint_jetstream_default="wss://jetstream.atproto.tools"
 _endpoint_resolve_handle_default="https://zio.blue" # lol wtf is bsky.social
 _endpoint_plc_directory_default="https://plc.zio.blue"
@@ -99,6 +100,7 @@ _dist_username="$(atfile.util.get_envvar "${_envvar_prefix}_DIST_USERNAME" $_dis
 _enable_fingerprint="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_FINGERPRINT" "$_enable_fingerprint_default")"
 _enable_update_git_clobber="$(atfile.util.get_envvar "${_envvar_prefix}_ENABLE_UPDATE_GIT_CLOBBER" "$_enable_update_git_clobber_default")"
 _endpoint_appview_bsky="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_APPVIEW_BSKY" "$_endpoint_appview_bsky_default")"
+_endpoint_appview_bsky_video="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_APPVIEW_BSKY_VIDEO" "$_endpoint_appview_bsky_video_default")"
 _endpoint_jetstream="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_JETSTREAM" "$_endpoint_jetstream_default")"
 _endpoint_plc_directory="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_PLC_DIRECTORY" "$_endpoint_plc_directory_default")"
 _endpoint_resolve_handle="$(atfile.util.get_envvar "${_envvar_prefix}_ENDPOINT_RESOLVE_HANDLE" "$_endpoint_resolve_handle_default")"
@@ -268,6 +270,7 @@ if [[ $_is_sourced == 0 ]]; then
         "get"|"i") _command="info" ;;
         "ls") _command="list" ;;
         "did") _command="resolve" ;;
+        "sb") _command="something-broke" ;;
         "js") _command="stream" ;;
         "ul"|"u") _command="upload" ;;
         "ub") _command="upload-blob" ;;
@@ -459,6 +462,9 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             fi
             
             atfile.invoke.get_url "$2"
+            ;;
+        "temp-video")
+            app.bsky.video.getUploadLimits
             ;;
         *)
             atfile.die.unknown_command "$_command"

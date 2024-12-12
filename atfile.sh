@@ -69,6 +69,7 @@ git describe --exact-match --tags > /dev/null 2>&1
 declare -a ATFILE_DEVEL_SOURCES
 
 for f in "$ATFILE_DEVEL_DIR/src/commands/"*; do ATFILE_DEVEL_SOURCES+=("$f"); done
+for f in "$ATFILE_DEVEL_DIR/src/lexi/"*; do ATFILE_DEVEL_SOURCES+=("$f"); done
 for f in "$ATFILE_DEVEL_DIR/src/shared/"*; do ATFILE_DEVEL_SOURCES+=("$f"); done
 ATFILE_DEVEL_SOURCES+=("$ATFILE_DEVEL_DIR/src/entry.sh")
 
