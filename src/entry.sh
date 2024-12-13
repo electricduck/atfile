@@ -239,20 +239,25 @@ atfile.util.check_prog "jq" "$_prog_hint_jq"
 
 ## Lifecycle commands
 
+is_lifecycle_command=0
+
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.help
-    atfile.util.print_seconds_since_start_debug
-    exit 0
+    is_lifecycle_command=1
 fi
 
 if [[ $_command == "update" ]]; then
     atfile.update install
-    atfile.util.print_seconds_since_start_debug
-    exit 0
+    is_lifecycle_command=1
 fi
 
 if [[ $_command == "version" || $_command == "--version" ]]; then
     echo -e "$_version"
+    is_lifecycle_command=1
+fi
+
+if [[ $is_lifecycle_command == 1 ]]; then
+    atfile.update check-only
     atfile.util.print_seconds_since_start_debug
     exit 0
 fi
@@ -471,7 +476,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             ;;
     esac
 
-    # TODO: Add cache for when this was last done so we're not doing it all the time
     atfile.update check-only
 fi
 
