@@ -965,12 +965,10 @@ function atfile.util.print_blob_url_output() {
 
 function atfile.util.print_copyright_warning() {
     if [[ $_skip_copyright_warn == 0 ]]; then
-        echo "
-  ##########################################
-  # You are uploading files to Bluesky PDS #
-  #    Do not upload copyrighted files!    #
-  ##########################################
-"
+        echo -e "╔════════════════════════════════════════╗
+║ You are uploading files to Bluesky PDS ║ 
+║    Do not upload copyrighted files!    ║ 
+╚════════════════════════════════════════╝"
     fi
 }
 
