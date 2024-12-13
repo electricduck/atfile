@@ -53,6 +53,10 @@ function atfile.devel.die() {
     exit 255
 }
 
+if [[ "$0" != "$BASH_SOURCE" ]]; then
+    atfile.devel.die "Unable to source"
+fi
+
 ATFILE_DEVEL=1
 ATFILE_DEVEL_DIR="$(dirname "$(realpath "$0")")"
 ATFILE_DEVEL_ENTRY="$(realpath "$0")"
