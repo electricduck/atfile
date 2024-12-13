@@ -2,11 +2,30 @@
 
 # TODO: Validate checksum
 function atfile.update() {
+    cmd="$1"
     unset error
 
-    if [[ $_output_json == 1 ]]; then
-        atfile.die "Command not available as JSON"
+    if [[ "$cmd" == "check-only" ]]; then
+        [[ $_disable_update_checking == 1 ]] && exit 0
+        [[ $_disable_updater == 1 ]] && exit 0
+        [[ $_is_git == 1 && $_enable_update_git_clobber == 0 ]] && exit 0
+        [[ $_output_json == 1 ]] && exit 0
+
+        last_checked="$(atfile.cache.get "update-check")"
+        current_checked="$(atfile.util.get_date "" "%s")"
+        check_sleep=3600
+
+        atfile.say.debug "Checking for update...\n↳ Last Checked: $last_checked\n↳ Current: $current_checked\n↳ Sleep: $check_sleep"
+
+        if [[ $(( $last_checked + $check_sleep < $current_checked )) == 0 ]]; then
+            last_checked="$(atfile.cache.set "update-check" "$current_checked")"
+            exit 0
+        else
+            last_checked="$(atfile.cache.set "update-check" "$current_checked")"
+        fi
     fi
+
+    [[ $_output_json == 1 ]] && atfile.die "Command not available as JSON"
 
     update_did="$_dist_username"
 
@@ -28,15 +47,17 @@ function atfile.update() {
     update_available=0
     
     atfile.say.debug "Checking version...\n↳ Latest: $latest_version ($parsed_latest_version)\n ↳ Date: $latest_version_date\n ↳ Commit: $latest_version_commit\n↳ Running: $_version ($parsed_running_version)"
-    atfile.say.debug "Checking environment..\n↳ OS: $_os\n↳ Dir: $_prog_dir\n↳ Git: $_is_git"
 
     if [[ $(( $parsed_latest_version > $parsed_running_version )) == 1 ]]; then
         update_available=1
     fi
 
-    case "$1" in
+    case "$cmd" in
         "check-only")
-            [[ $update_available == 0 ]] && exit 0
+            if [[ $update_available == 0 ]]; then
+                atfile.say.debug "No updates found"
+                exit 0
+            fi
 
             echo "---"
             if [[ $_os == "haiku" ]]; then

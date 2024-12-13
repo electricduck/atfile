@@ -69,6 +69,7 @@ $(atfile.something_broke.print_envvar "DEVEL_ENTRY")
 $(atfile.something_broke.print_envvar "DEVEL_PUBLISH" $_devel_publish_default)
 ↳ ${_envvar_prefix}_DEVEL_SOURCES:
 $(for s in "${ATFILE_DEVEL_SOURCES[@]}"; do echo " ↳ $s"; done)
+$(atfile.something_broke.print_envvar "DISABLE_UPDATE_CHECKING" $_disable_update_checking_default)
 $(atfile.something_broke.print_envvar "DISABLE_UPDATER" $_disable_updater_default)
 ↳ ${_envvar_prefix}_DIST_PASSWORD: $([[ -n $(atfile.util.get_envvar "${_envvar_prefix}_DIST_PASSWORD") ]] && echo "(Set)")
 $(atfile.something_broke.print_envvar "DIST_USERNAME" $_dist_username_default)

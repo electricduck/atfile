@@ -167,6 +167,8 @@ function atfile.help() {
     ${_envvar_prefix}_DEBUG <bool¹> (default: $_debug_default)
         Print debug outputs
         ⚠️  When output is JSON (${_envvar_prefix}_OUTPUT_JSON=1), sets to 0
+    ${_envvar_prefix}_DISABLE_UPDATE_CHECKING <bool¹> (default: $_disable_update_checking_default)
+        Disable periodic update checking when command finishes
     ${_envvar_prefix}_DISABLE_UPDATER <bool¹> (default: $_disable_updater_default)
         Disable \`update\` command\n
     ¹ A bool in Bash is 1 (true) or 0 (false)
