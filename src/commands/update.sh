@@ -103,7 +103,7 @@ function atfile.update() {
                         atfile.say "😎 Updated to $latest_version!"
                     fi
 
-                    exit 0
+                    return
                 fi
             else
                 atfile.die "Unable to download latest version"
