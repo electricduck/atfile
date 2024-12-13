@@ -67,6 +67,9 @@ function atfile.help() {
     usage_commands_profiles="Commands (AppViews)
     bsky [<actor>]
         Get Bluesky profile for <actor>\n
+    bsky-video [<file>]
+    bsky-video [<job-id>]
+        ...
     fyi [actor]
         Get Frontpage profile for <actor>"
 

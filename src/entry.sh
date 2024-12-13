@@ -315,6 +315,9 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
                 atfile.profile "$_command" "$2"
             fi
             ;;
+        "bsky-video")
+            atfile.bsky_video "$2"
+            ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
@@ -462,9 +465,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             fi
             
             atfile.invoke.get_url "$2"
-            ;;
-        "temp-video")
-            app.bsky.video.getUploadLimits
             ;;
         *)
             atfile.die.unknown_command "$_command"
