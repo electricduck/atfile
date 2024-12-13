@@ -171,15 +171,8 @@ function atfile.util.get_app_url_for_at_uri() {
     echo "$resolved_url"
 }
 
-function atfile.util.get_cache() {
-    file="$_path_cache/$1"
-    
-    if [[ ! -f "$file" ]]; then
-        touch "$file"
-        [[ $? != 0 ]] && atfile.die "Unable to create cache file ($file)"
-    fi
-    
-    echo -e "$(cat "$file")"
+function atfile.util.get_cache_path() {
+    echo "$_path_cache/$1"
 }
 
 function atfile.util.get_cdn_uri() {

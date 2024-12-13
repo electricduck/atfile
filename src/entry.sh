@@ -61,7 +61,7 @@ _path_envvar="$(atfile.util.get_envvar "${_envvar_prefix}_PATH_CONF" "$_path_env
 
 #### Defaults
 
-_debug_default=0
+_debug_default=$([[ $ATFILE_DEVEL == 1 ]] && echo 1 || echo 0)
 _devel_publish_default=0
 _disable_update_checking_default=0
 _disable_updater_default=0
@@ -255,6 +255,7 @@ fi
 
 if [[ $_command == "version" || $_command == "--version" ]]; then
     echo -e "$_version"
+    atfile.cache.del "update-check"
     is_lifecycle_command=1
 fi
 

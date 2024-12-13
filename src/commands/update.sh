@@ -6,20 +6,20 @@ function atfile.update() {
     unset error
 
     if [[ "$cmd" == "check-only" ]]; then
-        [[ $_disable_update_checking == 1 ]] && exit 0
-        [[ $_disable_updater == 1 ]] && exit 0
-        [[ $_is_git == 1 && $_enable_update_git_clobber == 0 ]] && exit 0
-        [[ $_output_json == 1 ]] && exit 0
+        [[ $_disable_update_checking == 1 ]] && return
+        [[ $_disable_updater == 1 ]] && return
+        [[ $_is_git == 1 && $_enable_update_git_clobber == 0 ]] && return
+        [[ $_output_json == 1 ]] && return
 
         last_checked="$(atfile.cache.get "update-check")"
         current_checked="$(atfile.util.get_date "" "%s")"
         check_sleep=3600
+        next_check=$(( $last_checked + $check_sleep ))
 
-        atfile.say.debug "Checking for update...\n↳ Last Checked: $last_checked\n↳ Current: $current_checked\n↳ Sleep: $check_sleep"
+        atfile.say.debug "Checking for last update check...\n↳ Last: $last_checked\n↳ Cur.: $current_checked\n↳ Next: $next_check"
 
-        if [[ $(( $last_checked + $check_sleep < $current_checked )) == 0 ]]; then
-            last_checked="$(atfile.cache.set "update-check" "$current_checked")"
-            exit 0
+        if [[ $(( $next_check < $current_checked )) == 0 ]]; then
+            return
         else
             last_checked="$(atfile.cache.set "update-check" "$current_checked")"
         fi
@@ -56,7 +56,7 @@ function atfile.update() {
         "check-only")
             if [[ $update_available == 0 ]]; then
                 atfile.say.debug "No updates found"
-                exit 0
+                return
             fi
 
             echo "---"
@@ -69,7 +69,7 @@ function atfile.update() {
         "install")
             if [[ $update_available == 0 ]]; then
                 atfile.say "No updates found"
-                exit 0
+                return
             fi
 
             [[ $_is_git == 1 && $_enable_update_git_clobber == 0 ]] &&\

@@ -16,7 +16,8 @@
 #
 #   Just as a published build, ATFile can be used entirely via this file. The
 #    below code automatically sources everything for you, and your config (if
-#    it exists) is utilized as normal. Try running `./atfile.sh help`.
+#    it exists) is utilized as normal. Try running `./atfile.sh help`. To turn
+#    debug messages off, set ATFILE_DEBUG to '0'.
 #
 #   To produce a single-file build of ATFile, run `./atfile.sh release`: the
 #    resulting file will be created at './bin/atfile-$version.sh'. Set variables
