@@ -429,7 +429,7 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             if [[ $ATFILE_DEVEL == 1 ]]; then
                 atfile.release
             else
-                atfile.die "Not running from Devel environment"
+                atfile.die.unknown_command "$_command"
             fi
             ;;
         "resolve")
