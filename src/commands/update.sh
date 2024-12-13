@@ -103,6 +103,8 @@ function atfile.update() {
                         atfile.say "😎 Updated to $latest_version!"
                     fi
 
+                    last_checked="$(atfile.cache.set "update-check" "$current_checked")"
+
                     return
                 fi
             else

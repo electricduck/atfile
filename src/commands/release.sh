@@ -52,6 +52,7 @@ function atfile.release() {
                 do
                     if [[ $line != "#"* ]] &&\
                        [[ $line != *"    #"* ]] &&\
+                       [[ $line != "    " ]] &&\
                        [[ $line != "" ]]; then
                         if [[ $line == *"{:"* && $line == *":}"* ]]; then
                             # NOTE: Not using atfile.util.get_envvar() here, as confusion can arise from config file
