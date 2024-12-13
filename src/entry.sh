@@ -323,9 +323,9 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
                 atfile.profile "$_command" "$2"
             fi
             ;;
-        "bsky-video")
-            atfile.bsky_video "$2"
-            ;;
+        #"bsky-video")
+        #    atfile.bsky_video "$2"
+        #    ;;
         "cat")
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
