@@ -593,11 +593,6 @@ function atfile.invoke.manage_record() {
     esac
 }
 
-function atfile.invoke.now() {
-    date="$1"
-    atfile.util.get_date "$1"
-}
-
 function atfile.invoke.print() {
     key="$1"
     unset error
