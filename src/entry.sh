@@ -245,21 +245,22 @@ is_lifecycle_command=0
 
 if [[ $_is_sourced == 0 ]] && [[ $_command == "" || $_command == "help" || $_command == "h" || $_command == "--help" || $_command == "-h" ]]; then
     atfile.help
-    is_lifecycle_command=1
+    
+    atfile.util.print_seconds_since_start_debug
+    exit 0
 fi
 
 if [[ $_command == "update" ]]; then
     atfile.update install
-    is_lifecycle_command=1
+    
+    atfile.util.print_seconds_since_start_debug
+    exit 0
 fi
 
 if [[ $_command == "version" || $_command == "--version" ]]; then
     echo -e "$_version"
-    atfile.cache.del "update-check"
-    is_lifecycle_command=1
-fi
 
-if [[ $is_lifecycle_command == 1 ]]; then
+    atfile.cache.del "update-check"
     atfile.update check-only
     atfile.util.print_seconds_since_start_debug
     exit 0
