@@ -44,7 +44,7 @@ function atfile.release() {
 
     for s in "${ATFILE_DEVEL_SOURCES[@]}"
     do
-        if [[ "$s" != "commands/release" ]]; then
+        if [[ "$s" != *"/src/commands/release.sh" ]]; then
             if [[ -f "$s" ]]; then
                 echo "↳ Compiling: $s"
 
