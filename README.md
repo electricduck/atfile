@@ -50,7 +50,7 @@ atfile help
         * Both GNU and BusyBox versions supported
     * [`websocat`](https://github.com/vi/websocat) _(optional: needed for `stream`)_
 * **PDS:** [Bluesky PDS](https://github.com/bluesky-social/pds)
-    * Other PDSs (such as[millipds](https://github.com/DavidBuchanan314/millipds)) remain untested, but if they implement standard `com.atproto.*` endpoints, there should be no reason these won't work
+    * Other PDSs (such as [millipds](https://github.com/DavidBuchanan314/millipds)) remain untested, but if they implement standard `com.atproto.*` endpoints, there should be no reason these won't work
     * Filesize limits cannot be automatically detected. By default, this is 50MB
         * To change this on Bluesky PDS, set `PDS_BLOB_UPLOAD_LIMIT=<bytes>`
         * If the PDS is running behind Cloudflare, the Free plan imposes a 100MB upload limit
@@ -85,7 +85,10 @@ _(Todo)_
 
 * **¹** You can bypass OS detection in one of two ways:
     * Set `ATFILE_SKIP_UNSUPPORTED_OS=1`<br />Be careful! There's a reason some OSes are not supported
-    * Set `ATFILE_FORCE_OS=<os>`<br />This overrides the OS detected. Possible values: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`, `haiku`, `linux`, `linux-mingw64`, `linux-musl`, `linux-termux`, `macos`, `solaris`, `unknown`
+    * Set `ATFILE_FORCE_OS=<os>`<br />This overrides the OS detected. Possible values:
+       * BSD: `bsd-freebsd`, `bsd-netbsd`, `bsd-openbsd`
+       * Linux: `linux`, `linux-mingw`, `linux-musl`, `linux-termux`
+       * Other: `haiku`, `macos`, `solaris`, `unknown`
 * **²** musl-powered distros do not use GNU/glibc packages, and have problems currently
     * Known musl distros: Alpine, Chimera, Dragora, Gentoo (musl), Morpheus, OpenWrt, postmarketOS, Sabotage, Void
     * Bypassing OS detection (see ¹) will work, but dates will not be handled correctly
