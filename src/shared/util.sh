@@ -921,6 +921,8 @@ function atfile.util.override_actor() {
     if [[ "$_fmt_blob_url" != "$_fmt_blob_url_default" ]]; then
         export _fmt_blob_url="$_fmt_blob_url_default"
     fi
+
+    atfile.say.debug "Overridden identity\n↳ DID: $_username\n↳ PDS: $_server\n↳ Blob URL: $_fmt_blob_url"
 }
 
 # NOTE: This is to help during sourcing if atfile.uitl.override_actor() has
@@ -970,13 +972,6 @@ function atfile.util.print_copyright_warning() {
 ║    Do not upload copyrighted files!    ║ 
 ╚════════════════════════════════════════╝"
     fi
-}
-
-# HACK: We don't normally atfile.say() in the atfile.util.* namespace, but
-#       atfile.until.override_actor() is in this namespace and it would be nice
-#       to have a debug output for it when called in the main command case
-function atfile.util.print_override_actor_debug() {
-    atfile.say.debug "Overridden identity\n↳ DID: $_username\n↳ PDS: $_server\n↳ Blob URL: $_fmt_blob_url"
 }
 
 function atfile.util.print_seconds_since_start_debug() {

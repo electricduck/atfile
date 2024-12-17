@@ -311,7 +311,6 @@ function atfile.invoke.handle_atfile() {
 
     if [[ -n "$actor" && -n "$key" ]]; then
         atfile.util.override_actor "$actor"
-        atfile.util.print_override_actor_debug
 
         atfile.say.debug "Getting record...\n↳ NSID: $_nsid_upload\n↳ Repo: $_username\n↳ Key: $key"
         record="$(com.atproto.repo.getRecord "$_username" "$_nsid_upload" "$key")"
@@ -562,7 +561,6 @@ function atfile.invoke.manage_record() {
             else
                 if [[ $username != $_username ]]; then
                     atfile.util.override_actor "$username"
-                    atfile.util.print_override_actor_debug
                 fi
             fi
             

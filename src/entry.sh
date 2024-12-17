@@ -318,7 +318,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
         "bsky"|"fyi")
             if [[ -z "$2" ]]; then
                 atfile.util.override_actor "$_username"
-                atfile.util.print_override_actor_debug
                 atfile.profile "$_command" "$_username"
             else
                 atfile.profile "$_command" "$2"
@@ -331,7 +330,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
                 atfile.util.override_actor "$3"
-                atfile.util.print_override_actor_debug
             fi
             
             atfile.invoke.print "$2"
@@ -344,7 +342,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
                 atfile.util.override_actor "$3"
-                atfile.util.print_override_actor_debug
             fi
             
             atfile.invoke.download "$2"
@@ -354,7 +351,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
                 atfile.util.override_actor "$3"
-                atfile.util.print_override_actor_debug
             fi
             
             atfile.invoke.download "$2" 1
@@ -387,7 +383,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
                 atfile.util.override_actor "$3"
-                atfile.util.print_override_actor_debug
             fi
             
             atfile.invoke.get "$2"
@@ -399,13 +394,11 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
                 # BUG:  Keys with periods in them can't be used as a cursor
                 
                 atfile.util.override_actor "$2"
-                atfile.util.print_override_actor_debug
 
                 atfile.invoke.list "$3"
             else
                 if [[ -n "$3" ]]; then
                     atfile.util.override_actor "$3"
-                    atfile.util.print_override_actor_debug
                 fi
                 atfile.invoke.list "$2"   
             fi
@@ -470,7 +463,6 @@ if [[ $_is_sourced == 0 ]] && [[ $ATFILE_DEVEL_NO_INVOKE != 1 ]]; then
             [[ -z "$2" ]] && atfile.die "<key> not set"
             if [[ -n "$3" ]]; then
                 atfile.util.override_actor "$3"
-                atfile.util.print_override_actor_debug
             fi
             
             atfile.invoke.get_url "$2"

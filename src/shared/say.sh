@@ -44,13 +44,13 @@ function atfile.say.debug() {
     message="$1"
 
     if [[ $_debug == 1 ]]; then
-        atfile.say "$message" "Debug" 35
+        atfile.say "$message" "Debug" 35 >&2
     fi
 }
 
 function atfile.say.die() {
     message="$1"
-    atfile.say "$message" "Error" 31 31 1
+    atfile.say "$message" "Error" 31 31 1 >&2
 }
 
 function atfile.say.inline() {

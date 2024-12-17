@@ -30,7 +30,6 @@ function atfile.update() {
     update_did="$_dist_username"
 
     atfile.util.override_actor "$update_did"
-    atfile.util.print_override_actor_debug
 
     atfile.say.debug "Getting latest release..."
     latest_release_record="$(com.atproto.repo.getRecord "$update_did" "self.atfile.latest" "self")"
