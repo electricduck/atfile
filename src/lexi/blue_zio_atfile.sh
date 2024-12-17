@@ -228,6 +228,9 @@ function blue.zio.atfile.finger__machine() {
                 machine_host="$(hostname)"
                 machine_os="Haiku $os_version"
                 ;;
+            "linux-mingw")
+                machine_host="$(hostname)"
+                ;;
             "linux-termux")
                 machine_os="Termux $TERMUX_VERSION"
                 ;;
