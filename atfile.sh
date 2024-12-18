@@ -49,7 +49,7 @@ year="$(date +%Y)"
 # Entry
 
 function atfile.devel.die() {
-    echo -e "\033[1;31mError: $1\033[0m"
+    echo -e "\033[1;31mError: $1\033[0m" >&2
     exit 255
 }
 

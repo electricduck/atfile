@@ -85,7 +85,6 @@ function atfile.update() {
             atfile.say.debug "Getting blob URL for $latest_version ($latest_version_record_id)..."
             blob_url="$(atfile.invoke.get_url $latest_version_record_id)"
             [[ $? != 0 ]] && atfile.die "Unable to get blob URL"
-            blob_url="$(echo -e "$blob_url" | tail -n 1)" # HACK: ATFILE_DEBUG=1 screws up output, so we'll `tail` for safety
 
             atfile.say.debug "Downloading latest release..."
             curl -H "User-Agent: $(atfile.util.get_uas)" -s -o "$temp_updated_path" "$blob_url"

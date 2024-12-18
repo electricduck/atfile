@@ -31,8 +31,13 @@ function atfile.say() {
     fi
     
     if [[ -n $prefix ]]; then
-        prefix_length=$(( ${#prefix} + 2 ))
-        prefix="${color_prefix}${prefix}: \033[0m"
+        if [[ $prefix == *":"* ]]; then
+            prefix_length=${#prefix}
+            prefix="${color_prefix}${prefix}\033[0m"
+        else
+            prefix_length=$(( ${#prefix} + 2 ))
+            prefix="${color_prefix}${prefix}: \033[0m"
+        fi
     fi
     
     message="$(echo "$message" | sed -e "s|\\\n|\\\n$(atfile.util.repeat_char " " $prefix_length)|g")"
@@ -42,9 +47,12 @@ function atfile.say() {
 
 function atfile.say.debug() {
     message="$1"
+    prefix="$2"
+
+    [[ -z "$prefix" ]] && prefix="Debug"
 
     if [[ $_debug == 1 ]]; then
-        atfile.say "$message" "Debug" 35 >&2
+        atfile.say "$message" "$prefix" 35 >&2
     fi
 }
 

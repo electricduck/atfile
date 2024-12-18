@@ -326,7 +326,7 @@ function atfile.invoke.handle_atfile() {
             [ -x "$(command -v xdg-open)" ] && \
             [ -x "$(command -v gtk-launch)" ]; then
 
-            [[ -z $file_type ]] && file_type="text/html" # HACK: Open with browser is file_type isn't set
+            [[ -z $file_type ]] && file_type="text/html" # HACK: Open with browser if $file_type isn't set
 
             if [[ -z $handler ]]; then
                 atfile.say.debug "Querying for handler '$file_type'..."
@@ -610,10 +610,6 @@ function atfile.invoke.print() {
     if [[ -n "$error" ]]; then
         atfile.die "Unable to cat '$key'" "$error"
     fi
-}
-
-function atfile.invoke.token() {
-    atfile.xrpc.pds.jwt
 }
 
 function atfile.invoke.toggle_desktop() {
