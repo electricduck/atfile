@@ -150,8 +150,10 @@ function dww.bot() {
     (( $dw_users_total > $dw_users_max )) && dw_users_max=$dw_users_total
     [[ $dw_dist == "."* ]] && dw_dist="0$dw_dist"
 
-    if (( $dw_users_total >= $dw_users_max )); then
+    if (( $dw_users_total > $dw_users_max )); then
         change_phrase="$(dww.util.get_change_phrase "high-score")"
+    elif (( $dw_users_total == $dw_users_max )); then
+        change_phrase="$(dww.util.get_change_phrase "steady")"
     elif (( $dw_users_active == $dw_users_active_prev )); then
         change_phrase="$(dww.util.get_change_phrase "steady")"
     elif (( $dw_users_active > $dw_users_active_prev )); then
