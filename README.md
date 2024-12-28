@@ -46,7 +46,7 @@ atfile help
     * [GnuPG (`gpg`)](https://gnupg.org) _(optional: needed for `upload-crypt`, `fetch-crypt`)_
     * [`jq`](https://jqlang.github.io/jq)
     * [MediaInfo (`mediainfo`)](https://mediaarea.net/en/MediaInfo) _(optional: set `ATFILE_SKIP_NI_MEDIAINFO=1` to ignore)_
-    * md5sum _(optional: set `ATFILE_SKIP_NI_MD5SUM=1` to ignore)_
+    * `md5sum` _(optional: set `ATFILE_SKIP_NI_MD5SUM=1` to ignore)_
         * Both GNU and BusyBox versions supported
     * [`websocat`](https://github.com/vi/websocat) _(optional: needed for `stream`)_
 * **PDS:** [Bluesky PDS](https://github.com/bluesky-social/pds)
