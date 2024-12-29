@@ -190,7 +190,7 @@ function atfile.util.get_cdn_uri() {
 }
 
 # TODO: Support BusyBox's shit `date` command
-#       `date -u +"$format" -s "1996-08-11 01:23:34"``
+#       `date -u +"$format" -s "1996-08-11 01:23:34"`
 function atfile.util.get_date() {
     date="$1"
     format="$2"
@@ -198,10 +198,12 @@ function atfile.util.get_date() {
 
     [[ -z $format ]] && format="%Y-%m-%dT%H:%M:%SZ"
 
-    if [[ $_os == "bsd-"* ]]; then
-        if [[ $date =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{3}){0,1})Z$ ]]; then
+    if [[ $date =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2})T([0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{3}){0,1})Z$ ]]; then
+        if [[ $_os == "bsd-"* ]]; then
             date="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
             in_format="%Y-%m-%d %H:%M:%S"
+        elif [[ $_os == "linux-musl" || $_os == "solaris" ]]; then
+            date="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
         fi
     fi
     
@@ -215,7 +217,7 @@ function atfile.util.get_date() {
         fi
     else
         if [[ $_os == "linux-musl" || $_os == "solaris" ]]; then
-            echo ""
+            date -u -d "$date"
         elif [[ $_os == "bsd-"* || $_os == "macos" ]]; then
             date -u -j -f "$in_format" "$date" +"$format"
         else
