@@ -61,6 +61,10 @@ ATFILE_DEVEL=1
 ATFILE_DEVEL_DIR="$(dirname "$(realpath "$0")")"
 ATFILE_DEVEL_ENTRY="$(realpath "$0")"
 
+if [ ! -x "$(command -v git)" ]; then
+    atfile.devel.die "'git' not installed (download: https://git-scm.com/downloads/linux)"
+fi
+
 git describe --exact-match --tags > /dev/null 2>&1
 [[ $? != 0 ]] && version+="+git.$(git rev-parse --short HEAD)"
 
